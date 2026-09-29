@@ -3,15 +3,27 @@ import { createClient } from '@supabase/supabase-js';
 // Cache client instance
 let supabaseInstance = null;
 
+const DEFAULT_SUPABASE_URL = 'https://wtrlpbumpwtauvxqwrrg.supabase.co';
+const DEFAULT_SUPABASE_KEY = 'sb_publishable_46vEMz8QI1UlU8ou_etYXw_YrheuDI2';
+
 export function getSupabaseCredentials() {
-  const envUrl = import.meta.env.VITE_SUPABASE_URL;
-  const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const envUrl =
+    import.meta.env.VITE_SUPABASE_URL ||
+    import.meta.env.SUPABASE_URL ||
+    import.meta.env.NEXT_PUBLIC_SUPABASE_URL;
 
-  const localUrl = localStorage.getItem('aura_supabase_url');
-  const localKey = localStorage.getItem('aura_supabase_key');
+  const envKey =
+    import.meta.env.VITE_SUPABASE_ANON_KEY ||
+    import.meta.env.SUPABASE_ANON_KEY ||
+    import.meta.env.VITE_SUPABASE_KEY ||
+    import.meta.env.SUPABASE_KEY ||
+    import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  const url = (localUrl && localUrl.trim()) || (envUrl && envUrl.trim()) || '';
-  const key = (localKey && localKey.trim()) || (envKey && envKey.trim()) || '';
+  const localUrl = localStorage.getItem('pulse_supabase_url') || localStorage.getItem('aura_supabase_url');
+  const localKey = localStorage.getItem('pulse_supabase_key') || localStorage.getItem('aura_supabase_key');
+
+  const url = (localUrl && localUrl.trim()) || (envUrl && envUrl.trim()) || DEFAULT_SUPABASE_URL;
+  const key = (localKey && localKey.trim()) || (envKey && envKey.trim()) || DEFAULT_SUPABASE_KEY;
 
   return { url, key };
 }

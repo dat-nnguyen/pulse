@@ -1,49 +1,46 @@
 /* ==========================================================================
-   AURA DESIGN SYSTEM — BESPOKE, NON-DERIVATIVE HIGH-FIDELITY AUDIO
+   AURA DESIGN SYSTEM — CLEAN, MINIMALIST, HIGH-FIDELITY AUDIO (NO GLOW)
    ========================================================================== */
 
 :root {
-  /* Aura Core Obsidian & Indigo Palette */
-  --aura-bg: #07090e;
-  --aura-bg-elevated: #0d121d;
-  --aura-surface-glass: rgba(17, 24, 39, 0.65);
-  --aura-surface-glass-hover: rgba(26, 36, 56, 0.75);
-  --aura-surface-solid: #131a29;
+  /* Crisp Obsidian & Slate Palette */
+  --aura-bg: #090c12;
+  --aura-bg-elevated: #0f141f;
+  --aura-surface: #141b29;
+  --aura-surface-hover: #1c2538;
+  --aura-surface-active: #243048;
   
-  /* Luminescent Accents */
-  --aura-cyan: #00f2fe;
-  --aura-blue: #4facfe;
-  --aura-violet: #7f00ff;
-  --aura-magenta: #f43f5e;
-  --aura-amber: #f59e0b;
-  --aura-emerald: #10b981;
-  --aura-gradient: linear-gradient(135deg, #00f2fe 0%, #4facfe 50%, #7f00ff 100%);
-  --aura-glow: 0 0 24px rgba(0, 242, 254, 0.35);
+  /* Crisp Solid Accents (No Glows) */
+  --aura-accent: #00d2df;
+  --aura-accent-hover: #00e5f4;
+  --aura-accent-muted: rgba(0, 210, 223, 0.12);
+  --aura-blue: #38bdf8;
+  --aura-violet: #818cf8;
 
   /* Typography Colors */
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
   --text-muted: #64748b;
-  --text-accent: #38bdf8;
 
-  /* Borders & Glass */
-  --border-glass: rgba(255, 255, 255, 0.08);
-  --border-glass-bright: rgba(255, 255, 255, 0.16);
+  /* Borders & Dividers (Clean Hairlines) */
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --border-accent: rgba(0, 210, 223, 0.35);
+
   --border-radius-pill: 9999px;
-  --border-radius-card: 16px;
-  --border-radius-modal: 24px;
+  --border-radius-card: 12px;
+  --border-radius-modal: 16px;
 
   /* Dimensions */
-  --nav-rail-width: 88px;
-  --desktop-sidebar-width: 280px;
-  --player-dock-height: 86px;
-  --mobile-nav-height: 64px;
-  --mobile-miniplayer-height: 62px;
+  --desktop-sidebar-width: 270px;
+  --player-dock-height: 82px;
+  --mobile-nav-height: 62px;
+  --mobile-miniplayer-height: 60px;
 
   --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-display: 'Outfit', 'Plus Jakarta Sans', sans-serif;
-  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
-  --transition-fast: all 0.2s var(--ease-spring);
+  --ease-clean: cubic-bezier(0.2, 0, 0, 1);
+  --transition-fast: all 0.15s var(--ease-clean);
 }
 
 /* Base Reset */
@@ -66,29 +63,17 @@ html, body, #root {
   user-select: none;
 }
 
-/* Subtle Ambient Cosmic Mesh Background */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background: 
-    radial-gradient(circle at 15% 20%, rgba(0, 242, 254, 0.04) 0%, transparent 40%),
-    radial-gradient(circle at 85% 75%, rgba(127, 0, 255, 0.05) 0%, transparent 45%);
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* Custom Sleek Scrollbar */
+/* Custom Minimal Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.16);
-  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
@@ -105,97 +90,90 @@ body::before {
   height: 100dvh;
   width: 100vw;
   overflow: hidden;
-  position: relative;
-  z-index: 1;
+  background: var(--aura-bg);
 }
 
 .aura-main-wrapper {
   display: flex;
   flex: 1;
   min-height: 0;
-  padding: 12px 14px 0 14px;
-  gap: 12px;
+  padding: 10px 10px 0 10px;
+  gap: 10px;
   overflow: hidden;
 }
 
 /* ==========================================================================
-   AURA BESPOKE NAVIGATION BAR (SIDEBAR)
+   SIDEBAR
    ========================================================================== */
 
 .aura-sidebar {
   width: var(--desktop-sidebar-width);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   flex-shrink: 0;
 }
 
 .aura-glass-card {
-  background: var(--aura-surface-glass);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
-  border: 1px solid var(--border-glass);
+  background: var(--aura-surface);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--border-radius-card);
   padding: 16px;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
 }
 
-/* Aura Logo Header */
+/* Brand Header */
 .aura-brand-header {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 4px 8px 16px 8px;
-  border-bottom: 1px solid var(--border-glass);
-  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 12px;
 }
 
 .aura-logo-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: var(--aura-gradient);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--aura-surface-active);
+  border: 1px solid var(--border-strong);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: var(--aura-glow);
 }
 
 .aura-brand-name {
   font-family: var(--font-display);
-  font-size: 19px;
+  font-size: 18px;
   font-weight: 800;
-  letter-spacing: -0.5px;
-  background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.3px;
+  color: #ffffff;
 }
 
 .aura-brand-tag {
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 1px;
+  letter-spacing: 0.8px;
   text-transform: uppercase;
-  color: var(--aura-cyan);
+  color: var(--aura-accent);
 }
 
 /* Navigation items */
 .aura-nav-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .aura-nav-btn {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
-  padding: 10px 14px;
-  border-radius: 12px;
+  padding: 9px 12px;
+  border-radius: 8px;
   background: transparent;
   border: 1px solid transparent;
   cursor: pointer;
@@ -206,19 +184,17 @@ body::before {
 
 .aura-nav-btn:hover {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--aura-surface-hover);
 }
 
 .aura-nav-btn.active {
   color: #ffffff;
-  background: rgba(0, 242, 254, 0.1);
-  border-color: rgba(0, 242, 254, 0.25);
-  box-shadow: 0 4px 16px rgba(0, 242, 254, 0.15);
+  background: var(--aura-surface-active);
+  border-color: var(--border-strong);
 }
 
 .aura-nav-btn.active svg {
-  color: var(--aura-cyan);
-  filter: drop-shadow(0 0 8px rgba(0, 242, 254, 0.5));
+  color: var(--aura-accent);
 }
 
 /* Library Shelf */
@@ -234,32 +210,32 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 8px 10px 8px;
+  padding: 0 6px 10px 6px;
 }
 
 .aura-shelf-title {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.5px;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   text-transform: uppercase;
 }
 
 .aura-shelf-chips {
   display: flex;
   gap: 6px;
-  padding: 0 6px 12px 6px;
+  padding: 0 4px 10px 4px;
   overflow-x: auto;
 }
 
 .aura-chip {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--aura-bg-elevated);
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
-  padding: 5px 12px;
+  padding: 4px 10px;
   border-radius: var(--border-radius-pill);
-  border: 1px solid var(--border-glass);
+  border: 1px solid var(--border-subtle);
   cursor: pointer;
   white-space: nowrap;
   transition: var(--transition-fast);
@@ -267,10 +243,9 @@ body::before {
 
 .aura-chip:hover,
 .aura-chip.active {
-  background: var(--aura-gradient);
-  color: #ffffff;
-  border-color: transparent;
-  box-shadow: 0 4px 12px rgba(79, 172, 254, 0.3);
+  background: var(--text-primary);
+  color: var(--aura-bg);
+  border-color: var(--text-primary);
 }
 
 .aura-library-scroll {
@@ -278,16 +253,16 @@ body::before {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding-right: 4px;
+  gap: 3px;
+  padding-right: 3px;
 }
 
 .aura-item-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 10px;
-  border-radius: 10px;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 8px;
   cursor: pointer;
   background: transparent;
   border: 1px solid transparent;
@@ -297,21 +272,21 @@ body::before {
 }
 
 .aura-item-row:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--aura-surface-hover);
 }
 
 .aura-item-row.active {
-  background: rgba(0, 242, 254, 0.08);
-  border-color: rgba(0, 242, 254, 0.2);
+  background: var(--aura-surface-active);
+  border-color: var(--border-subtle);
 }
 
 .aura-item-cover {
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
   object-fit: cover;
   flex-shrink: 0;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  background: var(--aura-surface-active);
 }
 
 .aura-item-info {
@@ -323,7 +298,7 @@ body::before {
 
 .aura-item-title {
   color: var(--text-primary);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -332,7 +307,7 @@ body::before {
 
 .aura-item-meta {
   color: var(--text-muted);
-  font-size: 11.5px;
+  font-size: 11px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -345,41 +320,37 @@ body::before {
 
 .aura-main-content {
   flex: 1;
-  background: var(--aura-surface-glass);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
-  border: 1px solid var(--border-glass);
+  background: var(--aura-surface);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--border-radius-card);
   display: flex;
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
   position: relative;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
 }
 
-/* Frosted Floating Top Bar */
+/* Top Bar */
 .aura-top-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 24px;
-  border-bottom: 1px solid var(--border-glass);
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border-subtle);
   position: sticky;
   top: 0;
   z-index: 20;
-  gap: 16px;
-  background: rgba(7, 9, 14, 0.6);
-  backdrop-filter: blur(20px);
+  gap: 14px;
+  background: var(--aura-surface);
 }
 
 .aura-circle-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border-glass);
-  color: var(--text-primary);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--aura-bg-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -388,43 +359,42 @@ body::before {
 }
 
 .aura-circle-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  transform: translateY(-1px);
+  color: var(--text-primary);
+  background: var(--aura-surface-hover);
+  border-color: var(--border-strong);
 }
 
 .aura-circle-btn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
-  transform: none;
 }
 
 .aura-search-bar {
   flex: 1;
-  max-width: 440px;
+  max-width: 400px;
   position: relative;
 }
 
 .aura-search-input {
   width: 100%;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border-glass);
+  background: var(--aura-bg-elevated);
+  border: 1px solid var(--border-subtle);
   color: var(--text-primary);
-  font-size: 14px;
-  padding: 10px 16px 10px 42px;
+  font-size: 13.5px;
+  padding: 8px 14px 8px 38px;
   border-radius: var(--border-radius-pill);
   outline: none;
   transition: var(--transition-fast);
 }
 
 .aura-search-input:focus {
-  border-color: var(--aura-cyan);
-  background: rgba(255, 255, 255, 0.09);
-  box-shadow: 0 0 16px rgba(0, 242, 254, 0.2);
+  border-color: var(--aura-accent);
+  background: var(--aura-surface-hover);
 }
 
 .aura-search-icon {
   position: absolute;
-  left: 14px;
+  left: 12px;
   top: 50%;
   transform: translateY(-50%);
   color: var(--text-muted);
@@ -434,83 +404,70 @@ body::before {
 .aura-badge-lossless {
   display: flex;
   align-items: center;
-  gap: 6px;
-  background: rgba(0, 242, 254, 0.08);
-  border: 1px solid rgba(0, 242, 254, 0.25);
-  color: var(--aura-cyan);
+  gap: 5px;
+  background: var(--aura-accent-muted);
+  border: 1px solid var(--border-accent);
+  color: var(--aura-accent);
   font-size: 11px;
   font-weight: 700;
-  padding: 6px 12px;
+  padding: 4px 10px;
   border-radius: var(--border-radius-pill);
   letter-spacing: 0.5px;
 }
 
 .aura-btn-primary {
-  background: var(--aura-gradient);
-  color: #ffffff;
+  background: var(--aura-accent);
+  color: #07090e;
   border: none;
   font-size: 13px;
   font-weight: 700;
-  padding: 8px 18px;
+  padding: 8px 16px;
   border-radius: var(--border-radius-pill);
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 8px;
-  box-shadow: 0 4px 16px rgba(0, 242, 254, 0.25);
+  gap: 7px;
   transition: var(--transition-fast);
 }
 
 .aura-btn-primary:hover {
-  transform: translateY(-1px) scale(1.02);
-  box-shadow: 0 6px 22px rgba(0, 242, 254, 0.4);
+  background: var(--aura-accent-hover);
 }
 
-/* Scrollable View Area */
+/* Scroll Area */
 .aura-scroll-area {
   flex: 1;
   overflow-y: auto;
-  padding: 24px 28px 48px 28px;
+  padding: 22px 24px 40px 24px;
 }
 
-/* Ambient Now Playing Spotlight Card */
+/* Clean Spotlight Card (No Glow/Bloom) */
 .aura-ambient-spotlight {
   display: flex;
   align-items: center;
-  gap: 28px;
-  padding: 28px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
-  border: 1px solid var(--border-glass-bright);
-  border-radius: 20px;
-  margin-bottom: 32px;
+  gap: 24px;
+  padding: 22px;
+  background: var(--aura-bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  margin-bottom: 28px;
   position: relative;
-  overflow: hidden;
 }
 
 .aura-spotlight-art-container {
-  width: 140px;
-  height: 140px;
-  border-radius: 14px;
+  width: 120px;
+  height: 120px;
+  border-radius: 10px;
   position: relative;
   flex-shrink: 0;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+  background: var(--aura-surface-active);
 }
 
 .aura-spotlight-art {
   width: 100%;
   height: 100%;
-  border-radius: 14px;
+  border-radius: 10px;
   object-fit: cover;
-}
-
-.aura-spotlight-bloom {
-  position: absolute;
-  inset: -15px;
-  border-radius: 28px;
-  background-size: cover;
-  background-position: center;
-  filter: blur(28px) opacity(0.6);
-  z-index: -1;
 }
 
 .aura-spotlight-info {
@@ -522,32 +479,32 @@ body::before {
 
 .aura-spotlight-title {
   font-family: var(--font-display);
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 800;
-  letter-spacing: -0.5px;
-  margin-bottom: 6px;
+  letter-spacing: -0.4px;
+  margin-bottom: 4px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .aura-spotlight-artist {
-  font-size: 16px;
+  font-size: 15px;
   color: var(--text-secondary);
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
-/* Sections */
+/* Section Header */
 .aura-section-header {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  margin: 32px 0 18px 0;
+  margin: 28px 0 16px 0;
 }
 
 .aura-section-title {
   font-family: var(--font-display);
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 800;
   letter-spacing: -0.3px;
   color: var(--text-primary);
@@ -555,15 +512,15 @@ body::before {
 
 .aura-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
 }
 
 .aura-media-card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--border-glass);
-  padding: 14px;
-  border-radius: 16px;
+  background: var(--aura-bg-elevated);
+  border: 1px solid var(--border-subtle);
+  padding: 12px;
+  border-radius: 12px;
   cursor: pointer;
   transition: var(--transition-fast);
   position: relative;
@@ -572,50 +529,42 @@ body::before {
 }
 
 .aura-media-card:hover {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.18);
-  transform: translateY(-3px);
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.4);
+  background: var(--aura-surface-hover);
+  border-color: var(--border-strong);
 }
 
 .aura-card-art-box {
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 10px;
+  border-radius: 8px;
   position: relative;
   overflow: hidden;
-  margin-bottom: 12px;
-  background: var(--aura-surface-solid);
+  margin-bottom: 10px;
+  background: var(--aura-surface-active);
 }
 
 .aura-card-art {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.3s ease;
-}
-
-.aura-media-card:hover .aura-card-art {
-  transform: scale(1.04);
 }
 
 .aura-card-floating-play {
   position: absolute;
-  right: 10px;
-  bottom: 10px;
-  width: 44px;
-  height: 44px;
+  right: 8px;
+  bottom: 8px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
-  background: var(--aura-gradient);
-  color: #ffffff;
+  background: var(--aura-accent);
+  color: #07090e;
   border: none;
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transform: translateY(8px);
+  transform: translateY(4px);
   transition: var(--transition-fast);
-  box-shadow: 0 8px 20px rgba(0, 242, 254, 0.4);
   cursor: pointer;
 }
 
@@ -625,17 +574,17 @@ body::before {
 }
 
 .aura-card-title {
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 700;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-bottom: 3px;
+  margin-bottom: 2px;
 }
 
 .aura-card-subtitle {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -643,39 +592,34 @@ body::before {
 }
 
 /* ==========================================================================
-   FLOATING GLASS PLAYER DOCK (DESKTOP)
+   MATTE DOCK PLAYER BAR (DESKTOP, NO GLOW)
    ========================================================================== */
 
 .aura-player-dock {
   height: var(--player-dock-height);
-  background: rgba(13, 18, 29, 0.85);
-  backdrop-filter: blur(32px);
-  -webkit-backdrop-filter: blur(32px);
-  border: 1px solid var(--border-glass-bright);
-  border-radius: 20px;
-  margin: 10px 14px;
-  padding: 0 20px;
+  background: var(--aura-surface);
+  border-top: 1px solid var(--border-subtle);
+  padding: 0 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   z-index: 30;
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.6);
 }
 
 .aura-dock-left {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   width: 28%;
   min-width: 180px;
 }
 
 .aura-dock-cover {
-  width: 52px;
-  height: 52px;
-  border-radius: 10px;
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
   object-fit: cover;
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5);
+  background: var(--aura-surface-active);
 }
 
 .aura-dock-info {
@@ -686,7 +630,7 @@ body::before {
 
 .aura-dock-title {
   color: var(--text-primary);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
@@ -695,7 +639,7 @@ body::before {
 
 .aura-dock-artist {
   color: var(--text-muted);
-  font-size: 11.5px;
+  font-size: 11px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -707,14 +651,14 @@ body::before {
   flex-direction: column;
   align-items: center;
   width: 44%;
-  max-width: 680px;
+  max-width: 640px;
 }
 
 .aura-dock-controls {
   display: flex;
   align-items: center;
-  gap: 18px;
-  margin-bottom: 6px;
+  gap: 16px;
+  margin-bottom: 5px;
 }
 
 .aura-control-btn {
@@ -725,57 +669,53 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 6px;
-  border-radius: 50%;
+  padding: 5px;
+  border-radius: 6px;
   transition: var(--transition-fast);
 }
 
 .aura-control-btn:hover {
   color: var(--text-primary);
-  transform: scale(1.08);
 }
 
 .aura-control-btn.active {
-  color: var(--aura-cyan);
-  filter: drop-shadow(0 0 6px rgba(0, 242, 254, 0.4));
+  color: var(--aura-accent);
 }
 
 .aura-play-btn {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  background: var(--aura-gradient);
-  color: #ffffff;
+  background: var(--text-primary);
+  color: var(--aura-bg);
   border: none;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 4px 16px rgba(0, 242, 254, 0.35);
   transition: var(--transition-fast);
 }
 
 .aura-play-btn:hover {
-  transform: scale(1.08);
-  box-shadow: 0 6px 20px rgba(0, 242, 254, 0.5);
+  background: #ffffff;
 }
 
 .aura-dock-timeline {
   display: flex;
   align-items: center;
   width: 100%;
-  gap: 10px;
+  gap: 8px;
 }
 
 .aura-time-label {
   font-size: 11px;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
-  width: 34px;
+  width: 32px;
   text-align: center;
 }
 
-/* Custom Aura Glowing Scrubber */
+/* Custom Matte Scrubber */
 .aura-scrubber {
   flex: 1;
   -webkit-appearance: none;
@@ -790,55 +730,53 @@ body::before {
 .aura-scrubber::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: #ffffff;
-  box-shadow: 0 0 8px rgba(0, 242, 254, 0.8);
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition: opacity 0.1s ease;
 }
 
 .aura-scrubber:hover::-webkit-slider-thumb {
   opacity: 1;
-  transform: scale(1.1);
 }
 
 .aura-dock-right {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 10px;
   width: 28%;
   min-width: 180px;
 }
 
-/* Live mini visualizer bars inside dock */
+/* Clean mini waveform */
 .aura-dock-waveform {
   display: flex;
   align-items: flex-end;
-  gap: 2.5px;
-  height: 16px;
-  padding: 0 6px;
+  gap: 2px;
+  height: 14px;
+  padding: 0 4px;
 }
 
 .aura-wave-bar {
-  width: 2.5px;
-  background: var(--aura-cyan);
+  width: 2px;
+  background: var(--aura-accent);
   border-radius: 1px;
-  animation: wavePulse 0.9s infinite ease-in-out alternate;
+  animation: wavePulse 0.8s infinite ease-in-out alternate;
 }
 
-.aura-wave-bar:nth-child(1) { height: 6px; animation-delay: 0.1s; }
-.aura-wave-bar:nth-child(2) { height: 16px; animation-delay: 0.3s; }
-.aura-wave-bar:nth-child(3) { height: 10px; animation-delay: 0.15s; }
-.aura-wave-bar:nth-child(4) { height: 14px; animation-delay: 0.4s; }
-.aura-wave-bar:nth-child(5) { height: 8px; animation-delay: 0.25s; }
+.aura-wave-bar:nth-child(1) { height: 5px; animation-delay: 0.1s; }
+.aura-wave-bar:nth-child(2) { height: 14px; animation-delay: 0.3s; }
+.aura-wave-bar:nth-child(3) { height: 9px; animation-delay: 0.15s; }
+.aura-wave-bar:nth-child(4) { height: 12px; animation-delay: 0.4s; }
+.aura-wave-bar:nth-child(5) { height: 7px; animation-delay: 0.25s; }
 
 @keyframes wavePulse {
   0% { height: 3px; }
-  100% { height: 16px; }
+  100% { height: 14px; }
 }
 
 /* ==========================================================================
@@ -871,17 +809,15 @@ body::before {
     display: none;
   }
 
-  /* Android & iOS Thumb-Friendly Bottom Navigation */
+  /* Android & iOS Bottom Nav */
   .aura-mobile-nav {
     display: flex;
     height: var(--mobile-nav-height);
-    background: rgba(7, 9, 14, 0.92);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border-top: 1px solid var(--border-glass);
+    background: var(--aura-surface);
+    border-top: 1px solid var(--border-subtle);
     align-items: center;
     justify-content: space-around;
-    padding-bottom: max(env(safe-area-inset-bottom), 10px);
+    padding-bottom: max(env(safe-area-inset-bottom), 8px);
     z-index: 40;
   }
 
@@ -897,43 +833,37 @@ body::before {
     font-weight: 600;
     cursor: pointer;
     padding: 6px 12px;
-    border-radius: 12px;
-    transition: var(--transition-fast);
   }
 
   .aura-mobile-tab.active {
-    color: #ffffff;
+    color: var(--text-primary);
   }
 
   .aura-mobile-tab.active svg {
-    color: var(--aura-cyan);
-    filter: drop-shadow(0 0 6px rgba(0, 242, 254, 0.4));
+    color: var(--aura-accent);
   }
 
-  /* Floating Miniplayer for Mobile & Android */
+  /* Clean Miniplayer */
   .aura-mobile-miniplayer {
     display: flex;
     align-items: center;
     justify-content: space-between;
     height: var(--mobile-miniplayer-height);
-    background: rgba(18, 24, 38, 0.88);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border: 1px solid var(--border-glass-bright);
-    border-radius: 16px;
-    margin: 0 10px 10px 10px;
-    padding: 6px 14px;
+    background: var(--aura-bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    margin: 0 8px 8px 8px;
+    padding: 6px 12px;
     position: fixed;
     bottom: var(--mobile-nav-height);
     left: 0;
     right: 0;
     z-index: 35;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
   }
 }
 
 /* ==========================================================================
-   FULLSCREEN MOBILE PLAYER (SWIPE/TAP TO EXPAND)
+   FULLSCREEN MOBILE PLAYER (NO GLOW)
    ========================================================================== */
 
 .aura-fullscreen-overlay {
@@ -943,39 +873,88 @@ body::before {
   background: var(--aura-bg);
   display: flex;
   flex-direction: column;
-  padding: max(env(safe-area-inset-top), 24px) 24px max(env(safe-area-inset-bottom), 32px) 24px;
+  padding: max(env(safe-area-inset-top), 20px) 20px max(env(safe-area-inset-bottom), 24px) 20px;
   overflow-y: auto;
-  animation: auraSlideUp 0.35s var(--ease-spring);
-}
-
-@keyframes auraSlideUp {
-  from { transform: translateY(100%); opacity: 0.8; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-.aura-fullscreen-backdrop-art {
-  position: absolute;
-  inset: 0;
-  background-size: cover;
-  background-position: center;
-  filter: blur(90px) brightness(0.25);
-  opacity: 0.7;
-  z-index: -1;
 }
 
 .aura-art-frame {
   width: 100%;
   aspect-ratio: 1;
-  max-width: 360px;
-  margin: 0 auto 32px auto;
-  border-radius: 20px;
+  max-width: 340px;
+  margin: 0 auto 28px auto;
+  border-radius: 14px;
   overflow: hidden;
-  position: relative;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+  background: var(--aura-surface);
+  border: 1px solid var(--border-subtle);
 }
 
 .aura-art-frame img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* ==========================================================================
+   MODALS (EQUALIZER, QUEUE, SHARE)
+   ========================================================================== */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modal-surface {
+  background: var(--aura-surface);
+  border-radius: var(--border-radius-modal);
+  width: 100%;
+  max-width: 520px;
+  padding: 22px;
+  border: 1px solid var(--border-subtle);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Synced Lyrics */
+.lyrics-container {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 30px 10px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.lyric-line {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.35);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.lyric-line.active {
+  color: #ffffff;
+  font-size: 28px;
+}
+
+.lyric-line.past {
+  color: rgba(255, 255, 255, 0.65);
 }

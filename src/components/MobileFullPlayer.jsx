@@ -49,14 +49,6 @@ export default function MobileFullPlayer({
 
   return (
     <div className="aura-fullscreen-overlay">
-      {/* Dynamic Ambient Background Blur */}
-      <div
-        className="aura-fullscreen-backdrop-art"
-        style={{
-          backgroundImage: `url(${currentTrack.coverUrl || ''})`,
-        }}
-      />
-
       {/* Top Header: Down Chevron, Title, Share */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
         <button
@@ -180,21 +172,20 @@ export default function MobileFullPlayer({
 
         <button
           style={{
-            width: 64,
-            height: 64,
+            width: 60,
+            height: 60,
             borderRadius: '50%',
-            background: 'var(--aura-gradient)',
+            background: 'var(--text-primary)',
             border: 'none',
-            color: '#ffffff',
+            color: 'var(--aura-bg)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            boxShadow: '0 8px 24px rgba(0, 242, 254, 0.4)',
           }}
           onClick={onTogglePlay}
         >
-          {isPlaying ? <Pause size={30} fill="#ffffff" /> : <Play size={30} fill="#ffffff" style={{ marginLeft: 3 }} />}
+          {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" style={{ marginLeft: 3 }} />}
         </button>
 
         <button className="aura-control-btn" onClick={onNext}>

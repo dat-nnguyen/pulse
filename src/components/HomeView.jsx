@@ -26,10 +26,6 @@ export default function HomeView({
               alt={currentTrack.title}
               className="aura-spotlight-art"
             />
-            <div
-              className="aura-spotlight-bloom"
-              style={{ backgroundImage: `url(${currentTrack.coverUrl})` }}
-            />
           </div>
 
           <div className="aura-spotlight-info">
@@ -69,37 +65,37 @@ export default function HomeView({
       )}
 
       {/* Quick Listening Modes */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginBottom: 36 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 32 }}>
         <div
           className="aura-glass-card"
           style={{
             cursor: 'pointer',
-            padding: 16,
+            padding: 14,
             display: 'flex',
             alignItems: 'center',
-            gap: 14,
-            background: 'linear-gradient(135deg, rgba(127, 0, 255, 0.15) 0%, rgba(244, 63, 94, 0.08) 100%)',
-            border: '1px solid rgba(127, 0, 255, 0.25)',
+            gap: 12,
+            background: 'var(--aura-bg-elevated)',
+            border: '1px solid var(--border-subtle)',
           }}
           onClick={() => onPlayPlaylist('liked')}
         >
           <div
             style={{
-              width: 44,
-              height: 44,
-              borderRadius: 12,
-              background: 'linear-gradient(135deg, #7f00ff, #f43f5e)',
+              width: 40,
+              height: 40,
+              borderRadius: 8,
+              background: 'var(--aura-surface-active)',
+              border: '1px solid var(--border-strong)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 14px rgba(244, 63, 94, 0.35)',
             }}
           >
-            <Heart size={20} fill="#ffffff" color="#ffffff" />
+            <Heart size={18} fill="#f43f5e" color="#f43f5e" />
           </div>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc' }}>Favorites Lounge</div>
-            <div style={{ fontSize: 12, color: '#94a3b8' }}>{likedCount} saved tracks</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc' }}>Favorites Lounge</div>
+            <div style={{ fontSize: 11.5, color: '#94a3b8' }}>{likedCount} saved tracks</div>
           </div>
         </div>
 
@@ -107,32 +103,32 @@ export default function HomeView({
           className="aura-glass-card"
           style={{
             cursor: 'pointer',
-            padding: 16,
+            padding: 14,
             display: 'flex',
             alignItems: 'center',
-            gap: 14,
-            background: 'linear-gradient(135deg, rgba(0, 242, 254, 0.15) 0%, rgba(79, 172, 254, 0.08) 100%)',
-            border: '1px solid rgba(0, 242, 254, 0.25)',
+            gap: 12,
+            background: 'var(--aura-bg-elevated)',
+            border: '1px solid var(--border-subtle)',
           }}
           onClick={() => onPlayPlaylist('downloaded')}
         >
           <div
             style={{
-              width: 44,
-              height: 44,
-              borderRadius: 12,
-              background: 'linear-gradient(135deg, #00f2fe, #4facfe)',
+              width: 40,
+              height: 40,
+              borderRadius: 8,
+              background: 'var(--aura-surface-active)',
+              border: '1px solid var(--border-strong)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 14px rgba(0, 242, 254, 0.35)',
             }}
           >
-            <HardDriveDownload size={20} color="#ffffff" />
+            <HardDriveDownload size={18} color="#00d2df" />
           </div>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc' }}>Offline Vault</div>
-            <div style={{ fontSize: 12, color: '#94a3b8' }}>{offlineTracks.length} local lossless songs</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc' }}>Offline Vault</div>
+            <div style={{ fontSize: 11.5, color: '#94a3b8' }}>{offlineTracks.length} local lossless songs</div>
           </div>
         </div>
 
@@ -140,32 +136,32 @@ export default function HomeView({
           className="aura-glass-card"
           style={{
             cursor: 'pointer',
-            padding: 16,
+            padding: 14,
             display: 'flex',
             alignItems: 'center',
-            gap: 14,
-            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.08) 100%)',
-            border: '1px solid rgba(16, 185, 129, 0.25)',
+            gap: 12,
+            background: 'var(--aura-bg-elevated)',
+            border: '1px solid var(--border-subtle)',
           }}
           onClick={onOpenDownloader}
         >
           <div
             style={{
-              width: 44,
-              height: 44,
-              borderRadius: 12,
-              background: 'linear-gradient(135deg, #10b981, #059669)',
+              width: 40,
+              height: 40,
+              borderRadius: 8,
+              background: 'var(--aura-surface-active)',
+              border: '1px solid var(--border-strong)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
             }}
           >
-            <Radio size={20} color="#ffffff" />
+            <Radio size={18} color="#10b981" />
           </div>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc' }}>Sound Ingest</div>
-            <div style={{ fontSize: 12, color: '#94a3b8' }}>Fetch YouTube, Podcasts & Files</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc' }}>Sound Ingest</div>
+            <div style={{ fontSize: 11.5, color: '#94a3b8' }}>Fetch YouTube, Podcasts & Files</div>
           </div>
         </div>
       </div>

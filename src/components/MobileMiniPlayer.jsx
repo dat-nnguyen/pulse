@@ -73,24 +73,23 @@ export default function MobileMiniPlayer({
 
         <button
           style={{
-            width: 38,
-            height: 38,
+            width: 36,
+            height: 36,
             borderRadius: '50%',
-            background: 'var(--aura-gradient)',
+            background: 'var(--text-primary)',
             border: 'none',
-            color: '#ffffff',
+            color: 'var(--aura-bg)',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 12px rgba(0, 242, 254, 0.3)',
           }}
           onClick={(e) => {
             e.stopPropagation();
             onTogglePlay();
           }}
         >
-          {isPlaying ? <Pause size={18} fill="#ffffff" /> : <Play size={18} fill="#ffffff" style={{ marginLeft: 2 }} />}
+          {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" style={{ marginLeft: 2 }} />}
         </button>
 
         <button

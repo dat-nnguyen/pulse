@@ -59,13 +59,13 @@ export default function TopBar({
               height: 28,
               borderRadius: 8,
               background: '#0e1420',
-              border: '1px solid rgba(0, 210, 223, 0.3)',
+              border: '1px solid var(--pulse-accent-border)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            <Activity size={16} color="#00d2df" />
+            <Activity size={16} color="var(--pulse-accent)" />
           </div>
           <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.02em', color: '#f8fafc' }}>
             PULSE
@@ -100,8 +100,8 @@ export default function TopBar({
                 width: 20,
                 height: 20,
                 borderRadius: '50%',
-                background: '#00d2df',
-                color: '#080a10',
+                background: 'var(--pulse-accent)',
+                color: 'var(--pulse-bg)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -170,7 +170,7 @@ export default function TopBar({
           title={isCloudConnected ? "Supabase Cloud: Connected" : "Connect Supabase Cloud"}
           style={{ width: 34, height: 34, position: 'relative' }}
         >
-          <Database size={15} color={isCloudConnected ? "#00d2df" : "inherit"} />
+          <Database size={15} color={isCloudConnected ? "var(--pulse-accent)" : "inherit"} />
           {isCloudConnected && (
             <span
               style={{
@@ -180,7 +180,7 @@ export default function TopBar({
                 width: 5,
                 height: 5,
                 borderRadius: '50%',
-                background: '#00d2df',
+                background: 'var(--pulse-accent)',
               }}
             />
           )}

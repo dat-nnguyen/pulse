@@ -47,14 +47,14 @@ export default function HomeView({
             style={{
               fontSize: 28,
               fontWeight: 800,
-              color: '#f8fafc',
+              color: 'var(--text-primary)',
               margin: 0,
               letterSpacing: '-0.02em',
             }}
           >
             Your Playlists
           </h1>
-          <p style={{ margin: '6px 0 0 0', fontSize: 13.5, color: '#94a3b8' }}>
+          <p style={{ margin: '6px 0 0 0', fontSize: 13.5, color: 'var(--text-secondary)' }}>
             {playlists.length + 2} collections • {tracks.length} lossless & original tracks
           </p>
         </div>
@@ -119,15 +119,15 @@ export default function HomeView({
             <Heart size={26} fill="#ffffff" color="#ffffff" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#f8fafc' }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
               Favorites
             </div>
-            <div style={{ fontSize: 12.5, color: '#94a3b8', marginTop: 2 }}>
+            <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 2 }}>
               {likedCount} liked tracks
             </div>
           </div>
           <div className="aura-card-play-btn" title="Open Favorites">
-            <ArrowRight size={18} color="#00d2df" />
+            <ArrowRight size={18} color="var(--pulse-accent)" />
           </div>
         </div>
 
@@ -161,15 +161,15 @@ export default function HomeView({
             <HardDriveDownload size={26} color="#ffffff" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#f8fafc' }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
               Offline Storage
             </div>
-            <div style={{ fontSize: 12.5, color: '#94a3b8', marginTop: 2 }}>
+            <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 2 }}>
               {offlineTracks.length} cached tracks
             </div>
           </div>
           <div className="aura-card-play-btn" title="Open Offline">
-            <ArrowRight size={18} color="#00d2df" />
+            <ArrowRight size={18} color="var(--pulse-accent)" />
           </div>
         </div>
 
@@ -203,15 +203,15 @@ export default function HomeView({
             <Music size={26} color="#ffffff" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#f8fafc' }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
               All Tracks
             </div>
-            <div style={{ fontSize: 12.5, color: '#94a3b8', marginTop: 2 }}>
+            <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 2 }}>
               {tracks.length} total tracks
             </div>
           </div>
           <div className="aura-card-play-btn" title="Open All Tracks">
-            <ArrowRight size={18} color="#00d2df" />
+            <ArrowRight size={18} color="var(--pulse-accent)" />
           </div>
         </div>
       </div>
@@ -226,10 +226,10 @@ export default function HomeView({
             marginBottom: 20,
           }}
         >
-          <h2 style={{ fontSize: 20, fontWeight: 700, color: '#f8fafc', margin: 0 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
             Custom Playlists
           </h2>
-          <span style={{ fontSize: 13, color: '#94a3b8' }}>
+          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
             {playlists.length} custom {playlists.length === 1 ? 'playlist' : 'playlists'}
           </span>
         </div>
@@ -273,12 +273,12 @@ export default function HomeView({
                 marginBottom: 12,
               }}
             >
-              <Plus size={22} color="#00d2df" />
+              <Plus size={22} color="var(--pulse-accent)" />
             </div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
               Create Playlist
             </div>
-            <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
               Build a custom collection
             </div>
           </div>
@@ -333,10 +333,10 @@ export default function HomeView({
                 )}
               </div>
 
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {pl.name}
               </div>
-              <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 3 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 3 }}>
                 {pl.trackIds?.length || 0} {pl.trackIds?.length === 1 ? 'track' : 'tracks'}
               </div>
             </div>

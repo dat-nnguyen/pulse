@@ -39,7 +39,7 @@ export default function Sidebar({
       <div className="aura-glass-card">
         <div className="aura-brand-header">
           <div className="aura-logo-icon">
-            <Activity size={20} color="#00d2df" />
+            <Activity size={20} color="var(--pulse-accent)" />
           </div>
           <div>
             <div className="aura-brand-name">PULSE</div>
@@ -91,7 +91,7 @@ export default function Sidebar({
               setSelectedPlaylistId(null);
             }}
           >
-            <Disc3 size={17} color="#00d2df" />
+            <Disc3 size={17} color="var(--pulse-accent)" />
             <span className="aura-shelf-title">Your Playlists</span>
           </button>
 
@@ -118,7 +118,7 @@ export default function Sidebar({
               title={isCloudConnected ? "Supabase Cloud: Connected" : "Supabase Cloud Sync"}
               onClick={onOpenSupabase}
             >
-              <Database size={13} color={isCloudConnected ? "#00d2df" : "inherit"} />
+              <Database size={13} color={isCloudConnected ? "var(--pulse-accent)" : "inherit"} />
               {isCloudConnected && (
                 <span
                   style={{
@@ -128,7 +128,7 @@ export default function Sidebar({
                     width: 5,
                     height: 5,
                     borderRadius: '50%',
-                    background: '#00d2df',
+                    background: 'var(--pulse-accent)',
                   }}
                 />
               )}
@@ -276,8 +276,8 @@ export default function Sidebar({
                   width: 24,
                   height: 24,
                   borderRadius: '50%',
-                  background: '#00d2df',
-                  color: '#080a10',
+                  background: 'var(--pulse-accent)',
+                  color: 'var(--pulse-bg)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',

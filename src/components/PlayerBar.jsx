@@ -113,8 +113,8 @@ export default function PlayerBar({
           </>
         ) : (
           <div className="aura-dock-info">
-            <span className="aura-dock-title" style={{ color: '#64748b' }}>Pulse Audio</span>
-            <span className="aura-dock-artist">Select a track to start listening</span>
+            <span className="aura-dock-title" style={{ color: 'var(--text-muted)' }}>Pulse Audio</span>
+            <span className="aura-dock-artist">Select a track to play</span>
           </div>
         )}
       </div>
@@ -166,7 +166,7 @@ export default function PlayerBar({
             onChange={(e) => onSeek(parseFloat(e.target.value))}
             className="aura-scrubber"
             style={{
-              background: `linear-gradient(to right, #00d2df 0%, #00d2df ${progressPercent}%, rgba(255, 255, 255, 0.12) ${progressPercent}%, rgba(255, 255, 255, 0.12) 100%)`,
+              background: `linear-gradient(to right, var(--pulse-accent) 0%, var(--pulse-accent) ${progressPercent}%, rgba(255, 255, 255, 0.12) ${progressPercent}%, rgba(255, 255, 255, 0.12) 100%)`,
             }}
           />
           <span className="aura-time-label">{formatTime(duration)}</span>

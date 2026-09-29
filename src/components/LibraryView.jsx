@@ -154,7 +154,7 @@ export default function LibraryView({
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 0 }}>
-          <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5, color: '#00d2df' }}>
+          <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5, color: 'var(--pulse-accent)' }}>
             Playlist
           </span>
           <h1
@@ -360,7 +360,7 @@ export default function LibraryView({
                         <div className="track-cell-info">
                           <div
                             className="track-cell-title"
-                            style={{ color: isCurrent ? '#00d2df' : 'inherit' }}
+                            style={{ color: isCurrent ? 'var(--pulse-accent)' : 'inherit' }}
                           >
                             {track.title}
                           </div>

@@ -35,7 +35,7 @@ export default function MobileMiniPlayer({
           style={{
             height: '100%',
             width: `${progressPercent}%`,
-            background: '#00d2df',
+            background: 'var(--pulse-accent)',
             transition: 'width 0.1s linear',
           }}
         />

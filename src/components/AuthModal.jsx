@@ -83,7 +83,7 @@ export default function AuthModal({ isOpen, onClose, user, onAuthSuccess }) {
                 justifyContent: 'center',
               }}
             >
-              <User size={18} color="#00d2df" />
+              <User size={18} color="var(--pulse-accent)" />
             </div>
             <div>
               <h2 className="modal-title">{user ? 'Account & Device Sync' : 'Account Login'}</h2>
@@ -115,7 +115,7 @@ export default function AuthModal({ isOpen, onClose, user, onAuthSuccess }) {
                     width: 44,
                     height: 44,
                     borderRadius: '50%',
-                    background: '#00d2df',
+                    background: 'var(--pulse-accent)',
                     color: '#080a10',
                     display: 'flex',
                     alignItems: 'center',

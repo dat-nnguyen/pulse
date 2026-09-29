@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Sliders, Volume2, Sparkles, RefreshCw } from 'lucide-react';
+import { X, Sliders, Sparkles, RefreshCw } from 'lucide-react';
 import { audioEngine } from '../services/audioEngine';
 
 const PRESETS = {
@@ -78,8 +78,8 @@ export default function EqualizerModal({ isOpen, onClose }) {
       for (let i = 0; i < freqData.length; i++) {
         const barHeight = (freqData[i] / 255) * canvas.height;
         const grad = ctx.createLinearGradient(0, canvas.height, 0, 0);
-        grad.addColorStop(0, '#1ed760');
-        grad.addColorStop(1, '#1fdf64');
+        grad.addColorStop(0, '#00c2d1');
+        grad.addColorStop(1, '#00d8e8');
 
         ctx.fillStyle = grad;
         ctx.fillRect(x, canvas.height - barHeight, barWidth - 2, barHeight);
@@ -98,54 +98,50 @@ export default function EqualizerModal({ isOpen, onClose }) {
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-surface" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 580 }}>
+      <div className="modal-surface" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
         {/* Header */}
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Sliders size={22} color="#1ed760" />
-            <h2 className="modal-title">Audio Equalizer & Master</h2>
+            <Sliders size={20} color="var(--pulse-accent)" />
+            <h2 className="modal-title">Equalizer</h2>
           </div>
-          <button className="top-bar-circle-btn" onClick={onClose}>
-            <X size={18} />
+          <button className="aura-circle-btn" onClick={onClose} style={{ width: 30, height: 30 }}>
+            <X size={16} />
           </button>
         </div>
 
-        {/* Real-time spectrum visualizer canvas */}
-        <div style={{ marginBottom: 20, background: '#181818', borderRadius: 8, padding: 12, textAlign: 'center' }}>
+        {/* Real-time spectrum visualizer */}
+        <div className="eq-visualizer-box">
           <canvas
             ref={canvasRef}
             width={480}
-            height={80}
-            style={{ width: '100%', height: 80, display: 'block' }}
+            height={70}
+            style={{ width: '100%', height: 70, display: 'block' }}
           />
-          <div style={{ fontSize: 11, color: '#727272', marginTop: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-            <Sparkles size={11} color="#1ed760" />
-            <span>Real-time Web Audio API Hardware Acceleration</span>
+          <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+            <Sparkles size={10} color="var(--pulse-accent)" />
+            <span>Real-time Web Audio API</span>
           </div>
         </div>
 
-        {/* Presets Pills */}
-        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 12, marginBottom: 16 }}>
+        {/* Presets */}
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 10, marginBottom: 14 }}>
           {Object.keys(PRESETS).map((p) => (
             <button
               key={p}
-              className={`sidebar-filter-pill ${activePreset === p ? 'active' : ''}`}
+              className={`aura-chip ${activePreset === p ? 'active' : ''}`}
               onClick={() => handleSelectPreset(p)}
-              style={{ fontSize: 12 }}
             >
               {p}
             </button>
           ))}
         </div>
 
-        {/* 5-Band Slider Bars */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, margin: '24px 0' }}>
+        {/* 5-Band Sliders */}
+        <div className="eq-band-grid">
           {BANDS.map((band, idx) => (
-            <div
-              key={band.label}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}
-            >
-              <span style={{ fontSize: 11, color: '#1ed760', fontWeight: 700 }}>
+            <div key={band.label} className="eq-band-item">
+              <span className="eq-band-value">
                 {bandValues[idx] > 0 ? `+${bandValues[idx]}` : bandValues[idx]} dB
               </span>
               <input
@@ -155,25 +151,20 @@ export default function EqualizerModal({ isOpen, onClose }) {
                 step="0.5"
                 value={bandValues[idx]}
                 onChange={(e) => handleBandChange(idx, e.target.value)}
-                style={{
-                  writingMode: 'bt-lr',
-                  WebkitAppearance: 'slider-vertical',
-                  width: 8,
-                  height: 120,
-                  cursor: 'pointer',
-                }}
+                className="eq-vertical-slider"
+                orient="vertical"
               />
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#ffffff' }}>{band.label}</span>
-              <span style={{ fontSize: 10, color: '#727272' }}>{band.sub}</span>
+              <span className="eq-band-label">{band.label}</span>
+              <span className="eq-band-sublabel">{band.sub}</span>
             </div>
           ))}
         </div>
 
-        {/* Bass Boost Slider */}
-        <div style={{ background: '#181818', padding: 14, borderRadius: 8, marginBottom: 20 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13, fontWeight: 600 }}>
-            <span>Bass Boost</span>
-            <span style={{ color: '#1ed760' }}>+{bassBoost} dB</span>
+        {/* Bass Boost */}
+        <div className="eq-bass-box">
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12.5, fontWeight: 600 }}>
+            <span style={{ color: 'var(--text-primary)' }}>Bass Boost</span>
+            <span style={{ color: 'var(--pulse-accent)' }}>+{bassBoost} dB</span>
           </div>
           <input
             type="range"
@@ -182,8 +173,12 @@ export default function EqualizerModal({ isOpen, onClose }) {
             step="0.5"
             value={bassBoost}
             onChange={(e) => handleBassBoostChange(e.target.value)}
-            className="custom-range-slider"
-            style={{ width: '100%' }}
+            className="aura-scrubber"
+            style={{
+              width: '100%',
+              height: 5,
+              background: `linear-gradient(to right, var(--pulse-accent) 0%, var(--pulse-accent) ${(bassBoost / 12) * 100}%, rgba(255,255,255,0.1) ${(bassBoost / 12) * 100}%, rgba(255,255,255,0.1) 100%)`,
+            }}
           />
         </div>
 
@@ -194,23 +189,19 @@ export default function EqualizerModal({ isOpen, onClose }) {
             style={{
               background: 'transparent',
               border: 'none',
-              color: '#b3b3b3',
-              fontSize: 13,
+              color: 'var(--text-secondary)',
+              fontSize: 12.5,
               display: 'flex',
               alignItems: 'center',
-              gap: 6,
+              gap: 5,
               cursor: 'pointer',
             }}
           >
-            <RefreshCw size={14} />
-            <span>Reset to Flat</span>
+            <RefreshCw size={13} />
+            <span>Reset</span>
           </button>
 
-          <button
-            className="action-pill-btn"
-            style={{ background: '#1ed760', color: '#000000', padding: '10px 24px' }}
-            onClick={onClose}
-          >
+          <button className="aura-btn-primary" onClick={onClose} style={{ padding: '8px 20px' }}>
             Done
           </button>
         </div>

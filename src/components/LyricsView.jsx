@@ -131,7 +131,7 @@ export default function LyricsView({
                 justifyContent: 'center',
               }}
             >
-              <Music size={18} color="#00d2df" />
+              <Music size={18} color="var(--pulse-accent)" />
             </div>
           )}
           <div style={{ minWidth: 0 }}>
@@ -255,7 +255,7 @@ export default function LyricsView({
             border: '1px solid var(--border-subtle)',
           }}
         >
-          <Mic2 size={36} color="#00d2df" style={{ margin: '0 auto 16px auto', display: 'block' }} />
+          <Mic2 size={36} color="var(--pulse-accent)" style={{ margin: '0 auto 16px auto', display: 'block' }} />
           <h3 style={{ fontSize: 18, fontWeight: 700, color: '#f8fafc', margin: '0 0 8px 0' }}>
             No lyrics available for this track
           </h3>

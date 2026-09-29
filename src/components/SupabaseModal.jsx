@@ -64,7 +64,7 @@ export default function SupabaseModal({ isOpen, onClose }) {
         {/* Header */}
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Database size={22} color="#00d2df" />
+            <Database size={22} color="var(--pulse-accent)" />
             <h2 className="modal-title">Supabase Cloud Sync</h2>
           </div>
           <button className="aura-circle-btn" onClick={onClose}>
@@ -86,7 +86,7 @@ export default function SupabaseModal({ isOpen, onClose }) {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Cloud size={20} color={isConnected ? '#00d2df' : '#94a3b8'} />
+            <Cloud size={20} color={isConnected ? 'var(--pulse-accent)' : 'var(--text-secondary)'} />
             <div>
               <div style={{ fontSize: 13.5, fontWeight: 700, color: '#f8fafc' }}>
                 {isConnected ? 'Connected to Supabase Cloud' : 'Local Offline Mode (IndexedDB)'}
@@ -177,7 +177,7 @@ export default function SupabaseModal({ isOpen, onClose }) {
               href="https://supabase.com/dashboard"
               target="_blank"
               rel="noopener noreferrer"
-              style={{ fontSize: 12, color: '#00d2df', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}
+              style={{ fontSize: 12, color: 'var(--pulse-accent)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}
             >
               <span>Get Free Supabase Keys</span>
               <ExternalLink size={12} />

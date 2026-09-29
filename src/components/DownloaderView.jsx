@@ -70,7 +70,7 @@ export default function DownloaderView({
 
       setDownloadStatus({
         type: 'success',
-        message: `Successfully downloaded "${track.title}" in original 320kbps quality!`,
+        message: `Downloaded "${track.title}" in original quality`,
       });
       setWebUrl('');
       setCustomTitle('');
@@ -79,7 +79,7 @@ export default function DownloaderView({
     } catch (err) {
       setDownloadStatus({
         type: 'error',
-        message: err.message || 'Download failed. Ensure URL is valid or drop audio files directly.',
+        message: err.message || 'Download failed. Check the URL or try a direct audio link.',
       });
     } finally {
       setIsDownloading(false);
@@ -152,11 +152,11 @@ export default function DownloaderView({
       /\.(mp3|wav|flac|m4a|ogg|aac)$/i.test(f.name)
     );
     if (files.length === 0) {
-      setImportStatus({ type: 'error', message: 'Please select valid audio files (MP3, FLAC, WAV, M4A).' });
+      setImportStatus({ type: 'error', message: 'Select valid audio files (MP3, FLAC, WAV, M4A).' });
       return;
     }
 
-    setImportStatus({ type: 'loading', message: `Importing ${files.length} audio file(s)...` });
+    setImportStatus({ type: 'loading', message: `Importing ${files.length} file(s)...` });
     try {
       for (const file of files) {
         const parsed = await parseAudioFile(file);
@@ -165,168 +165,155 @@ export default function DownloaderView({
       }
       setImportStatus({
         type: 'success',
-        message: `Successfully added ${files.length} song(s) in original quality!`,
+        message: `Added ${files.length} track(s) in original quality`,
       });
     } catch (err) {
-      setImportStatus({ type: 'error', message: 'Failed to import files: ' + err.message });
+      setImportStatus({ type: 'error', message: 'Import failed: ' + err.message });
     }
   };
 
   return (
-    <div className="spotify-scroll-area">
+    <div className="pulse-downloader-scroll">
       {/* Header */}
-      <div style={{ margin: '28px 0 20px 0' }}>
-        <h1 className="section-title" style={{ fontSize: 32 }}>Download & Ingest Audio</h1>
-        <p style={{ color: '#b3b3b3', fontSize: 14, marginTop: 4 }}>
-          Add new music and podcasts • Bit-perfect 320kbps & lossless sound • Background playback
+      <div style={{ marginBottom: 20 }}>
+        <h1
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 26,
+            fontWeight: 800,
+            letterSpacing: '-0.02em',
+            color: 'var(--text-primary)',
+            margin: '0 0 6px',
+          }}
+        >
+          Add Audio
+        </h1>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 13.5, margin: 0 }}>
+          Import music and podcasts — 320kbps and lossless audio preserved
         </p>
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 12, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 12, marginBottom: 24 }}>
+      <div className="pulse-tab-bar">
         <button
-          className={`sidebar-filter-pill ${activeTab === 'youtube' ? 'active' : ''}`}
+          className={`pulse-tab ${activeTab === 'youtube' ? 'active' : ''}`}
           onClick={() => setActiveTab('youtube')}
-          style={{ display: 'flex', alignItems: 'center', gap: 8 }}
         >
-          <YoutubeIcon size={16} />
-          <span>YouTube & Web Audio</span>
+          <YoutubeIcon size={14} />
+          <span>Web Audio</span>
         </button>
 
         <button
-          className={`sidebar-filter-pill ${activeTab === 'podcasts' ? 'active' : ''}`}
+          className={`pulse-tab ${activeTab === 'podcasts' ? 'active' : ''}`}
           onClick={() => setActiveTab('podcasts')}
-          style={{ display: 'flex', alignItems: 'center', gap: 8 }}
         >
-          <PodcastIcon size={16} />
-          <span>Podcasts & Shows</span>
+          <PodcastIcon size={14} />
+          <span>Podcasts</span>
         </button>
 
         <button
-          className={`sidebar-filter-pill ${activeTab === 'local' ? 'active' : ''}`}
+          className={`pulse-tab ${activeTab === 'local' ? 'active' : ''}`}
           onClick={() => setActiveTab('local')}
-          style={{ display: 'flex', alignItems: 'center', gap: 8 }}
         >
-          <UploadCloud size={16} />
-          <span>Local Files Import</span>
+          <UploadCloud size={14} />
+          <span>Local Files</span>
         </button>
       </div>
 
       {/* TAB 1: YOUTUBE & WEB AUDIO */}
       {activeTab === 'youtube' && (
-        <div style={{ maxWidth: 640 }}>
-          <form onSubmit={handleWebDownload} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ maxWidth: 600 }}>
+          <form onSubmit={handleWebDownload} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 700, marginBottom: 8, color: '#ffffff' }}>
-                Audio / YouTube / SoundCloud / Web Stream URL
+              <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, marginBottom: 6, color: 'var(--text-primary)' }}>
+                Audio URL
               </label>
               <input
                 type="url"
                 required
-                placeholder="https://www.youtube.com/watch?v=... or direct .mp3 / .flac link"
+                placeholder="https://youtube.com/watch?v=... or direct .mp3 link"
                 value={webUrl}
                 onChange={(e) => setWebUrl(e.target.value)}
-                className="top-bar-search-input"
-                style={{ width: '100%', borderRadius: 8, padding: '12px 16px', background: '#242424' }}
+                className="pulse-input"
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               <div>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 700, marginBottom: 8, color: '#ffffff' }}>
-                  Custom Title (Optional)
+                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, marginBottom: 6, color: 'var(--text-primary)' }}>
+                  Title (optional)
                 </label>
                 <input
                   type="text"
-                  placeholder="Auto-detect or type song name"
+                  placeholder="Auto-detect or type name"
                   value={customTitle}
                   onChange={(e) => setCustomTitle(e.target.value)}
-                  className="top-bar-search-input"
-                  style={{ width: '100%', borderRadius: 8, padding: '10px 14px', background: '#242424' }}
+                  className="pulse-input"
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 700, marginBottom: 8, color: '#ffffff' }}>
-                  Artist Name (Optional)
+                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, marginBottom: 6, color: 'var(--text-primary)' }}>
+                  Artist (optional)
                 </label>
                 <input
                   type="text"
                   placeholder="Auto-detect or type artist"
                   value={customArtist}
                   onChange={(e) => setCustomArtist(e.target.value)}
-                  className="top-bar-search-input"
-                  style={{ width: '100%', borderRadius: 8, padding: '10px 14px', background: '#242424' }}
+                  className="pulse-input"
                 />
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
               <button
                 type="submit"
                 disabled={isDownloading || !webUrl.trim()}
-                className="action-pill-btn"
-                style={{
-                  background: isDownloading ? '#535353' : '#1ed760',
-                  color: '#000000',
-                  padding: '12px 24px',
-                  fontSize: 14,
-                  fontWeight: 800,
-                  cursor: isDownloading ? 'not-allowed' : 'pointer',
-                }}
+                className="aura-btn-primary"
+                style={{ padding: '10px 20px', fontSize: 13 }}
               >
                 {isDownloading ? (
                   <>
-                    <Loader2 size={18} className="spin" />
-                    <span>Extracting High Quality Audio...</span>
+                    <Loader2 size={16} className="spin" />
+                    <span>Extracting audio...</span>
                   </>
                 ) : (
                   <>
-                    <Download size={18} />
-                    <span>Download (320kbps MP3 / Lossless)</span>
+                    <Download size={16} />
+                    <span>Download</span>
                   </>
                 )}
               </button>
 
-              <div className="quality-badge">
-                <Sparkles size={12} />
-                <span>Original Sound Preserved</span>
+              <div className="aura-badge-lossless">
+                <Sparkles size={10} />
+                <span>Original quality</span>
               </div>
             </div>
           </form>
 
-          {/* Progress / Status banner */}
+          {/* Progress */}
           {downloadProgress && (
-            <div style={{ marginTop: 20, background: '#242424', padding: 16, borderRadius: 8 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+            <div style={{ marginTop: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>
                 <span>{downloadProgress.status}</span>
                 <span>{downloadProgress.percent}%</span>
               </div>
-              <div style={{ height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{ width: `${downloadProgress.percent}%`, height: '100%', background: '#1ed760' }} />
+              <div className="pulse-progress-track">
+                <div className="pulse-progress-fill" style={{ width: `${downloadProgress.percent}%` }} />
               </div>
             </div>
           )}
 
           {downloadStatus && (
-            <div
-              style={{
-                marginTop: 20,
-                padding: 16,
-                borderRadius: 8,
-                background: downloadStatus.type === 'success' ? 'rgba(30, 215, 96, 0.15)' : 'rgba(241, 94, 108, 0.15)',
-                border: `1px solid ${downloadStatus.type === 'success' ? '#1ed760' : '#f15e6c'}`,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-              }}
-            >
+            <div className={`pulse-status-banner ${downloadStatus.type}`}>
               {downloadStatus.type === 'success' ? (
-                <CheckCircle size={20} color="#1ed760" />
+                <CheckCircle size={18} />
               ) : (
-                <AlertCircle size={20} color="#f15e6c" />
+                <AlertCircle size={18} />
               )}
-              <span style={{ fontSize: 14 }}>{downloadStatus.message}</span>
+              <span>{downloadStatus.message}</span>
             </div>
           )}
         </div>
@@ -335,99 +322,80 @@ export default function DownloaderView({
       {/* TAB 2: PODCASTS & SHOWS */}
       {activeTab === 'podcasts' && (
         <div>
-          {/* Search Bar for Apple Podcasts */}
-          <form onSubmit={handleSearchPodcasts} style={{ display: 'flex', gap: 12, maxWidth: 540, marginBottom: 24 }}>
+          <form onSubmit={handleSearchPodcasts} style={{ display: 'flex', gap: 10, maxWidth: 500, marginBottom: 20 }}>
             <input
               type="text"
-              placeholder="Search Apple Podcasts directory (e.g. Huberman, Joe Rogan)..."
+              placeholder="Search Apple Podcasts..."
               value={podcastQuery}
               onChange={(e) => setPodcastQuery(e.target.value)}
-              className="top-bar-search-input"
-              style={{ flex: 1, borderRadius: 8, padding: '10px 16px', background: '#242424' }}
+              className="pulse-input"
+              style={{ flex: 1 }}
             />
-            <button
-              type="submit"
-              className="action-pill-btn"
-              style={{ background: '#1ed760', color: '#000000', padding: '10px 20px' }}
-            >
-              <Search size={16} />
+            <button type="submit" className="aura-btn-primary" style={{ padding: '8px 16px' }}>
+              <Search size={14} />
               <span>Search</span>
             </button>
           </form>
 
           {isSearchingPodcasts && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#b3b3b3', margin: '20px 0' }}>
-              <Loader2 size={18} className="spin" />
-              <span>Searching Apple Podcasts directory...</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)', margin: '16px 0' }}>
+              <Loader2 size={16} className="spin" />
+              <span style={{ fontSize: 13 }}>Searching podcasts...</span>
             </div>
           )}
 
-          {/* If a podcast show is selected: show episodes */}
+          {/* Episode list or search results */}
           {selectedPodcastShow ? (
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
-                <button
-                  className="sidebar-filter-pill"
-                  onClick={() => setSelectedPodcastShow(null)}
-                >
-                  ← Back to search results
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                <button className="aura-btn-secondary" onClick={() => setSelectedPodcastShow(null)}>
+                  ← Back
                 </button>
-                <h2 style={{ fontSize: 20, fontWeight: 700 }}>{selectedPodcastShow.name} Episodes</h2>
+                <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                  {selectedPodcastShow.name}
+                </h2>
               </div>
 
               {isLoadingFeed ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#b3b3b3' }}>
-                  <Loader2 size={18} className="spin" />
-                  <span>Loading episodes & audio enclosures...</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)' }}>
+                  <Loader2 size={16} className="spin" />
+                  <span style={{ fontSize: 13 }}>Loading episodes...</span>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {podcastEpisodes.map((ep) => (
-                    <div
-                      key={ep.id}
-                      style={{
-                        background: '#181818',
-                        padding: 16,
-                        borderRadius: 8,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: 16,
-                      }}
-                    >
+                    <div key={ep.id} className="pulse-episode-row">
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 16, fontWeight: 700, color: '#ffffff', marginBottom: 4 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 3 }}>
                           {ep.title}
                         </div>
-                        <div style={{ fontSize: 13, color: '#b3b3b3' }}>
-                          {ep.pubDate ? new Date(ep.pubDate).toLocaleDateString() : ''} • {ep.formattedDuration || 'Audio Episode'}
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                          {ep.pubDate ? new Date(ep.pubDate).toLocaleDateString() : ''} • {ep.formattedDuration || 'Audio'}
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <button
-                          className="action-pill-btn"
-                          style={{ background: '#ffffff', color: '#000000', padding: '8px 14px', fontSize: 13 }}
+                          className="aura-btn-primary"
+                          style={{ padding: '6px 12px', fontSize: 12 }}
                           onClick={() => onPlayTrack(ep)}
-                          title="Stream Now"
                         >
-                          <Play size={15} fill="#000000" />
+                          <Play size={13} fill="#07090e" />
                           <span>Play</span>
                         </button>
 
                         <button
-                          className="action-pill-btn"
-                          style={{ background: 'rgba(255,255,255,0.1)', color: '#ffffff', padding: '8px 14px', fontSize: 13 }}
+                          className="aura-btn-secondary"
+                          style={{ padding: '6px 12px', fontSize: 12 }}
                           disabled={downloadingEpisodeId === ep.id}
                           onClick={() => handleDownloadEpisode(ep)}
-                          title="Download for offline playback"
                         >
                           {downloadingEpisodeId === ep.id ? (
-                            <Loader2 size={15} className="spin" />
+                            <Loader2 size={13} className="spin" />
                           ) : (
-                            <HardDriveDownload size={15} />
+                            <HardDriveDownload size={13} />
                           )}
-                          <span>Download</span>
+                          <span>Save</span>
                         </button>
                       </div>
                     </div>
@@ -436,22 +404,16 @@ export default function DownloaderView({
               )}
             </div>
           ) : (
-            /* Show Podcast Results Grid */
-            <div className="media-cards-grid">
+            <div className="pulse-podcast-grid">
               {podcastResults.map((p) => (
                 <div
                   key={p.id}
-                  className="media-card"
+                  className="pulse-podcast-card"
                   onClick={() => handleSelectPodcast(p)}
                 >
-                  <div className="media-card-artwork-box">
-                    <img src={p.coverUrl} alt={p.name} className="media-card-img" />
-                    <button className="media-card-floating-play" title="View Episodes">
-                      <PodcastIcon size={22} color="#000000" />
-                    </button>
-                  </div>
-                  <div className="media-card-title">{p.name}</div>
-                  <div className="media-card-subtitle">{p.artist} • {p.trackCount} episodes</div>
+                  <img src={p.coverUrl} alt={p.name} />
+                  <div className="card-name">{p.name}</div>
+                  <div className="card-meta">{p.artist} • {p.trackCount} episodes</div>
                 </div>
               ))}
             </div>
@@ -461,27 +423,12 @@ export default function DownloaderView({
 
       {/* TAB 3: LOCAL FILE IMPORT */}
       {activeTab === 'local' && (
-        <div style={{ maxWidth: 640 }}>
+        <div style={{ maxWidth: 600 }}>
           <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setIsDragging(true);
-            }}
+            className={`pulse-drop-zone ${isDragging ? 'dragging' : ''}`}
+            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
             onDragLeave={() => setIsDragging(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setIsDragging(false);
-              handleFiles(e.dataTransfer.files);
-            }}
-            style={{
-              border: `2px dashed ${isDragging ? '#1ed760' : 'rgba(255, 255, 255, 0.2)'}`,
-              borderRadius: 12,
-              padding: '48px 24px',
-              textAlign: 'center',
-              background: isDragging ? 'rgba(30, 215, 96, 0.05)' : '#181818',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-            }}
+            onDrop={(e) => { e.preventDefault(); setIsDragging(false); handleFiles(e.dataTransfer.files); }}
             onClick={() => document.getElementById('audio-file-input').click()}
           >
             <input
@@ -492,54 +439,31 @@ export default function DownloaderView({
               style={{ display: 'none' }}
               onChange={(e) => handleFiles(e.target.files)}
             />
-            <UploadCloud size={48} color={isDragging ? '#1ed760' : '#b3b3b3'} style={{ margin: '0 auto 16px auto' }} />
-            <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
-              Drag & Drop your music files here
+            <UploadCloud size={40} color={isDragging ? 'var(--pulse-accent)' : 'var(--text-muted)'} style={{ margin: '0 auto 14px', display: 'block' }} />
+            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 6, color: 'var(--text-primary)' }}>
+              Drop audio files here
             </h3>
-            <p style={{ color: '#b3b3b3', fontSize: 14, marginBottom: 16 }}>
-              Supports MP3 (320kbps), FLAC (Lossless 24-bit), WAV, M4A, AAC
+            <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 14 }}>
+              MP3, FLAC, WAV, M4A, AAC — original quality preserved
             </p>
             <button
               type="button"
-              className="action-pill-btn"
-              style={{ background: '#ffffff', color: '#000000', margin: '0 auto' }}
+              className="aura-btn-secondary"
             >
-              Browse Files from Mac / iPhone
+              Browse files
             </button>
           </div>
 
           {importStatus && (
-            <div
-              style={{
-                marginTop: 20,
-                padding: 16,
-                borderRadius: 8,
-                background:
-                  importStatus.type === 'success'
-                    ? 'rgba(30, 215, 96, 0.15)'
-                    : importStatus.type === 'loading'
-                    ? 'rgba(255, 255, 255, 0.1)'
-                    : 'rgba(241, 94, 108, 0.15)',
-                border: `1px solid ${
-                  importStatus.type === 'success'
-                    ? '#1ed760'
-                    : importStatus.type === 'loading'
-                    ? 'rgba(255,255,255,0.2)'
-                    : '#f15e6c'
-                }`,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-              }}
-            >
+            <div className={`pulse-status-banner ${importStatus.type}`}>
               {importStatus.type === 'loading' ? (
-                <Loader2 size={20} className="spin" />
+                <Loader2 size={16} className="spin" />
               ) : importStatus.type === 'success' ? (
-                <CheckCircle size={20} color="#1ed760" />
+                <CheckCircle size={16} />
               ) : (
-                <AlertCircle size={20} color="#f15e6c" />
+                <AlertCircle size={16} />
               )}
-              <span style={{ fontSize: 14 }}>{importStatus.message}</span>
+              <span>{importStatus.message}</span>
             </div>
           )}
         </div>

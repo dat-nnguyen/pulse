@@ -64,8 +64,8 @@ export default function MobileFullPlayer({
         </button>
 
         <div style={{ textAlign: 'center' }}>
-          <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase', color: '#00d2df' }}>
-            NOW PLAYING
+          <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--pulse-accent)' }}>
+            Now Playing
           </span>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#f8fafc', marginTop: 2 }}>
             {currentTrack.album || 'Pulse Soundstage'}
@@ -79,7 +79,7 @@ export default function MobileFullPlayer({
             style={{ width: 40, height: 40, position: 'relative' }}
             title={isCloudConnected ? "Supabase Cloud: Connected" : "Supabase Cloud"}
           >
-            <Database size={18} color={isCloudConnected ? "#00d2df" : "inherit"} />
+            <Database size={18} color={isCloudConnected ? "var(--pulse-accent)" : "inherit"} />
             {isCloudConnected && (
               <span
                 style={{
@@ -89,7 +89,7 @@ export default function MobileFullPlayer({
                   width: 6,
                   height: 6,
                   borderRadius: '50%',
-                  background: '#00d2df',
+                  background: 'var(--pulse-accent)',
                 }}
               />
             )}
@@ -141,7 +141,7 @@ export default function MobileFullPlayer({
           onClick={onOpenEqualizer}
           style={{
             background: 'rgba(255, 255, 255, 0.08)',
-            border: '1px solid var(--border-glass)',
+            border: '1px solid var(--border-medium)',
             color: '#ffffff',
             borderRadius: 20,
             padding: '5px 12px',
@@ -153,7 +153,7 @@ export default function MobileFullPlayer({
             cursor: 'pointer',
           }}
         >
-          <Sliders size={13} color="#00d2df" />
+          <Sliders size={13} color="var(--pulse-accent)" />
           <span>Equalizer</span>
         </button>
       </div>
@@ -171,7 +171,7 @@ export default function MobileFullPlayer({
           style={{
             width: '100%',
             height: 5,
-            background: `linear-gradient(to right, #00d2df 0%, #00d2df ${progressPercent}%, rgba(255, 255, 255, 0.15) ${progressPercent}%, rgba(255, 255, 255, 0.15) 100%)`,
+            background: `linear-gradient(to right, var(--pulse-accent) 0%, var(--pulse-accent) ${progressPercent}%, rgba(255, 255, 255, 0.15) ${progressPercent}%, rgba(255, 255, 255, 0.15) 100%)`,
           }}
         />
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
@@ -231,8 +231,8 @@ export default function MobileFullPlayer({
       <div
         style={{
           background: 'rgba(255, 255, 255, 0.06)',
-          border: '1px solid var(--border-glass-bright)',
-          borderRadius: 18,
+          border: '1px solid var(--border-medium)',
+          borderRadius: 16,
           padding: 18,
           cursor: 'pointer',
           backdropFilter: 'blur(20px)',
@@ -240,7 +240,7 @@ export default function MobileFullPlayer({
         onClick={onOpenLyrics}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#00d2df', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--pulse-accent)', display: 'flex', alignItems: 'center', gap: 8 }}>
             <Mic2 size={16} /> Karaoke Synced Lyrics
           </span>
           <span style={{ fontSize: 12, color: '#94a3b8' }}>Tap to Expand</span>

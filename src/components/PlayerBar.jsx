@@ -199,8 +199,9 @@ export default function PlayerBar({
           <Sliders size={18} />
         </button>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: 110 }}>
-          <button className="aura-control-btn" onClick={handleMuteToggle}>
+        {/* Volume Control */}
+        <div className="aura-volume-control">
+          <button className="aura-control-btn" onClick={handleMuteToggle} title={isMuted ? 'Unmute' : 'Mute'}>
             {isMuted || volume === 0 ? (
               <VolumeX size={18} />
             ) : volume < 0.5 ? (
@@ -219,17 +220,18 @@ export default function PlayerBar({
               setIsMuted(false);
               onVolumeChange(parseFloat(e.target.value));
             }}
-            className="aura-scrubber"
+            className="aura-scrubber aura-volume-slider"
             style={{
               background: `linear-gradient(to right, #ffffff 0%, #ffffff ${volumePercent}%, rgba(255, 255, 255, 0.12) ${volumePercent}%, rgba(255, 255, 255, 0.12) 100%)`,
             }}
           />
         </div>
 
+        {/* Expand / Soundstage Fullscreen Button */}
         <button
-          className="aura-control-btn"
+          className="aura-control-btn aura-fullscreen-btn"
           onClick={onOpenFullscreen}
-          title="Open Soundstage"
+          title="Open Soundstage Player"
         >
           <Maximize2 size={16} />
         </button>

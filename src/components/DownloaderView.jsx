@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   Download,
-  Podcast as PodcastIcon,
   UploadCloud,
   CheckCircle,
   AlertCircle,
@@ -9,8 +8,7 @@ import {
   Sparkles,
   Music,
   Play,
-  HardDriveDownload,
-  Search
+  HardDriveDownload
 } from 'lucide-react';
 
 function YoutubeIcon({ size = 16 }) {
@@ -20,8 +18,8 @@ function YoutubeIcon({ size = 16 }) {
     </svg>
   );
 }
+
 import { downloadFromWebUrl } from '../services/musicDownloaderService';
-import { searchApplePodcasts, fetchPodcastFeed } from '../services/podcastService';
 import { parseAudioFile } from '../services/localFileParser';
 import { saveTrack } from '../services/storageService';
 
@@ -30,7 +28,7 @@ export default function DownloaderView({
   onPlayTrack,
   prefilledQuery = '',
 }) {
-  const [activeTab, setActiveTab] = useState('youtube'); // 'youtube' | 'podcasts' | 'local'
+  const [activeTab, setActiveTab] = useState('youtube'); // 'youtube' | 'local'
 
   // YouTube / Web download state
   const [webUrl, setWebUrl] = useState('');
@@ -39,15 +37,6 @@ export default function DownloaderView({
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(null);
   const [downloadStatus, setDownloadStatus] = useState(null); // { type: 'success' | 'error', message }
-
-  // Podcasts search state
-  const [podcastQuery, setPodcastQuery] = useState(prefilledQuery || 'Huberman Lab');
-  const [podcastResults, setPodcastResults] = useState([]);
-  const [isSearchingPodcasts, setIsSearchingPodcasts] = useState(false);
-  const [selectedPodcastShow, setSelectedPodcastShow] = useState(null);
-  const [podcastEpisodes, setPodcastEpisodes] = useState([]);
-  const [isLoadingFeed, setIsLoadingFeed] = useState(false);
-  const [downloadingEpisodeId, setDownloadingEpisodeId] = useState(null);
 
   // Local file import state
   const [isDragging, setIsDragging] = useState(false);
@@ -87,66 +76,7 @@ export default function DownloaderView({
     }
   };
 
-  // 2. Search Apple Podcasts
-  const handleSearchPodcasts = async (e) => {
-    if (e) e.preventDefault();
-    if (!podcastQuery.trim()) return;
-
-    setIsSearchingPodcasts(true);
-    setSelectedPodcastShow(null);
-    try {
-      const results = await searchApplePodcasts(podcastQuery.trim());
-      setPodcastResults(results);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsSearchingPodcasts(false);
-    }
-  };
-
-  // Select podcast show and fetch episodes
-  const handleSelectPodcast = async (podcast) => {
-    setSelectedPodcastShow(podcast);
-    setIsLoadingFeed(true);
-    try {
-      const feed = await fetchPodcastFeed(podcast.feedUrl);
-      setPodcastEpisodes(feed.episodes || []);
-    } catch (err) {
-      alert('Could not load podcast episodes: ' + err.message);
-    } finally {
-      setIsLoadingFeed(false);
-    }
-  };
-
-  // Download a podcast episode to local storage
-  const handleDownloadEpisode = async (episode) => {
-    setDownloadingEpisodeId(episode.id);
-    try {
-      const res = await fetch(episode.audioUrl);
-      const blob = await res.blob();
-      const saved = await saveTrack({
-        ...episode,
-        audioBlob: blob,
-        isDownloaded: true,
-        downloadedAt: Date.now(),
-        fileSizeBytes: blob.size,
-      });
-      onTrackAdded(saved);
-      alert(`Episode "${episode.title}" downloaded offline!`);
-    } catch (err) {
-      // If direct blob fetch hits CORS, save with streaming URL
-      const saved = await saveTrack({
-        ...episode,
-        isDownloaded: true,
-      });
-      onTrackAdded(saved);
-      alert(`Episode added to library!`);
-    } finally {
-      setDownloadingEpisodeId(null);
-    }
-  };
-
-  // 3. Local file drag-and-drop
+  // 2. Local file drag-and-drop
   const handleFiles = async (fileList) => {
     const files = Array.from(fileList).filter((f) =>
       /\.(mp3|wav|flac|m4a|ogg|aac)$/i.test(f.name)
@@ -189,7 +119,7 @@ export default function DownloaderView({
           Add Audio
         </h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: 13.5, margin: 0 }}>
-          Import music and podcasts — 320kbps and lossless audio preserved
+          Import music & audio — 320kbps and lossless audio preserved
         </p>
       </div>
 
@@ -201,14 +131,6 @@ export default function DownloaderView({
         >
           <YoutubeIcon size={14} />
           <span>Web Audio</span>
-        </button>
-
-        <button
-          className={`pulse-tab ${activeTab === 'podcasts' ? 'active' : ''}`}
-          onClick={() => setActiveTab('podcasts')}
-        >
-          <PodcastIcon size={14} />
-          <span>Podcasts</span>
         </button>
 
         <button
@@ -238,14 +160,14 @@ export default function DownloaderView({
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
               <div>
-                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, marginBottom: 6, color: 'var(--text-primary)' }}>
-                  Title (optional)
+                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, marginBottom: 6, color: 'var(--text-secondary)' }}>
+                  Custom Title (Optional)
                 </label>
                 <input
                   type="text"
-                  placeholder="Auto-detect or type name"
+                  placeholder="Song Title"
                   value={customTitle}
                   onChange={(e) => setCustomTitle(e.target.value)}
                   className="pulse-input"
@@ -253,12 +175,12 @@ export default function DownloaderView({
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, marginBottom: 6, color: 'var(--text-primary)' }}>
-                  Artist (optional)
+                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, marginBottom: 6, color: 'var(--text-secondary)' }}>
+                  Artist (Optional)
                 </label>
                 <input
                   type="text"
-                  placeholder="Auto-detect or type artist"
+                  placeholder="Artist Name"
                   value={customArtist}
                   onChange={(e) => setCustomArtist(e.target.value)}
                   className="pulse-input"
@@ -266,7 +188,7 @@ export default function DownloaderView({
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
               <button
                 type="submit"
                 disabled={isDownloading || !webUrl.trim()}
@@ -319,109 +241,7 @@ export default function DownloaderView({
         </div>
       )}
 
-      {/* TAB 2: PODCASTS & SHOWS */}
-      {activeTab === 'podcasts' && (
-        <div>
-          <form onSubmit={handleSearchPodcasts} style={{ display: 'flex', gap: 10, maxWidth: 500, marginBottom: 20 }}>
-            <input
-              type="text"
-              placeholder="Search Apple Podcasts..."
-              value={podcastQuery}
-              onChange={(e) => setPodcastQuery(e.target.value)}
-              className="pulse-input"
-              style={{ flex: 1 }}
-            />
-            <button type="submit" className="aura-btn-primary" style={{ padding: '8px 16px' }}>
-              <Search size={14} />
-              <span>Search</span>
-            </button>
-          </form>
-
-          {isSearchingPodcasts && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)', margin: '16px 0' }}>
-              <Loader2 size={16} className="spin" />
-              <span style={{ fontSize: 13 }}>Searching podcasts...</span>
-            </div>
-          )}
-
-          {/* Episode list or search results */}
-          {selectedPodcastShow ? (
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-                <button className="aura-btn-secondary" onClick={() => setSelectedPodcastShow(null)}>
-                  ← Back
-                </button>
-                <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                  {selectedPodcastShow.name}
-                </h2>
-              </div>
-
-              {isLoadingFeed ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)' }}>
-                  <Loader2 size={16} className="spin" />
-                  <span style={{ fontSize: 13 }}>Loading episodes...</span>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {podcastEpisodes.map((ep) => (
-                    <div key={ep.id} className="pulse-episode-row">
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 3 }}>
-                          {ep.title}
-                        </div>
-                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                          {ep.pubDate ? new Date(ep.pubDate).toLocaleDateString() : ''} • {ep.formattedDuration || 'Audio'}
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <button
-                          className="aura-btn-primary"
-                          style={{ padding: '6px 12px', fontSize: 12 }}
-                          onClick={() => onPlayTrack(ep)}
-                        >
-                          <Play size={13} fill="#07090e" />
-                          <span>Play</span>
-                        </button>
-
-                        <button
-                          className="aura-btn-secondary"
-                          style={{ padding: '6px 12px', fontSize: 12 }}
-                          disabled={downloadingEpisodeId === ep.id}
-                          onClick={() => handleDownloadEpisode(ep)}
-                        >
-                          {downloadingEpisodeId === ep.id ? (
-                            <Loader2 size={13} className="spin" />
-                          ) : (
-                            <HardDriveDownload size={13} />
-                          )}
-                          <span>Save</span>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="pulse-podcast-grid">
-              {podcastResults.map((p) => (
-                <div
-                  key={p.id}
-                  className="pulse-podcast-card"
-                  onClick={() => handleSelectPodcast(p)}
-                >
-                  <img src={p.coverUrl} alt={p.name} />
-                  <div className="card-name">{p.name}</div>
-                  <div className="card-meta">{p.artist} • {p.trackCount} episodes</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 3: LOCAL FILE IMPORT */}
+      {/* TAB 2: LOCAL FILE IMPORT */}
       {activeTab === 'local' && (
         <div style={{ maxWidth: 600 }}>
           <div

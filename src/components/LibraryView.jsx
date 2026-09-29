@@ -91,22 +91,6 @@ export default function LibraryView({
           position: 'relative',
         }}
       >
-        {onBack && (
-          <button
-            className="aura-circle-btn"
-            onClick={onBack}
-            style={{
-              position: 'absolute',
-              top: 20,
-              left: 24,
-              width: 34,
-              height: 34,
-            }}
-            title="Back to Playlists"
-          >
-            <ChevronLeft size={20} />
-          </button>
-        )}
 
         {coverArt ? (
           <img
@@ -261,7 +245,7 @@ export default function LibraryView({
                 style={{ marginTop: 12, fontSize: 13 }}
               >
                 <Plus size={16} />
-                <span>Import Music or Podcasts</span>
+                <span>Import Music</span>
               </button>
             )}
           </div>
@@ -273,10 +257,10 @@ export default function LibraryView({
                 <th>Title</th>
                 <th>Album</th>
                 <th>Bitrate</th>
-                <th style={{ textAlign: 'right', width: 70 }}>
+                <th style={{ textAlign: 'right', width: 75 }}>
                   <Clock size={14} />
                 </th>
-                <th style={{ width: 60 }}></th>
+                <th style={{ width: 85, textAlign: 'right' }}></th>
               </tr>
             </thead>
             <tbody>
@@ -346,31 +330,54 @@ export default function LibraryView({
                       </span>
                     </td>
 
-                    <td style={{ textAlign: 'right', color: '#94a3b8', fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>
+                    <td style={{ textAlign: 'right', color: 'var(--text-secondary)', fontSize: 13, fontVariantNumeric: 'tabular-nums', paddingRight: 16 }}>
                       {formatTime(track.duration)}
                     </td>
 
-                    <td>
+                    <td style={{ paddingRight: 16, textAlign: 'right' }}>
                       <div
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}
+                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <button
-                          className="aura-circle-btn"
-                          style={{ width: 28, height: 28 }}
+                          className={`aura-control-btn track-like-btn ${isTrackLiked ? 'active' : ''}`}
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: '50%',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background: isTrackLiked ? 'rgba(244, 63, 94, 0.12)' : 'transparent',
+                            border: isTrackLiked ? '1px solid rgba(244, 63, 94, 0.3)' : 'none',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                          }}
                           onClick={() => onToggleLike(track.id)}
                           title={isTrackLiked ? 'Remove from Favorites' : 'Add to Favorites'}
                         >
                           <Heart
-                            size={14}
+                            size={16}
                             fill={isTrackLiked ? '#f43f5e' : 'none'}
                             color={isTrackLiked ? '#f43f5e' : '#94a3b8'}
                           />
                         </button>
                         {onDeleteTrack && (
                           <button
-                            className="aura-circle-btn"
-                            style={{ width: 28, height: 28 }}
+                            className="aura-control-btn track-delete-btn"
+                            style={{
+                              width: 30,
+                              height: 30,
+                              borderRadius: '50%',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              background: 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: 'var(--text-muted)',
+                              transition: 'all 0.15s ease',
+                            }}
                             onClick={() => {
                               if (window.confirm(`Delete "${track.title}" from library?`)) {
                                 onDeleteTrack(track.id);
@@ -378,7 +385,7 @@ export default function LibraryView({
                             }}
                             title="Delete track"
                           >
-                            <Trash2 size={13} color="#94a3b8" />
+                            <Trash2 size={15} />
                           </button>
                         )}
                       </div>

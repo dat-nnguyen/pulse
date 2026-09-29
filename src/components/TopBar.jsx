@@ -147,7 +147,7 @@ export default function TopBar({
         <button
           className="aura-btn-primary hide-on-mobile"
           onClick={onOpenDownloader}
-          title="Import music & podcasts"
+          title="Import music & audio"
           style={{ padding: '7px 14px', fontSize: 12.5 }}
         >
           <Download size={14} />

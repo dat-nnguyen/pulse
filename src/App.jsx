@@ -28,6 +28,7 @@ import QueueModal from './components/QueueModal';
 import ShareModal from './components/ShareModal';
 import SupabaseModal from './components/SupabaseModal';
 import AuthModal from './components/AuthModal';
+import CreatePlaylistModal from './components/CreatePlaylistModal';
 import { getCurrentUser, subscribeAuthChange } from './services/authService';
 
 export default function App() {
@@ -49,6 +50,7 @@ export default function App() {
   const [showShare, setShowShare] = useState(false);
   const [showSupabaseModal, setShowSupabaseModal] = useState(false);
   const [showFullMobilePlayer, setShowFullMobilePlayer] = useState(false);
+  const [showCreatePlaylistModal, setShowCreatePlaylistModal] = useState(false);
 
   // Library & Audio Data
   const [tracks, setTracks] = useState([]);
@@ -289,20 +291,12 @@ export default function App() {
     }
   };
 
-  // Create New Playlist
-  const handleCreatePlaylist = async () => {
-    const name = window.prompt('Enter Playlist Name:', `My Playlist #${playlists.length + 1}`);
-    if (!name || !name.trim()) return;
+  // Create New Playlist via Floating Modal
+  const handleCreatePlaylist = () => {
+    setShowCreatePlaylistModal(true);
+  };
 
-    const newPlaylist = {
-      id: `pl_${Date.now()}`,
-      name: name.trim(),
-      description: 'Custom Spotify Local Playlist',
-      createdAt: Date.now(),
-      trackIds: currentTrack ? [currentTrack.id] : [],
-    };
-
-    await savePlaylist(newPlaylist);
+  const handlePlaylistCreated = (newPlaylist) => {
     setPlaylists((prev) => [...prev, newPlaylist]);
     setSelectedPlaylistId(newPlaylist.id);
     setCurrentView('playlist');
@@ -536,6 +530,13 @@ export default function App() {
         onClose={() => setShowAuthModal(false)}
         user={user}
         onAuthSuccess={(u) => setUser(u)}
+      />
+
+      <CreatePlaylistModal
+        isOpen={showCreatePlaylistModal}
+        onClose={() => setShowCreatePlaylistModal(false)}
+        onPlaylistCreated={handlePlaylistCreated}
+        currentTrackId={currentTrack?.id}
       />
     </div>
   );

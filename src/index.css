@@ -889,9 +889,55 @@ html, body, #root {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  gap: 12px;
+  flex: 1;
+  max-width: 330px;
+}
+
+.aura-volume-control {
+  display: flex;
+  align-items: center;
   gap: 8px;
-  width: 28%;
-  min-width: 180px;
+  width: 125px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.aura-volume-slider {
+  width: 82px !important;
+  max-width: 82px !important;
+  min-width: 0 !important;
+  flex: 1;
+}
+
+.aura-fullscreen-btn {
+  width: 32px !important;
+  height: 32px !important;
+  flex-shrink: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4px;
+}
+
+/* Track actions styling */
+.track-like-btn {
+  transition: all var(--transition) !important;
+}
+
+.track-like-btn:hover {
+  background: rgba(244, 63, 94, 0.15) !important;
+  transform: scale(1.08);
+}
+
+.track-delete-btn {
+  transition: all var(--transition) !important;
+}
+
+.track-delete-btn:hover {
+  color: var(--pulse-danger) !important;
+  background: rgba(244, 63, 94, 0.12) !important;
+  transform: scale(1.08);
 }
 
 /* Mini waveform indicator */
@@ -1242,11 +1288,6 @@ html, body, #root {
   .aura-badge-lossless span {
     font-size: 9.5px !important;
   }
-
-  .pulse-podcast-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 10px !important;
-  }
 }
 
 
@@ -1442,71 +1483,6 @@ html, body, #root {
 
 .pulse-input::placeholder {
   color: var(--text-muted);
-}
-
-/* Podcast results grid */
-.pulse-podcast-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 14px;
-}
-
-.pulse-podcast-card {
-  background: var(--pulse-bg-raised);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 10px;
-  cursor: pointer;
-  transition: all var(--transition);
-}
-
-.pulse-podcast-card:hover {
-  background: var(--pulse-surface-hover);
-  border-color: var(--border-medium);
-  transform: translateY(-1px);
-}
-
-.pulse-podcast-card img {
-  width: 100%;
-  aspect-ratio: 1;
-  border-radius: 8px;
-  object-fit: cover;
-  margin-bottom: 8px;
-}
-
-.pulse-podcast-card .card-name {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.pulse-podcast-card .card-meta {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-top: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Episode row */
-.pulse-episode-row {
-  background: var(--pulse-bg-raised);
-  padding: 14px;
-  border-radius: 8px;
-  border: 1px solid var(--border-subtle);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  transition: background var(--transition);
-}
-
-.pulse-episode-row:hover {
-  background: var(--pulse-surface-hover);
 }
 
 /* Drop zone */

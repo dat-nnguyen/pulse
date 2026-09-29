@@ -1,0 +1,31 @@
+{
+  "short_name": "Aura",
+  "name": "Aura — Lossless Audio Lounge",
+  "description": "Personal, ad-free high fidelity music and podcast player with offline downloads and background playback.",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#080A10",
+  "theme_color": "#080A10",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "categories": ["music", "audio", "entertainment"],
+  "shortcuts": [
+    {
+      "name": "Search & Ingest",
+      "url": "/?view=downloader",
+      "description": "Download new music or podcasts"
+    },
+    {
+      "name": "Offline Library",
+      "url": "/?view=library",
+      "description": "View downloaded tracks"
+    }
+  ]
+}

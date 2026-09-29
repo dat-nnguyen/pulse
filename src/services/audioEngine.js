@@ -1,0 +1,307 @@
+// Audio Engine with Web Audio API Equalizer, Visualizer, and MediaSession lock-screen controls
+
+class AudioEngine {
+  constructor() {
+    this.audio = new Audio();
+    this.audio.preload = 'auto';
+    this.audio.crossOrigin = 'anonymous';
+
+    this.audioCtx = null;
+    this.sourceNode = null;
+    this.analyserNode = null;
+    this.bassNode = null;
+    this.eqNodes = [];
+    this.isWebAudioInitialized = false;
+
+    this.currentTrack = null;
+    this.isPlaying = false;
+    this.volume = 0.8;
+    this.audio.volume = this.volume;
+
+    // Callbacks
+    this.listeners = {
+      timeUpdate: [],
+      durationChange: [],
+      playState: [],
+      ended: [],
+      trackChange: [],
+      error: [],
+      eqChange: [],
+    };
+
+    this.setupAudioListeners();
+    this.setupMediaSession();
+  }
+
+  setupAudioListeners() {
+    this.audio.addEventListener('timeupdate', () => {
+      const cur = this.audio.currentTime || 0;
+      const dur = this.audio.duration || 0;
+      this.notify('timeUpdate', { currentTime: cur, duration: dur });
+      this.updateMediaSessionPosition(cur, dur);
+    });
+
+    this.audio.addEventListener('durationchange', () => {
+      this.notify('durationChange', this.audio.duration || 0);
+    });
+
+    this.audio.addEventListener('play', () => {
+      this.isPlaying = true;
+      if (this.audioCtx && this.audioCtx.state === 'suspended') {
+        this.audioCtx.resume();
+      }
+      this.notify('playState', true);
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'playing';
+      }
+    });
+
+    this.audio.addEventListener('pause', () => {
+      this.isPlaying = false;
+      this.notify('playState', false);
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'paused';
+      }
+    });
+
+    this.audio.addEventListener('ended', () => {
+      this.notify('ended');
+    });
+
+    this.audio.addEventListener('error', (e) => {
+      console.warn('Audio playback error:', e);
+      this.notify('error', e);
+    });
+  }
+
+  initWebAudio() {
+    if (this.isWebAudioInitialized) return;
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return;
+
+      this.audioCtx = new AudioContextClass();
+      this.sourceNode = this.audioCtx.createMediaElementSource(this.audio);
+
+      // Create Equalizer bands: 60Hz, 250Hz, 1kHz, 4kHz, 16kHz
+      const frequencies = [60, 250, 1000, 4000, 16000];
+      this.eqNodes = frequencies.map((freq, index) => {
+        const filter = this.audioCtx.createBiquadFilter();
+        if (index === 0) {
+          filter.type = 'lowshelf';
+        } else if (index === frequencies.length - 1) {
+          filter.type = 'highshelf';
+        } else {
+          filter.type = 'peaking';
+          filter.Q.value = 1.4;
+        }
+        filter.frequency.value = freq;
+        filter.gain.value = 0;
+        return filter;
+      });
+
+      // Bass Boost Node
+      this.bassNode = this.audioCtx.createBiquadFilter();
+      this.bassNode.type = 'lowshelf';
+      this.bassNode.frequency.value = 80;
+      this.bassNode.gain.value = 0;
+
+      // Spectrum Analyser
+      this.analyserNode = this.audioCtx.createAnalyser();
+      this.analyserNode.fftSize = 64;
+      this.analyserNode.smoothingTimeConstant = 0.8;
+
+      // Connect graph: Source -> Bass -> EQ 0..4 -> Analyser -> Destination
+      let currentNode = this.sourceNode;
+      currentNode.connect(this.bassNode);
+      currentNode = this.bassNode;
+
+      for (const eqNode of this.eqNodes) {
+        currentNode.connect(eqNode);
+        currentNode = eqNode;
+      }
+
+      currentNode.connect(this.analyserNode);
+      this.analyserNode.connect(this.audioCtx.destination);
+
+      this.isWebAudioInitialized = true;
+    } catch (err) {
+      console.warn('Web Audio initialization note (CORS or permissions):', err);
+    }
+  }
+
+  // Setup Apple & standard lock screen controls via MediaSession
+  setupMediaSession() {
+    if (!('mediaSession' in navigator)) return;
+
+    const actionHandlers = [
+      ['play', () => this.play()],
+      ['pause', () => this.pause()],
+      ['previoustrack', () => this.notify('prevTrackRequest')],
+      ['nexttrack', () => this.notify('nextTrackRequest')],
+      ['seekbackward', (details) => {
+        const skipTime = details.seekOffset || 10;
+        this.seek(Math.max(this.audio.currentTime - skipTime, 0));
+      }],
+      ['seekforward', (details) => {
+        const skipTime = details.seekOffset || 10;
+        this.seek(Math.min(this.audio.currentTime + skipTime, this.audio.duration || 0));
+      }],
+      ['seekto', (details) => {
+        if (details.seekTime != null) {
+          this.seek(details.seekTime);
+        }
+      }],
+      ['stop', () => {
+        this.pause();
+        this.seek(0);
+      }],
+    ];
+
+    for (const [action, handler] of actionHandlers) {
+      try {
+        navigator.mediaSession.setActionHandler(action, handler);
+      } catch (error) {
+        // unsupported action in this browser
+      }
+    }
+  }
+
+  updateMediaSessionMetadata(track) {
+    if (!('mediaSession' in navigator) || !track) return;
+
+    const artwork = [];
+    if (track.coverUrl) {
+      artwork.push(
+        { src: track.coverUrl, sizes: '96x96', type: 'image/png' },
+        { src: track.coverUrl, sizes: '128x128', type: 'image/png' },
+        { src: track.coverUrl, sizes: '192x192', type: 'image/png' },
+        { src: track.coverUrl, sizes: '256x256', type: 'image/png' },
+        { src: track.coverUrl, sizes: '384x384', type: 'image/png' },
+        { src: track.coverUrl, sizes: '512x512', type: 'image/png' }
+      );
+    }
+
+    navigator.mediaSession.metadata = new window.MediaMetadata({
+      title: track.title || 'Untitled Track',
+      artist: track.artist || 'Unknown Artist',
+      album: track.album || 'Local Library',
+      artwork: artwork,
+    });
+  }
+
+  updateMediaSessionPosition(currentTime, duration) {
+    if (!('mediaSession' in navigator) || !('setPositionState' in navigator.mediaSession)) return;
+    if (duration && isFinite(duration) && duration > 0) {
+      try {
+        navigator.mediaSession.setPositionState({
+          duration: duration,
+          playbackRate: this.audio.playbackRate || 1.0,
+          position: Math.min(currentTime, duration),
+        });
+      } catch (e) {
+        // Ignore edge position timing exceptions
+      }
+    }
+  }
+
+  async loadTrack(track) {
+    this.currentTrack = track;
+    this.initWebAudio();
+
+    if (this.audioCtx && this.audioCtx.state === 'suspended') {
+      await this.audioCtx.resume();
+    }
+
+    // Determine audio URL (blob url or streaming url)
+    let src = track.audioUrl;
+    if (track.audioBlob) {
+      src = URL.createObjectURL(track.audioBlob);
+    }
+
+    this.audio.src = src;
+    this.updateMediaSessionMetadata(track);
+    this.notify('trackChange', track);
+  }
+
+  async play() {
+    this.initWebAudio();
+    if (this.audioCtx && this.audioCtx.state === 'suspended') {
+      await this.audioCtx.resume();
+    }
+    try {
+      await this.audio.play();
+    } catch (e) {
+      console.warn('Playback error / autoplay prevention:', e);
+      throw e;
+    }
+  }
+
+  pause() {
+    this.audio.pause();
+  }
+
+  togglePlay() {
+    if (this.isPlaying) {
+      this.pause();
+    } else {
+      this.play();
+    }
+  }
+
+  seek(seconds) {
+    if (isFinite(seconds)) {
+      this.audio.currentTime = seconds;
+      this.updateMediaSessionPosition(seconds, this.audio.duration);
+    }
+  }
+
+  setVolume(val) {
+    this.volume = Math.max(0, Math.min(1, val));
+    this.audio.volume = this.volume;
+  }
+
+  setEqualizerBand(bandIndex, gainDb) {
+    if (this.eqNodes[bandIndex]) {
+      this.eqNodes[bandIndex].gain.setTargetAtTime(gainDb, this.audioCtx?.currentTime || 0, 0.05);
+      this.notify('eqChange', { bandIndex, gainDb });
+    }
+  }
+
+  setBassBoost(gainDb) {
+    if (this.bassNode) {
+      this.bassNode.gain.setTargetAtTime(gainDb, this.audioCtx?.currentTime || 0, 0.05);
+    }
+  }
+
+  applyEQPreset(preset) {
+    // preset: array of 5 dB gains, e.g. [4, 2, 0, 1, 3]
+    if (!Array.isArray(preset)) return;
+    preset.forEach((gain, index) => {
+      this.setEqualizerBand(index, gain);
+    });
+  }
+
+  getFrequencyData() {
+    if (!this.analyserNode) return new Uint8Array(32);
+    const dataArray = new Uint8Array(this.analyserNode.frequencyBinCount);
+    this.analyserNode.getByteFrequencyData(dataArray);
+    return dataArray;
+  }
+
+  on(event, callback) {
+    if (!this.listeners[event]) this.listeners[event] = [];
+    this.listeners[event].push(callback);
+    return () => {
+      this.listeners[event] = this.listeners[event].filter((cb) => cb !== callback);
+    };
+  }
+
+  notify(event, data) {
+    if (this.listeners[event]) {
+      this.listeners[event].forEach((cb) => cb(data));
+    }
+  }
+}
+
+export const audioEngine = new AudioEngine();

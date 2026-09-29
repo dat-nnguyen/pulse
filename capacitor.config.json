@@ -1,0 +1,18 @@
+{
+  "appId": "com.spotify.localplayer",
+  "appName": "Spotify Local",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "ios": {
+    "contentInset": "always",
+    "allowsLinkPreview": false,
+    "scrollEnabled": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "backgroundColor": "#121212",
+      "showSpinner": false
+    }
+  }
+}

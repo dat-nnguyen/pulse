@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  aura:
+    build: .
+    container_name: aura-music-player
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - HOST=0.0.0.0
+      - NODE_ENV=production
+    volumes:
+      - audio_cache:/app/audio_cache
+
+volumes:
+  audio_cache:
+    driver: local

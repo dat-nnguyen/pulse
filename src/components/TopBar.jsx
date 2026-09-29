@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -6,8 +5,10 @@ import {
   Sparkles,
   Download,
   Share2,
-  Sliders
+  Sliders,
+  Database
 } from 'lucide-react';
+import { isSupabaseConfigured } from '../services/supabaseClient';
 
 export default function TopBar({
   currentView,
@@ -15,11 +16,13 @@ export default function TopBar({
   setSearchQuery,
   onOpenShare,
   onOpenEqualizer,
+  onOpenSupabase,
   currentTrack,
   onOpenDownloader,
   canGoBack,
   onGoBack,
 }) {
+  const isCloudConnected = isSupabaseConfigured();
   return (
     <header className="aura-top-bar">
       {/* Navigation history arrows */}
@@ -72,6 +75,28 @@ export default function TopBar({
           title="Audio Equalizer & Visualizer"
         >
           <Sliders size={16} />
+        </button>
+
+        <button
+          className="aura-circle-btn"
+          onClick={onOpenSupabase}
+          title={isCloudConnected ? "Supabase Cloud: Connected" : "Connect Supabase Cloud"}
+          style={{ position: 'relative' }}
+        >
+          <Database size={16} color={isCloudConnected ? "#00d2df" : "inherit"} />
+          {isCloudConnected && (
+            <span
+              style={{
+                position: 'absolute',
+                top: 7,
+                right: 7,
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: '#00d2df',
+              }}
+            />
+          )}
         </button>
 
         <button

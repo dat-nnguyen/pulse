@@ -27,6 +27,7 @@ import LyricsView from './components/LyricsView';
 import EqualizerModal from './components/EqualizerModal';
 import QueueModal from './components/QueueModal';
 import ShareModal from './components/ShareModal';
+import SupabaseModal from './components/SupabaseModal';
 
 export default function App() {
   // Navigation & View State
@@ -42,6 +43,7 @@ export default function App() {
   const [showQueue, setShowQueue] = useState(false);
   const [showEqualizer, setShowEqualizer] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [showSupabaseModal, setShowSupabaseModal] = useState(false);
   const [showFullMobilePlayer, setShowFullMobilePlayer] = useState(false);
 
   // Library & Audio Data
@@ -332,6 +334,7 @@ export default function App() {
           onCreatePlaylist={handleCreatePlaylist}
           onOpenEqualizer={() => setShowEqualizer(true)}
           onOpenShare={() => setShowShare(true)}
+          onOpenSupabase={() => setShowSupabaseModal(true)}
           activeFilter={sidebarFilter}
           setActiveFilter={setSidebarFilter}
           selectedPlaylistId={selectedPlaylistId}
@@ -349,6 +352,7 @@ export default function App() {
             }}
             onOpenShare={() => setShowShare(true)}
             onOpenEqualizer={() => setShowEqualizer(true)}
+            onOpenSupabase={() => setShowSupabaseModal(true)}
             currentTrack={currentTrack}
             onOpenDownloader={() => handleOpenDownloader(searchQuery)}
             canGoBack={viewHistory.length > 1}
@@ -492,6 +496,7 @@ export default function App() {
         }}
         onOpenEqualizer={() => setShowEqualizer(true)}
         onOpenShare={() => setShowShare(true)}
+        onOpenSupabase={() => setShowSupabaseModal(true)}
       />
 
       {/* Modals */}
@@ -512,6 +517,11 @@ export default function App() {
         onClose={() => setShowShare(false)}
         tracks={tracks}
         playlists={playlists}
+      />
+
+      <SupabaseModal
+        isOpen={showSupabaseModal}
+        onClose={() => setShowSupabaseModal(false)}
       />
     </div>
   );

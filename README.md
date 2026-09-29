@@ -59,6 +59,36 @@ npm run start
 
 ---
 
+## ⚡ Cloud Deployment (Vercel Frontend + Supabase Backend)
+
+Aura can be deployed **100% serverless, zero-cost, and maintenance-free** using Vercel for the frontend and Supabase for cloud database and audio file storage.
+
+### 1. Set Up Supabase Backend (Free)
+
+1. Create a free account at [supabase.com](https://supabase.com) and create a new project.
+2. In your Supabase dashboard, navigate to **SQL Editor**.
+3. Open [`supabase/schema.sql`](supabase/schema.sql) from this repository, paste the entire SQL code, and click **Run**.
+   - This creates the `tracks`, `playlists`, `playlist_tracks`, and `likes` tables.
+   - It sets up the public `audio-files` storage bucket.
+   - It configures Row Level Security (RLS) policies for secure anonymous streaming and uploads.
+4. Go to **Project Settings** → **API** to copy your:
+   - **Project URL** (`https://xyzcompany.supabase.co`)
+   - **anon / public key** (`eyJhbGciOi...`)
+
+### 2. Deploy Frontend to Vercel (Free)
+
+1. Push this repository to your GitHub account (or fork it).
+2. Go to [vercel.com](https://vercel.com) and click **"Add New Project"**.
+3. Import your GitHub repository (`real-free-music-player`).
+4. In the **Environment Variables** section, add:
+   - `VITE_SUPABASE_URL`: `https://your-project.supabase.co`
+   - `VITE_SUPABASE_ANON_KEY`: your Supabase anon key
+5. Click **Deploy**. Vercel will build and deploy the application in ~30 seconds with a global CDN and automatic SSL!
+
+> **Alternative: UI Config**: You can also deploy to Vercel without environment variables. Users can click the **Database (Cloud)** icon in the top bar or sidebar to enter their Supabase credentials directly in the app.
+
+---
+
 ## 🐳 Self-Hosting with Docker
 
 The fastest way to deploy your personal music server on a VPS, home lab, or Synology NAS:

@@ -12,8 +12,10 @@ import {
   Mic2,
   Sliders,
   Share2,
-  Sparkles
+  Sparkles,
+  Database
 } from 'lucide-react';
+import { isSupabaseConfigured } from '../services/supabaseClient';
 
 export default function MobileFullPlayer({
   isOpen,
@@ -35,6 +37,7 @@ export default function MobileFullPlayer({
   onOpenLyrics,
   onOpenEqualizer,
   onOpenShare,
+  onOpenSupabase,
 }) {
   if (!isOpen || !currentTrack) return null;
 
@@ -46,6 +49,7 @@ export default function MobileFullPlayer({
   };
 
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const isCloudConnected = isSupabaseConfigured();
 
   return (
     <div className="aura-fullscreen-overlay">
@@ -68,13 +72,36 @@ export default function MobileFullPlayer({
           </div>
         </div>
 
-        <button
-          className="aura-circle-btn"
-          onClick={onOpenShare}
-          style={{ width: 40, height: 40 }}
-        >
-          <Share2 size={18} />
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            className="aura-circle-btn"
+            onClick={onOpenSupabase}
+            style={{ width: 40, height: 40, position: 'relative' }}
+            title={isCloudConnected ? "Supabase Cloud: Connected" : "Supabase Cloud"}
+          >
+            <Database size={18} color={isCloudConnected ? "#00d2df" : "inherit"} />
+            {isCloudConnected && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: 8,
+                  right: 8,
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: '#00d2df',
+                }}
+              />
+            )}
+          </button>
+          <button
+            className="aura-circle-btn"
+            onClick={onOpenShare}
+            style={{ width: 40, height: 40 }}
+          >
+            <Share2 size={18} />
+          </button>
+        </div>
       </div>
 
       {/* Large Artwork Frame */}

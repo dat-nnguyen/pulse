@@ -10,8 +10,10 @@ import {
   Share2,
   HardDriveDownload,
   Disc3,
-  Waves
+  Waves,
+  Database
 } from 'lucide-react';
+import { isSupabaseConfigured } from '../services/supabaseClient';
 
 export default function Sidebar({
   currentView,
@@ -21,11 +23,13 @@ export default function Sidebar({
   onCreatePlaylist,
   onOpenEqualizer,
   onOpenShare,
+  onOpenSupabase,
   activeFilter,
   setActiveFilter,
   selectedPlaylistId,
   setSelectedPlaylistId,
 }) {
+  const isCloudConnected = isSupabaseConfigured();
   return (
     <aside className="aura-sidebar">
       {/* Brand & Main Navigation Card */}
@@ -114,6 +118,27 @@ export default function Sidebar({
               onClick={onOpenEqualizer}
             >
               <Sliders size={14} />
+            </button>
+            <button
+              className="aura-circle-btn"
+              style={{ width: 28, height: 28, position: 'relative' }}
+              title={isCloudConnected ? "Supabase Cloud: Connected" : "Supabase Cloud Sync"}
+              onClick={onOpenSupabase}
+            >
+              <Database size={13} color={isCloudConnected ? "#00d2df" : "inherit"} />
+              {isCloudConnected && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: 4,
+                    right: 4,
+                    width: 5,
+                    height: 5,
+                    borderRadius: '50%',
+                    background: '#00d2df',
+                  }}
+                />
+              )}
             </button>
             <button
               className="aura-circle-btn"

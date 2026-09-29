@@ -108,12 +108,12 @@ export default function PlayerBar({
               onClick={onToggleLike}
               title={isLiked ? 'Remove from Favorites' : 'Save to Favorites'}
             >
-              <Heart size={18} fill={isLiked ? '#00f2fe' : 'none'} color={isLiked ? '#00f2fe' : 'currentColor'} />
+              <Heart size={18} fill={isLiked ? '#f43f5e' : 'none'} color={isLiked ? '#f43f5e' : 'currentColor'} />
             </button>
           </>
         ) : (
           <div className="aura-dock-info">
-            <span className="aura-dock-title" style={{ color: '#64748b' }}>Aura Soundstage</span>
+            <span className="aura-dock-title" style={{ color: '#64748b' }}>Pulse Audio</span>
             <span className="aura-dock-artist">Select a track to start listening</span>
           </div>
         )}
@@ -166,7 +166,7 @@ export default function PlayerBar({
             onChange={(e) => onSeek(parseFloat(e.target.value))}
             className="aura-scrubber"
             style={{
-              background: `linear-gradient(to right, #00f2fe 0%, #4facfe ${progressPercent}%, rgba(255, 255, 255, 0.12) ${progressPercent}%, rgba(255, 255, 255, 0.12) 100%)`,
+              background: `linear-gradient(to right, #00d2df 0%, #00d2df ${progressPercent}%, rgba(255, 255, 255, 0.12) ${progressPercent}%, rgba(255, 255, 255, 0.12) 100%)`,
             }}
           />
           <span className="aura-time-label">{formatTime(duration)}</span>

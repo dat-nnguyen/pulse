@@ -1,7 +1,5 @@
 import React from 'react';
 import {
-  Compass,
-  Search,
   Library,
   Plus,
   Heart,
@@ -10,8 +8,10 @@ import {
   Share2,
   HardDriveDownload,
   Disc3,
-  Waves,
-  Database
+  Activity,
+  Database,
+  User,
+  LogIn
 } from 'lucide-react';
 import { isSupabaseConfigured } from '../services/supabaseClient';
 
@@ -20,6 +20,8 @@ export default function Sidebar({
   setCurrentView,
   playlists = [],
   likedCount = 0,
+  user,
+  onOpenAuth,
   onCreatePlaylist,
   onOpenEqualizer,
   onOpenShare,
@@ -30,41 +32,31 @@ export default function Sidebar({
   setSelectedPlaylistId,
 }) {
   const isCloudConnected = isSupabaseConfigured();
+
   return (
     <aside className="aura-sidebar">
       {/* Brand & Main Navigation Card */}
       <div className="aura-glass-card">
         <div className="aura-brand-header">
           <div className="aura-logo-icon">
-            <Waves size={20} color="#ffffff" />
+            <Activity size={20} color="#00d2df" />
           </div>
           <div>
-            <div className="aura-brand-name">AURA</div>
-            <div className="aura-brand-tag">Lossless Audio</div>
+            <div className="aura-brand-name">PULSE</div>
+            <div className="aura-brand-tag">Personal Audio</div>
           </div>
         </div>
 
         <nav className="aura-nav-list">
           <button
-            className={`aura-nav-btn ${currentView === 'home' ? 'active' : ''}`}
+            className={`aura-nav-btn ${currentView === 'home' && !selectedPlaylistId ? 'active' : ''}`}
             onClick={() => {
               setCurrentView('home');
               setSelectedPlaylistId(null);
             }}
           >
-            <Compass size={20} />
-            <span>Discover</span>
-          </button>
-
-          <button
-            className={`aura-nav-btn ${currentView === 'search' ? 'active' : ''}`}
-            onClick={() => {
-              setCurrentView('search');
-              setSelectedPlaylistId(null);
-            }}
-          >
-            <Search size={20} />
-            <span>Search</span>
+            <Library size={19} />
+            <span>Playlists</span>
           </button>
 
           <button
@@ -74,8 +66,8 @@ export default function Sidebar({
               setSelectedPlaylistId(null);
             }}
           >
-            <CloudDownload size={20} />
-            <span>Add Audio & Shows</span>
+            <CloudDownload size={19} />
+            <span>Add Audio</span>
           </button>
         </nav>
       </div>
@@ -92,14 +84,15 @@ export default function Sidebar({
               display: 'flex',
               alignItems: 'center',
               gap: 8,
+              padding: 0,
             }}
             onClick={() => {
-              setCurrentView('library');
+              setCurrentView('home');
               setSelectedPlaylistId(null);
             }}
           >
-            <Library size={18} color="#00f2fe" />
-            <span className="aura-shelf-title">Your Collection</span>
+            <Disc3 size={17} color="#00d2df" />
+            <span className="aura-shelf-title">Your Playlists</span>
           </button>
 
           <div style={{ display: 'flex', gap: 4 }}>
@@ -109,7 +102,7 @@ export default function Sidebar({
               title="Create Playlist"
               onClick={onCreatePlaylist}
             >
-              <Plus size={16} />
+              <Plus size={15} />
             </button>
             <button
               className="aura-circle-btn"
@@ -117,7 +110,7 @@ export default function Sidebar({
               title="Equalizer & Visualizer"
               onClick={onOpenEqualizer}
             >
-              <Sliders size={14} />
+              <Sliders size={13} />
             </button>
             <button
               className="aura-circle-btn"
@@ -140,14 +133,6 @@ export default function Sidebar({
                 />
               )}
             </button>
-            <button
-              className="aura-circle-btn"
-              style={{ width: 28, height: 28 }}
-              title="Share Player"
-              onClick={onOpenShare}
-            >
-              <Share2 size={14} />
-            </button>
           </div>
         </div>
 
@@ -164,12 +149,6 @@ export default function Sidebar({
             onClick={() => setActiveFilter('playlists')}
           >
             Playlists
-          </button>
-          <button
-            className={`aura-chip ${activeFilter === 'podcasts' ? 'active' : ''}`}
-            onClick={() => setActiveFilter('podcasts')}
-          >
-            Podcasts
           </button>
           <button
             className={`aura-chip ${activeFilter === 'downloaded' ? 'active' : ''}`}
@@ -193,13 +172,13 @@ export default function Sidebar({
               <div
                 className="aura-item-cover"
                 style={{
-                  background: 'linear-gradient(135deg, #7f00ff, #f43f5e)',
+                  background: 'linear-gradient(135deg, #7f00ff, #e11d48)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <Heart size={18} fill="#ffffff" color="#ffffff" />
+                <Heart size={16} fill="#ffffff" color="#ffffff" />
               </div>
               <div className="aura-item-info">
                 <span className="aura-item-title">Favorites</span>
@@ -220,16 +199,16 @@ export default function Sidebar({
               <div
                 className="aura-item-cover"
                 style={{
-                  background: 'linear-gradient(135deg, #00f2fe, #4facfe)',
+                  background: 'linear-gradient(135deg, #0284c7, #0d9488)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <HardDriveDownload size={18} color="#ffffff" />
+                <HardDriveDownload size={16} color="#ffffff" />
               </div>
               <div className="aura-item-info">
-                <span className="aura-item-title">Offline Cache</span>
+                <span className="aura-item-title">Offline Storage</span>
                 <span className="aura-item-meta">Lossless & 320kbps</span>
               </div>
             </button>
@@ -251,13 +230,13 @@ export default function Sidebar({
                 <div
                   className="aura-item-cover"
                   style={{
-                    background: '#1a2438',
+                    background: '#151d2c',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <Disc3 size={18} color="#94a3b8" />
+                  <Disc3 size={16} color="#94a3b8" />
                 </div>
               )}
               <div className="aura-item-info">
@@ -266,6 +245,82 @@ export default function Sidebar({
               </div>
             </button>
           ))}
+        </div>
+
+        {/* Bottom User Sync Status Card */}
+        <div
+          style={{
+            marginTop: 10,
+            paddingTop: 10,
+            borderTop: '1px solid var(--border-subtle)',
+          }}
+        >
+          {user ? (
+            <button
+              onClick={onOpenAuth}
+              style={{
+                width: '100%',
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 8,
+                padding: '8px 10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+            >
+              <div
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: '50%',
+                  background: '#00d2df',
+                  color: '#080a10',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 11,
+                  fontWeight: 800,
+                  flexShrink: 0,
+                }}
+              >
+                {(user.email || 'U')[0].toUpperCase()}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {user.email?.split('@')[0]}
+                </div>
+                <div style={{ fontSize: 10.5, color: '#10b981', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#10b981' }} />
+                  Synced with Phone
+                </div>
+              </div>
+            </button>
+          ) : (
+            <button
+              onClick={onOpenAuth}
+              style={{
+                width: '100%',
+                background: 'transparent',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 8,
+                padding: '8px 10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                cursor: 'pointer',
+                color: '#94a3b8',
+                fontSize: 12,
+                fontWeight: 600,
+              }}
+            >
+              <LogIn size={13} />
+              <span>Sign In to Sync</span>
+            </button>
+          )}
         </div>
       </div>
     </aside>

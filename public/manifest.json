@@ -1,7 +1,7 @@
 {
-  "short_name": "Aura",
-  "name": "Aura — Lossless Audio Lounge",
-  "description": "Personal, ad-free high fidelity music and podcast player with offline downloads and background playback.",
+  "short_name": "Pulse",
+  "name": "Pulse — Personal Lossless Music",
+  "description": "Personal, ad-free high fidelity music and podcast player with offline downloads and cross-device sync.",
   "icons": [
     {
       "src": "/icon-192.png",

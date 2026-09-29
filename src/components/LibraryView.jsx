@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Play,
   Pause,
@@ -8,7 +8,11 @@ import {
   Trash2,
   Sparkles,
   Disc3,
-  Shuffle
+  Shuffle,
+  Search,
+  ChevronLeft,
+  Music,
+  Plus
 } from 'lucide-react';
 
 export default function LibraryView({
@@ -22,35 +26,50 @@ export default function LibraryView({
   onTogglePlay,
   onToggleLike,
   onDeleteTrack,
-  onPlayAll,
+  onBack,
+  onOpenDownloader,
 }) {
+  const [playlistFilter, setPlaylistFilter] = useState('');
+
   // Determine tracks to display based on selected playlist
   let title = 'Your Library';
-  let description = 'All tracks, podcasts, and offline downloads';
-  let bannerGradient = 'linear-gradient(180deg, #333333 0%, #121212 100%)';
+  let description = 'All lossless and offline tracks';
+  let bannerGradient = 'linear-gradient(180deg, #18202f 0%, #0b0e14 100%)';
   let coverArt = null;
-  let displayTracks = tracks;
+  let rawTracks = tracks;
 
   if (playlistId === 'liked') {
-    title = 'Liked Songs';
-    description = 'Your favorite songs saved to your local library';
-    bannerGradient = 'linear-gradient(180deg, #450af5 0%, #121212 100%)';
-    displayTracks = tracks.filter((t) => likedIds.has(t.id));
+    title = 'Favorites';
+    description = 'Your favorite songs saved to your library';
+    bannerGradient = 'linear-gradient(180deg, #3b114d 0%, #0b0e14 100%)';
+    rawTracks = tracks.filter((t) => likedIds.has(t.id));
   } else if (playlistId === 'downloaded') {
-    title = 'Offline Downloads';
+    title = 'Offline Storage';
     description = 'Saved locally to device storage • Lossless & 320kbps Original';
-    bannerGradient = 'linear-gradient(180deg, #0575e6 0%, #121212 100%)';
-    displayTracks = tracks.filter((t) => t.isDownloaded);
-  } else if (playlistId) {
+    bannerGradient = 'linear-gradient(180deg, #0c2b3d 0%, #0b0e14 100%)';
+    rawTracks = tracks.filter((t) => t.isDownloaded);
+  } else if (playlistId && playlistId !== 'all') {
     const pl = playlists.find((p) => p.id === playlistId);
     if (pl) {
       title = pl.name;
-      description = pl.description || 'Custom Playlist';
+      description = pl.description || 'Custom playlist';
       coverArt = pl.coverUrl;
       const idSet = new Set(pl.trackIds || []);
-      displayTracks = tracks.filter((t) => idSet.has(t.id));
+      rawTracks = tracks.filter((t) => idSet.has(t.id));
     }
   }
+
+  // In-playlist search filter
+  const displayTracks = useMemo(() => {
+    if (!playlistFilter.trim()) return rawTracks;
+    const q = playlistFilter.toLowerCase().trim();
+    return rawTracks.filter(
+      (t) =>
+        t.title?.toLowerCase().includes(q) ||
+        t.artist?.toLowerCase().includes(q) ||
+        t.album?.toLowerCase().includes(q)
+    );
+  }, [rawTracks, playlistFilter]);
 
   const formatTime = (secs) => {
     if (!secs || isNaN(secs) || !isFinite(secs)) return '0:00';
@@ -63,34 +82,65 @@ export default function LibraryView({
     currentTrack && displayTracks.some((t) => t.id === currentTrack.id);
 
   return (
-    <div className="spotify-scroll-area" style={{ padding: 0 }}>
-      {/* Hero Banner with Dominant Gradient */}
+    <div className="aura-scroll-area" style={{ padding: 0 }}>
+      {/* Hero Banner */}
       <div
         style={{
           background: bannerGradient,
-          padding: '40px 32px 24px 32px',
+          padding: '36px 32px 28px 32px',
           display: 'flex',
           alignItems: 'flex-end',
-          gap: 28,
+          gap: 24,
+          position: 'relative',
         }}
       >
+        {onBack && (
+          <button
+            className="aura-circle-btn"
+            onClick={onBack}
+            style={{
+              position: 'absolute',
+              top: 20,
+              left: 24,
+              width: 34,
+              height: 34,
+            }}
+            title="Back to Playlists"
+          >
+            <ChevronLeft size={20} />
+          </button>
+        )}
+
         {coverArt ? (
           <img
             src={coverArt}
             alt={title}
-            style={{ width: 192, height: 192, borderRadius: 8, boxShadow: '0 8px 30px rgba(0,0,0,0.6)', objectFit: 'cover' }}
+            style={{
+              width: 170,
+              height: 170,
+              borderRadius: 12,
+              objectFit: 'cover',
+              boxShadow: '0 12px 30px rgba(0,0,0,0.5)',
+              border: '1px solid var(--border-subtle)',
+            }}
           />
         ) : (
           <div
             style={{
-              width: 192,
-              height: 192,
-              borderRadius: 8,
-              background: playlistId === 'liked' ? 'linear-gradient(135deg, #450af5, #c4efd9)' : '#282828',
+              width: 170,
+              height: 170,
+              borderRadius: 12,
+              background:
+                playlistId === 'liked'
+                  ? 'linear-gradient(135deg, #7f00ff, #e11d48)'
+                  : playlistId === 'downloaded'
+                  ? 'linear-gradient(135deg, #0284c7, #0d9488)'
+                  : 'linear-gradient(135deg, #1e293b, #0f172a)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 8px 30px rgba(0,0,0,0.6)',
+              boxShadow: '0 12px 30px rgba(0,0,0,0.5)',
+              border: '1px solid var(--border-subtle)',
             }}
           >
             {playlistId === 'liked' ? (
@@ -98,74 +148,156 @@ export default function LibraryView({
             ) : playlistId === 'downloaded' ? (
               <HardDriveDownload size={64} color="#ffffff" />
             ) : (
-              <Disc3 size={64} color="#727272" />
+              <Disc3 size={64} color="#64748b" />
             )}
           </div>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 0 }}>
+          <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5, color: '#00d2df' }}>
             Playlist
           </span>
-          <h1 style={{ fontSize: 'clamp(28px, 5vw, 56px)', fontWeight: 900, letterSpacing: -1, lineHeight: 1.1 }}>
+          <h1
+            style={{
+              fontSize: 'clamp(26px, 4.5vw, 46px)',
+              fontWeight: 800,
+              letterSpacing: '-0.02em',
+              margin: '2px 0',
+              color: '#f8fafc',
+            }}
+          >
             {title}
           </h1>
-          <p style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: 14 }}>{description}</p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#ffffff', fontWeight: 600 }}>
-            <span>Spotify Local</span>
+          <p style={{ color: '#94a3b8', fontSize: 13.5, margin: 0 }}>{description}</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: '#e2e8f0', marginTop: 4 }}>
+            <span>Pulse Audio</span>
             <span>•</span>
-            <span>{displayTracks.length} {displayTracks.length === 1 ? 'song' : 'songs'}</span>
+            <span>{rawTracks.length} {rawTracks.length === 1 ? 'track' : 'tracks'}</span>
           </div>
         </div>
       </div>
 
-      {/* Action Buttons Row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 24, padding: '24px 32px' }}>
-        <button
-          className="quick-card-play-btn"
-          style={{
-            width: 56,
-            height: 56,
-            opacity: 1,
-            transform: 'none',
-            boxShadow: '0 8px 24px rgba(30, 215, 96, 0.4)',
-          }}
-          onClick={() => {
-            if (isPlaylistActive && isPlaying) {
-              onTogglePlay();
-            } else if (displayTracks.length > 0) {
-              onPlayTrack(displayTracks[0]);
-            }
-          }}
-          title="Play"
-        >
-          {isPlaylistActive && isPlaying ? (
-            <Pause size={26} fill="#000000" />
-          ) : (
-            <Play size={26} fill="#000000" style={{ marginLeft: 3 }} />
-          )}
-        </button>
+      {/* Action Row & In-Playlist Search */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '20px 32px',
+          gap: 16,
+          flexWrap: 'wrap',
+          borderBottom: '1px solid var(--border-subtle)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          {/* Main Play/Pause Button */}
+          <button
+            className="aura-btn-primary"
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: '50%',
+              padding: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            onClick={() => {
+              if (isPlaylistActive && isPlaying) {
+                onTogglePlay();
+              } else if (displayTracks.length > 0) {
+                onPlayTrack(displayTracks[0]);
+              }
+            }}
+            title="Play All"
+          >
+            {isPlaylistActive && isPlaying ? (
+              <Pause size={22} fill="#080a10" color="#080a10" />
+            ) : (
+              <Play size={22} fill="#080a10" color="#080a10" style={{ marginLeft: 2 }} />
+            )}
+          </button>
 
-        <button
-          className="control-btn"
-          title="Shuffle playlist"
-          onClick={() => {
-            if (displayTracks.length > 0) {
-              const randomIndex = Math.floor(Math.random() * displayTracks.length);
-              onPlayTrack(displayTracks[randomIndex]);
-            }
+          {/* Shuffle Button */}
+          <button
+            className="aura-circle-btn"
+            title="Shuffle playlist"
+            onClick={() => {
+              if (displayTracks.length > 0) {
+                const randomIndex = Math.floor(Math.random() * displayTracks.length);
+                onPlayTrack(displayTracks[randomIndex]);
+              }
+            }}
+          >
+            <Shuffle size={18} />
+          </button>
+        </div>
+
+        {/* IN-PLAYLIST SEARCH BAR (Fast Filter) */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            background: 'var(--aura-bg-elevated)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 8,
+            padding: '6px 12px',
+            minWidth: 240,
+            maxWidth: 320,
+            flex: '1 1 240px',
           }}
         >
-          <Shuffle size={24} />
-        </button>
+          <Search size={15} color="#94a3b8" />
+          <input
+            type="text"
+            placeholder="Search within playlist..."
+            value={playlistFilter}
+            onChange={(e) => setPlaylistFilter(e.target.value)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              outline: 'none',
+              color: '#f8fafc',
+              fontSize: 13,
+              width: '100%',
+            }}
+          />
+          {playlistFilter && (
+            <button
+              onClick={() => setPlaylistFilter('')}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#94a3b8',
+                cursor: 'pointer',
+                fontSize: 12,
+                padding: 0,
+              }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tracks Table */}
-      <div style={{ padding: '0 32px 40px 32px' }}>
+      <div style={{ padding: '8px 32px 40px 32px' }}>
         {displayTracks.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px 20px', color: '#b3b3b3' }}>
-            <p style={{ fontSize: 16, marginBottom: 12 }}>No songs found in this playlist.</p>
-            <p style={{ fontSize: 13 }}>Use the Download & Ingest tab to add your favorite music or podcasts.</p>
+          <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94a3b8' }}>
+            <p style={{ fontSize: 16, marginBottom: 8, color: '#f8fafc' }}>
+              {playlistFilter ? 'No matching tracks found in this playlist.' : 'This playlist is empty.'}
+            </p>
+            {onOpenDownloader && !playlistFilter && (
+              <button
+                className="aura-btn-primary"
+                onClick={onOpenDownloader}
+                style={{ marginTop: 12, fontSize: 13 }}
+              >
+                <Plus size={16} />
+                <span>Import Music or Podcasts</span>
+              </button>
+            )}
           </div>
         ) : (
           <table className="track-table">
@@ -174,9 +306,9 @@ export default function LibraryView({
                 <th style={{ width: 44 }}>#</th>
                 <th>Title</th>
                 <th>Album</th>
-                <th>Quality</th>
-                <th style={{ textAlign: 'right', width: 80 }}>
-                  <Clock size={16} />
+                <th>Bitrate</th>
+                <th style={{ textAlign: 'right', width: 70 }}>
+                  <Clock size={14} />
                 </th>
                 <th style={{ width: 60 }}></th>
               </tr>
@@ -198,77 +330,91 @@ export default function LibraryView({
                           <div className="eq-bar" />
                           <div className="eq-bar" />
                           <div className="eq-bar" />
-                          <div className="eq-bar" />
                         </div>
                       ) : (
-                        <span>{index + 1}</span>
+                        <span className="index-number">{index + 1}</span>
                       )}
                     </td>
 
                     <td>
-                      <div className="track-table-main">
-                        <img
-                          src={track.coverUrl}
-                          alt={track.title}
-                          className="track-table-cover"
-                        />
-                        <div className="track-table-title-col">
-                          <span className="track-table-title">{track.title}</span>
-                          <span className="track-table-artist">{track.artist}</span>
+                      <div className="track-primary-cell">
+                        {track.coverUrl ? (
+                          <img
+                            src={track.coverUrl}
+                            alt={track.title}
+                            className="track-cell-thumb"
+                          />
+                        ) : (
+                          <div
+                            className="track-cell-thumb"
+                            style={{
+                              background: '#151d2c',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <Music size={16} color="#64748b" />
+                          </div>
+                        )}
+                        <div className="track-cell-info">
+                          <div
+                            className="track-cell-title"
+                            style={{ color: isCurrent ? '#00d2df' : 'inherit' }}
+                          >
+                            {track.title}
+                          </div>
+                          <div className="track-cell-artist">{track.artist}</div>
                         </div>
                       </div>
                     </td>
 
-                    <td style={{ color: '#b3b3b3' }}>{track.album || 'Single'}</td>
+                    <td style={{ color: '#94a3b8', fontSize: 13 }}>
+                      {track.album || 'Single'}
+                    </td>
 
                     <td>
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 700,
-                          color: '#1ed760',
-                          background: 'rgba(30, 215, 96, 0.1)',
-                          padding: '2px 8px',
-                          borderRadius: 12,
-                        }}
-                      >
-                        {track.bitrate || 'Original'}
+                      <span className="aura-badge-lossless" style={{ fontSize: 10, padding: '2px 8px' }}>
+                        <Sparkles size={10} />
+                        <span>{track.bitrate || '320K'}</span>
                       </span>
                     </td>
 
-                    <td style={{ textAlign: 'right', color: '#b3b3b3' }}>
+                    <td style={{ textAlign: 'right', color: '#94a3b8', fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>
                       {formatTime(track.duration)}
                     </td>
 
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <button
-                          className="sidebar-icon-btn"
-                          style={{ padding: 4 }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onToggleLike(track.id);
-                          }}
+                          className="aura-circle-btn"
+                          style={{ width: 28, height: 28 }}
+                          onClick={() => onToggleLike(track.id)}
+                          title={isTrackLiked ? 'Remove from Favorites' : 'Add to Favorites'}
                         >
                           <Heart
-                            size={16}
-                            fill={isTrackLiked ? '#1ed760' : 'none'}
-                            color={isTrackLiked ? '#1ed760' : '#b3b3b3'}
+                            size={14}
+                            fill={isTrackLiked ? '#f43f5e' : 'none'}
+                            color={isTrackLiked ? '#f43f5e' : '#94a3b8'}
                           />
                         </button>
-                        <button
-                          className="sidebar-icon-btn"
-                          style={{ padding: 4 }}
-                          title="Delete from Library"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (window.confirm(`Delete "${track.title}" from library?`)) {
-                              onDeleteTrack(track.id);
-                            }
-                          }}
-                        >
-                          <Trash2 size={16} color="#727272" />
-                        </button>
+                        {onDeleteTrack && (
+                          <button
+                            className="aura-circle-btn"
+                            style={{ width: 28, height: 28 }}
+                            onClick={() => {
+                              if (window.confirm(`Delete "${track.title}" from library?`)) {
+                                onDeleteTrack(track.id);
+                              }
+                            }}
+                            title="Delete track"
+                          >
+                            <Trash2 size={13} color="#94a3b8" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

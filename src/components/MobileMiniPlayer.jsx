@@ -35,7 +35,7 @@ export default function MobileMiniPlayer({
           style={{
             height: '100%',
             width: `${progressPercent}%`,
-            background: 'linear-gradient(90deg, #00f2fe, #4facfe)',
+            background: '#00d2df',
             transition: 'width 0.1s linear',
           }}
         />
@@ -68,7 +68,7 @@ export default function MobileMiniPlayer({
             onToggleLike();
           }}
         >
-          <Heart size={18} fill={isLiked ? '#00f2fe' : 'none'} color={isLiked ? '#00f2fe' : '#94a3b8'} />
+          <Heart size={18} fill={isLiked ? '#f43f5e' : 'none'} color={isLiked ? '#f43f5e' : '#94a3b8'} />
         </button>
 
         <button

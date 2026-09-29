@@ -44,6 +44,11 @@ create table if not exists public.likes (
     liked_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
+-- Optional: User-Account Linking (for cross-device phone & laptop sync)
+alter table public.tracks add column if not exists user_id uuid references auth.users(id) on delete set null;
+alter table public.playlists add column if not exists user_id uuid references auth.users(id) on delete set null;
+alter table public.likes add column if not exists user_id uuid references auth.users(id) on delete cascade;
+
 -- 5. Create Storage Bucket for Audio & Cover Files
 insert into storage.buckets (id, name, public)
 values ('audio-files', 'audio-files', true)

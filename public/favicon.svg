@@ -1,9 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="64" height="64">
-  <rect width="48" height="48" rx="12" fill="#090C12"/>
+  <rect width="48" height="48" rx="12" fill="#0B0E14"/>
   <rect x="1" y="1" width="46" height="46" rx="11" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
-  <!-- Crisp soundwave bars -->
-  <path d="M12 28 V20 M18 34 V14 M24 38 V10 M30 32 V16 M36 26 V22" 
+  <!-- Minimalist Pulse Waveform -->
+  <path d="M10 24 H16 L20 14 L25 34 L29 18 L33 28 L35 24 H38" 
         stroke="#00D2DF" 
-        stroke-width="3.5" 
-        stroke-linecap="round"/>
+        stroke-width="3.2" 
+        stroke-linecap="round" 
+        stroke-linejoin="round" 
+        fill="none"/>
 </svg>

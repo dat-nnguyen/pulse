@@ -931,30 +931,74 @@ html, body, #root {
   color: var(--text-primary);
 }
 
-/* Synced Lyrics */
-.lyrics-container {
+/* Spotify-Style Lyrics Engine */
+.spotify-lyrics-stream {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 30px 10px;
-  max-width: 640px;
+  gap: 24px;
+  padding: 40px 16px 180px 16px;
+  max-width: 680px;
   margin: 0 auto;
 }
 
-.lyric-line {
-  font-size: 26px;
-  font-weight: 700;
-  line-height: 1.4;
-  color: rgba(255, 255, 255, 0.35);
-  transition: all 0.2s ease;
-  cursor: pointer;
-}
-
-.lyric-line.active {
-  color: #ffffff;
+.spotify-lyric-line {
   font-size: 28px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.015em;
+  color: rgba(255, 255, 255, 0.28);
+  transition: color 0.25s cubic-bezier(0.2, 0, 0, 1), transform 0.25s cubic-bezier(0.2, 0, 0, 1);
+  cursor: pointer;
+  user-select: none;
+  transform-origin: left center;
 }
 
-.lyric-line.past {
+.spotify-lyric-line:hover {
   color: rgba(255, 255, 255, 0.65);
+}
+
+.spotify-lyric-line.active {
+  color: #ffffff;
+  font-size: 32px;
+  font-weight: 800;
+  transform: scale(1.02);
+  text-shadow: 0 0 1px rgba(255, 255, 255, 0.5);
+}
+
+.spotify-lyric-line.past {
+  color: rgba(255, 255, 255, 0.52);
+}
+
+.spotify-lyric-line.future {
+  color: rgba(255, 255, 255, 0.22);
+}
+
+/* Playlist Card Hover & Create Card */
+.aura-playlist-card:hover {
+  border-color: rgba(0, 210, 223, 0.3) !important;
+  transform: translateY(-2px);
+}
+
+.aura-create-playlist-card:hover {
+  border-color: rgba(0, 210, 223, 0.45) !important;
+  background: rgba(0, 210, 223, 0.03) !important;
+  transform: translateY(-2px);
+}
+
+.aura-account-pill:hover {
+  background: var(--aura-surface-active) !important;
+  border-color: rgba(0, 210, 223, 0.3) !important;
+}
+
+@media (max-width: 768px) {
+  .spotify-lyrics-stream {
+    gap: 18px;
+    padding: 24px 10px 140px 10px;
+  }
+  .spotify-lyric-line {
+    font-size: 21px;
+  }
+  .spotify-lyric-line.active {
+    font-size: 24px;
+  }
 }

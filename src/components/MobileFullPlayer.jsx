@@ -64,11 +64,11 @@ export default function MobileFullPlayer({
         </button>
 
         <div style={{ textAlign: 'center' }}>
-          <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase', color: '#00f2fe' }}>
+          <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase', color: '#00d2df' }}>
             NOW PLAYING
           </span>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#f8fafc', marginTop: 2 }}>
-            {currentTrack.album || 'Aura Soundstage'}
+            {currentTrack.album || 'Pulse Soundstage'}
           </div>
         </div>
 
@@ -126,7 +126,7 @@ export default function MobileFullPlayer({
           onClick={onToggleLike}
           style={{ width: 44, height: 44 }}
         >
-          <Heart size={22} fill={isLiked ? '#00f2fe' : 'none'} color={isLiked ? '#00f2fe' : '#ffffff'} />
+          <Heart size={22} fill={isLiked ? '#f43f5e' : 'none'} color={isLiked ? '#f43f5e' : '#ffffff'} />
         </button>
       </div>
 
@@ -153,7 +153,7 @@ export default function MobileFullPlayer({
             cursor: 'pointer',
           }}
         >
-          <Sliders size={13} color="#00f2fe" />
+          <Sliders size={13} color="#00d2df" />
           <span>Equalizer</span>
         </button>
       </div>
@@ -171,7 +171,7 @@ export default function MobileFullPlayer({
           style={{
             width: '100%',
             height: 5,
-            background: `linear-gradient(to right, #00f2fe 0%, #4facfe ${progressPercent}%, rgba(255, 255, 255, 0.15) ${progressPercent}%, rgba(255, 255, 255, 0.15) 100%)`,
+            background: `linear-gradient(to right, #00d2df 0%, #00d2df ${progressPercent}%, rgba(255, 255, 255, 0.15) ${progressPercent}%, rgba(255, 255, 255, 0.15) 100%)`,
           }}
         />
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
@@ -240,7 +240,7 @@ export default function MobileFullPlayer({
         onClick={onOpenLyrics}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#00f2fe', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#00d2df', display: 'flex', alignItems: 'center', gap: 8 }}>
             <Mic2 size={16} /> Karaoke Synced Lyrics
           </span>
           <span style={{ fontSize: 12, color: '#94a3b8' }}>Tap to Expand</span>

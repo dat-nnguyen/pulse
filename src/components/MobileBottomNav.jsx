@@ -1,31 +1,15 @@
 import React from 'react';
-import { Compass, Search, Library, CloudDownload } from 'lucide-react';
+import { Library, CloudDownload, User } from 'lucide-react';
 
-export default function MobileBottomNav({ currentView, setCurrentView }) {
+export default function MobileBottomNav({ currentView, setCurrentView, user, onOpenAuth }) {
   return (
     <nav className="aura-mobile-nav">
       <button
-        className={`aura-mobile-tab ${currentView === 'home' ? 'active' : ''}`}
+        className={`aura-mobile-tab ${currentView === 'home' || currentView === 'playlist' ? 'active' : ''}`}
         onClick={() => setCurrentView('home')}
       >
-        <Compass size={22} />
-        <span>Discover</span>
-      </button>
-
-      <button
-        className={`aura-mobile-tab ${currentView === 'search' ? 'active' : ''}`}
-        onClick={() => setCurrentView('search')}
-      >
-        <Search size={22} />
-        <span>Search</span>
-      </button>
-
-      <button
-        className={`aura-mobile-tab ${currentView === 'library' ? 'active' : ''}`}
-        onClick={() => setCurrentView('library')}
-      >
         <Library size={22} />
-        <span>Collection</span>
+        <span>Playlists</span>
       </button>
 
       <button
@@ -34,6 +18,29 @@ export default function MobileBottomNav({ currentView, setCurrentView }) {
       >
         <CloudDownload size={22} />
         <span>Add Audio</span>
+      </button>
+
+      <button
+        className="aura-mobile-tab"
+        onClick={onOpenAuth}
+      >
+        <div style={{ position: 'relative', display: 'inline-block' }}>
+          <User size={22} />
+          {user && (
+            <span
+              style={{
+                position: 'absolute',
+                top: 0,
+                right: -2,
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                background: '#10b981',
+              }}
+            />
+          )}
+        </div>
+        <span>{user ? 'Account' : 'Sign In'}</span>
       </button>
     </nav>
   );

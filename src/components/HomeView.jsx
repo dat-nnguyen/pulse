@@ -1,240 +1,347 @@
 import React from 'react';
-import { Play, Pause, Sparkles, HardDriveDownload, Heart, Podcast as PodcastIcon, Radio } from 'lucide-react';
-import { FEATURED_PODCASTS } from '../services/podcastService';
+import {
+  Play,
+  Pause,
+  Heart,
+  HardDriveDownload,
+  Disc3,
+  Plus,
+  Music,
+  FolderPlus,
+  Sparkles,
+  ArrowRight,
+  CloudDownload
+} from 'lucide-react';
 
 export default function HomeView({
+  playlists = [],
   tracks = [],
   likedCount = 0,
   onPlayTrack,
-  onPlayPlaylist,
+  onOpenPlaylist,
+  onCreatePlaylist,
+  onOpenDownloader,
   currentTrack,
   isPlaying,
   onTogglePlay,
-  onSelectPodcast,
-  onOpenDownloader,
 }) {
   const offlineTracks = tracks.filter((t) => t.isDownloaded);
 
   return (
     <div className="aura-scroll-area">
-      {/* Soundstage Spotlight Hero */}
-      {currentTrack && (
-        <div className="aura-ambient-spotlight">
-          <div className="aura-spotlight-art-container">
-            <img
-              src={currentTrack.coverUrl}
-              alt={currentTrack.title}
-              className="aura-spotlight-art"
-            />
-          </div>
-
-          <div className="aura-spotlight-info">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <span className="aura-badge-lossless">
-                <Sparkles size={11} />
-                <span>{currentTrack.bitrate || '320K LOSSLESS'}</span>
-              </span>
-              <span style={{ fontSize: 12, color: '#94a3b8' }}>
-                {currentTrack.album || 'Studio Master'}
-              </span>
-            </div>
-
-            <h1 className="aura-spotlight-title">{currentTrack.title}</h1>
-            <div className="aura-spotlight-artist">{currentTrack.artist}</div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <button
-                className="aura-btn-primary"
-                onClick={onTogglePlay}
-                style={{ padding: '10px 24px', fontSize: 14 }}
-              >
-                {isPlaying ? <Pause size={18} fill="#ffffff" /> : <Play size={18} fill="#ffffff" />}
-                <span>{isPlaying ? 'Pause Session' : 'Play Now'}</span>
-              </button>
-
-              <button
-                className="aura-circle-btn"
-                title="View in Library"
-                onClick={() => onPlayPlaylist('downloaded')}
-              >
-                <HardDriveDownload size={18} color="#00f2fe" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Quick Listening Modes */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 32 }}>
-        <div
-          className="aura-glass-card"
-          style={{
-            cursor: 'pointer',
-            padding: 14,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            background: 'var(--aura-bg-elevated)',
-            border: '1px solid var(--border-subtle)',
-          }}
-          onClick={() => onPlayPlaylist('liked')}
-        >
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 8,
-              background: 'var(--aura-surface-active)',
-              border: '1px solid var(--border-strong)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Heart size={18} fill="#f43f5e" color="#f43f5e" />
-          </div>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc' }}>Favorites Lounge</div>
-            <div style={{ fontSize: 11.5, color: '#94a3b8' }}>{likedCount} saved tracks</div>
-          </div>
-        </div>
-
-        <div
-          className="aura-glass-card"
-          style={{
-            cursor: 'pointer',
-            padding: 14,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            background: 'var(--aura-bg-elevated)',
-            border: '1px solid var(--border-subtle)',
-          }}
-          onClick={() => onPlayPlaylist('downloaded')}
-        >
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 8,
-              background: 'var(--aura-surface-active)',
-              border: '1px solid var(--border-strong)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <HardDriveDownload size={18} color="#00d2df" />
-          </div>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc' }}>Offline Vault</div>
-            <div style={{ fontSize: 11.5, color: '#94a3b8' }}>{offlineTracks.length} local lossless songs</div>
-          </div>
-        </div>
-
-        <div
-          className="aura-glass-card"
-          style={{
-            cursor: 'pointer',
-            padding: 14,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            background: 'var(--aura-bg-elevated)',
-            border: '1px solid var(--border-subtle)',
-          }}
-          onClick={onOpenDownloader}
-        >
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 8,
-              background: 'var(--aura-surface-active)',
-              border: '1px solid var(--border-strong)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Radio size={18} color="#10b981" />
-          </div>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc' }}>Sound Ingest</div>
-            <div style={{ fontSize: 11.5, color: '#94a3b8' }}>Fetch YouTube, Podcasts & Files</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Section 1: Curated Lossless Masters */}
-      <div className="aura-section-header">
+      {/* Top Banner / User Vault Header */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 32,
+          paddingBottom: 20,
+          borderBottom: '1px solid var(--border-subtle)',
+          flexWrap: 'wrap',
+          gap: 16,
+        }}
+      >
         <div>
-          <h2 className="aura-section-title">Master Audio Sessions</h2>
-          <p style={{ color: '#94a3b8', fontSize: 13, marginTop: 4 }}>
-            Direct bit-perfect audio preserved with hardware equalization
+          <h1
+            style={{
+              fontSize: 28,
+              fontWeight: 800,
+              color: '#f8fafc',
+              margin: 0,
+              letterSpacing: '-0.02em',
+            }}
+          >
+            Your Playlists
+          </h1>
+          <p style={{ margin: '6px 0 0 0', fontSize: 13.5, color: '#94a3b8' }}>
+            {playlists.length + 2} collections • {tracks.length} lossless & original tracks
           </p>
         </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            className="aura-btn-primary"
+            onClick={onCreatePlaylist}
+            style={{ fontSize: 13 }}
+          >
+            <Plus size={16} />
+            <span>New Playlist</span>
+          </button>
+
+          <button
+            className="aura-btn-secondary"
+            onClick={onOpenDownloader}
+            style={{ fontSize: 13 }}
+          >
+            <CloudDownload size={16} />
+            <span>Add Audio</span>
+          </button>
+        </div>
       </div>
 
-      <div className="aura-cards-grid">
-        {tracks.map((track) => {
-          const isThisPlaying = currentTrack?.id === track.id && isPlaying;
-          return (
+      {/* Primary Collections Cards (Favorites, Offline, All Tracks) */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gap: 16,
+          marginBottom: 36,
+        }}
+      >
+        {/* Favorites / Liked Songs */}
+        <div
+          className="aura-glass-card aura-playlist-card"
+          onClick={() => onOpenPlaylist('liked')}
+          style={{
+            cursor: 'pointer',
+            padding: 20,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 16,
+            background: 'var(--aura-bg-elevated)',
+            border: '1px solid var(--border-subtle)',
+            position: 'relative',
+          }}
+        >
+          <div
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 12,
+              background: 'linear-gradient(135deg, #7f00ff, #e11d48)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <Heart size={26} fill="#ffffff" color="#ffffff" />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#f8fafc' }}>
+              Favorites
+            </div>
+            <div style={{ fontSize: 12.5, color: '#94a3b8', marginTop: 2 }}>
+              {likedCount} liked tracks
+            </div>
+          </div>
+          <div className="aura-card-play-btn" title="Open Favorites">
+            <ArrowRight size={18} color="#00d2df" />
+          </div>
+        </div>
+
+        {/* Offline Downloads */}
+        <div
+          className="aura-glass-card aura-playlist-card"
+          onClick={() => onOpenPlaylist('downloaded')}
+          style={{
+            cursor: 'pointer',
+            padding: 20,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 16,
+            background: 'var(--aura-bg-elevated)',
+            border: '1px solid var(--border-subtle)',
+            position: 'relative',
+          }}
+        >
+          <div
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 12,
+              background: 'linear-gradient(135deg, #0284c7, #0d9488)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <HardDriveDownload size={26} color="#ffffff" />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#f8fafc' }}>
+              Offline Storage
+            </div>
+            <div style={{ fontSize: 12.5, color: '#94a3b8', marginTop: 2 }}>
+              {offlineTracks.length} cached tracks
+            </div>
+          </div>
+          <div className="aura-card-play-btn" title="Open Offline">
+            <ArrowRight size={18} color="#00d2df" />
+          </div>
+        </div>
+
+        {/* All Songs Library */}
+        <div
+          className="aura-glass-card aura-playlist-card"
+          onClick={() => onOpenPlaylist('all')}
+          style={{
+            cursor: 'pointer',
+            padding: 20,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 16,
+            background: 'var(--aura-bg-elevated)',
+            border: '1px solid var(--border-subtle)',
+            position: 'relative',
+          }}
+        >
+          <div
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 12,
+              background: 'linear-gradient(135deg, #2563eb, #6366f1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <Music size={26} color="#ffffff" />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#f8fafc' }}>
+              All Tracks
+            </div>
+            <div style={{ fontSize: 12.5, color: '#94a3b8', marginTop: 2 }}>
+              {tracks.length} total tracks
+            </div>
+          </div>
+          <div className="aura-card-play-btn" title="Open All Tracks">
+            <ArrowRight size={18} color="#00d2df" />
+          </div>
+        </div>
+      </div>
+
+      {/* User Custom Playlists Grid */}
+      <div style={{ marginBottom: 40 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 20,
+          }}
+        >
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: '#f8fafc', margin: 0 }}>
+            Custom Playlists
+          </h2>
+          <span style={{ fontSize: 13, color: '#94a3b8' }}>
+            {playlists.length} custom {playlists.length === 1 ? 'playlist' : 'playlists'}
+          </span>
+        </div>
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+            gap: 18,
+          }}
+        >
+          {/* Create New Playlist Card */}
+          <div
+            onClick={onCreatePlaylist}
+            style={{
+              cursor: 'pointer',
+              borderRadius: 14,
+              border: '1px dashed rgba(255, 255, 255, 0.15)',
+              background: 'rgba(255, 255, 255, 0.02)',
+              padding: 20,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: 220,
+              textAlign: 'center',
+              transition: 'all 0.2s ease',
+            }}
+            className="aura-create-playlist-card"
+          >
             <div
-              key={track.id}
-              className="aura-media-card"
-              onClick={() => onPlayTrack(track)}
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: '50%',
+                background: 'rgba(0, 210, 223, 0.1)',
+                border: '1px solid rgba(0, 210, 223, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 12,
+              }}
             >
-              <div className="aura-card-art-box">
-                <img src={track.coverUrl} alt={track.title} className="aura-card-art" />
-                <button
-                  className="aura-card-floating-play"
-                  style={isThisPlaying ? { opacity: 1, transform: 'none' } : {}}
-                  title="Play Track"
-                >
-                  {isThisPlaying ? <Pause size={20} fill="#ffffff" /> : <Play size={20} fill="#ffffff" style={{ marginLeft: 2 }} />}
-                </button>
-              </div>
-              <div className="aura-card-title">{track.title}</div>
-              <div className="aura-card-subtitle">{track.artist} • {track.bitrate}</div>
+              <Plus size={22} color="#00d2df" />
             </div>
-          );
-        })}
-      </div>
-
-      {/* Section 2: Podcasts & Shows */}
-      <div className="aura-section-header" style={{ marginTop: 44 }}>
-        <div>
-          <h2 className="aura-section-title">Podcasts & Spoken Audio</h2>
-          <p style={{ color: '#94a3b8', fontSize: 13, marginTop: 4 }}>
-            Direct broadcast feeds • Stream or download episodes offline
-          </p>
-        </div>
-        <button
-          onClick={onOpenDownloader}
-          style={{ background: 'transparent', border: 'none', color: '#00f2fe', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
-        >
-          Explore All Shows
-        </button>
-      </div>
-
-      <div className="aura-cards-grid">
-        {FEATURED_PODCASTS.map((podcast) => (
-          <div
-            key={podcast.id}
-            className="aura-media-card"
-            onClick={() => onSelectPodcast(podcast)}
-          >
-            <div className="aura-card-art-box">
-              <img src={podcast.coverUrl} alt={podcast.name} className="aura-card-art" />
-              <button className="aura-card-floating-play" title="View Show">
-                <PodcastIcon size={20} color="#ffffff" />
-              </button>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc' }}>
+              Create Playlist
             </div>
-            <div className="aura-card-title">{podcast.name}</div>
-            <div className="aura-card-subtitle">{podcast.artist} • {podcast.genre}</div>
+            <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
+              Build a custom collection
+            </div>
           </div>
-        ))}
+
+          {/* User Playlist Cards */}
+          {playlists.map((pl) => (
+            <div
+              key={pl.id}
+              className="aura-glass-card aura-playlist-card"
+              onClick={() => onOpenPlaylist(pl.id)}
+              style={{
+                cursor: 'pointer',
+                borderRadius: 14,
+                padding: 14,
+                background: 'var(--aura-bg-elevated)',
+                border: '1px solid var(--border-subtle)',
+                display: 'flex',
+                flexDirection: 'column',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <div
+                style={{
+                  width: '100%',
+                  aspectRatio: '1/1',
+                  borderRadius: 10,
+                  overflow: 'hidden',
+                  background: '#151d2c',
+                  marginBottom: 12,
+                  position: 'relative',
+                }}
+              >
+                {pl.coverUrl ? (
+                  <img
+                    src={pl.coverUrl}
+                    alt={pl.name}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: 'linear-gradient(135deg, #1e293b, #0f172a)',
+                    }}
+                  >
+                    <Disc3 size={42} color="#64748b" />
+                  </div>
+                )}
+              </div>
+
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {pl.name}
+              </div>
+              <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 3 }}>
+                {pl.trackIds?.length || 0} {pl.trackIds?.length === 1 ? 'track' : 'tracks'}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -20,7 +20,6 @@ import MobileBottomNav from './components/MobileBottomNav';
 import MobileMiniPlayer from './components/MobileMiniPlayer';
 import MobileFullPlayer from './components/MobileFullPlayer';
 import HomeView from './components/HomeView';
-import SearchView from './components/SearchView';
 import LibraryView from './components/LibraryView';
 import DownloaderView from './components/DownloaderView';
 import LyricsView from './components/LyricsView';
@@ -28,14 +27,19 @@ import EqualizerModal from './components/EqualizerModal';
 import QueueModal from './components/QueueModal';
 import ShareModal from './components/ShareModal';
 import SupabaseModal from './components/SupabaseModal';
+import AuthModal from './components/AuthModal';
+import { getCurrentUser, subscribeAuthChange } from './services/authService';
 
 export default function App() {
+  // User Authentication State
+  const [user, setUser] = useState(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+
   // Navigation & View State
-  const [currentView, setCurrentView] = useState('home'); // 'home' | 'search' | 'library' | 'downloader' | 'playlist' | 'lyrics'
+  const [currentView, setCurrentView] = useState('home'); // 'home' | 'playlist' | 'downloader' | 'lyrics'
   const [viewHistory, setViewHistory] = useState(['home']);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState(null);
   const [sidebarFilter, setSidebarFilter] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
   const [prefilledDownloaderQuery, setPrefilledDownloaderQuery] = useState('');
 
   // Modals & Overlays
@@ -103,6 +107,11 @@ export default function App() {
       }
     }
     initDB();
+
+    // Check user authentication
+    getCurrentUser().then((u) => setUser(u));
+    const unsubscribe = subscribeAuthChange((u) => setUser(u));
+    return () => unsubscribe();
   }, []);
 
   // Play a specific track
@@ -331,6 +340,8 @@ export default function App() {
           setCurrentView={navigateTo}
           playlists={playlists}
           likedCount={likedIds.size}
+          user={user}
+          onOpenAuth={() => setShowAuthModal(true)}
           onCreatePlaylist={handleCreatePlaylist}
           onOpenEqualizer={() => setShowEqualizer(true)}
           onOpenShare={() => setShowShare(true)}
@@ -345,51 +356,33 @@ export default function App() {
         <main className="aura-main-content">
           <TopBar
             currentView={currentView}
-            searchQuery={searchQuery}
-            setSearchQuery={(q) => {
-              setSearchQuery(q);
-              if (currentView !== 'search') setCurrentView('search');
-            }}
+            user={user}
+            onOpenAuth={() => setShowAuthModal(true)}
             onOpenShare={() => setShowShare(true)}
             onOpenEqualizer={() => setShowEqualizer(true)}
             onOpenSupabase={() => setShowSupabaseModal(true)}
             currentTrack={currentTrack}
-            onOpenDownloader={() => handleOpenDownloader(searchQuery)}
+            onOpenDownloader={() => setCurrentView('downloader')}
             canGoBack={viewHistory.length > 1}
             onGoBack={handleGoBack}
           />
 
-          {/* Conditional View Rendering */}
+          {/* Pure Playlists & Collection Main View */}
           {currentView === 'home' && (
             <HomeView
+              playlists={playlists}
               tracks={tracks}
               likedCount={likedIds.size}
               onPlayTrack={handlePlayTrack}
-              onPlayPlaylist={(type) => {
+              onOpenPlaylist={(type) => {
                 setSelectedPlaylistId(type);
                 setCurrentView('playlist');
               }}
+              onCreatePlaylist={handleCreatePlaylist}
+              onOpenDownloader={() => setCurrentView('downloader')}
               currentTrack={currentTrack}
               isPlaying={isPlaying}
               onTogglePlay={handleTogglePlay}
-              onSelectPodcast={(podcast) => {
-                setPrefilledDownloaderQuery(podcast.name);
-                setCurrentView('downloader');
-              }}
-              onOpenDownloader={() => handleOpenDownloader()}
-            />
-          )}
-
-          {currentView === 'search' && (
-            <SearchView
-              searchQuery={searchQuery}
-              tracks={tracks}
-              onPlayTrack={handlePlayTrack}
-              onOpenDownloader={handleOpenDownloader}
-              onSelectPodcast={(pod) => {
-                setPrefilledDownloaderQuery(pod.name);
-                setCurrentView('downloader');
-              }}
             />
           )}
 
@@ -405,6 +398,11 @@ export default function App() {
               onTogglePlay={handleTogglePlay}
               onToggleLike={handleToggleLike}
               onDeleteTrack={handleDeleteTrack}
+              onBack={() => {
+                setSelectedPlaylistId(null);
+                setCurrentView('home');
+              }}
+              onOpenDownloader={() => setCurrentView('downloader')}
             />
           )}
 
@@ -425,6 +423,10 @@ export default function App() {
               currentTime={currentTime}
               onSeek={handleSeek}
               onClose={() => setCurrentView('home')}
+              onTrackUpdated={(updated) => {
+                setTracks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+                setCurrentTrack(updated);
+              }}
             />
           )}
         </main>
@@ -469,8 +471,13 @@ export default function App() {
         onOpenFullscreen={() => setShowFullMobilePlayer(true)}
       />
 
-      {/* Mobile Bottom Navigation Bar (iPhone) */}
-      <MobileBottomNav currentView={currentView} setCurrentView={navigateTo} />
+      {/* Mobile Bottom Navigation Bar (iPhone & Android) */}
+      <MobileBottomNav
+        currentView={currentView}
+        setCurrentView={navigateTo}
+        user={user}
+        onOpenAuth={() => setShowAuthModal(true)}
+      />
 
       {/* Fullscreen Mobile Player Overlay */}
       <MobileFullPlayer
@@ -522,6 +529,13 @@ export default function App() {
       <SupabaseModal
         isOpen={showSupabaseModal}
         onClose={() => setShowSupabaseModal(false)}
+      />
+
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        user={user}
+        onAuthSuccess={(u) => setUser(u)}
       />
     </div>
   );

@@ -15,7 +15,7 @@ if (!fs.existsSync(CACHE_DIR)) {
 }
 
 export const config = {
-  port: process.env.PORT || 3001,
+  port: process.env.PORT || 3030,
   host: process.env.HOST || '0.0.0.0',
   cacheDir: CACHE_DIR,
   distDir: path.join(rootDir, 'dist'),

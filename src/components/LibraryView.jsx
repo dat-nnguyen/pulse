@@ -85,12 +85,9 @@ export default function LibraryView({
     <div className="aura-scroll-area" style={{ padding: 0 }}>
       {/* Hero Banner */}
       <div
+        className="pulse-playlist-hero"
         style={{
           background: bannerGradient,
-          padding: '36px 32px 28px 32px',
-          display: 'flex',
-          alignItems: 'flex-end',
-          gap: 24,
           position: 'relative',
         }}
       >
@@ -115,20 +112,12 @@ export default function LibraryView({
           <img
             src={coverArt}
             alt={title}
-            style={{
-              width: 170,
-              height: 170,
-              borderRadius: 12,
-              objectFit: 'cover',
-              boxShadow: '0 12px 30px rgba(0,0,0,0.5)',
-              border: '1px solid var(--border-subtle)',
-            }}
+            className="pulse-hero-art"
           />
         ) : (
           <div
+            className="pulse-hero-art"
             style={{
-              width: 170,
-              height: 170,
               borderRadius: 12,
               background:
                 playlistId === 'liked'
@@ -144,11 +133,11 @@ export default function LibraryView({
             }}
           >
             {playlistId === 'liked' ? (
-              <Heart size={64} fill="#ffffff" color="#ffffff" />
+              <Heart size={48} fill="#ffffff" color="#ffffff" />
             ) : playlistId === 'downloaded' ? (
-              <HardDriveDownload size={64} color="#ffffff" />
+              <HardDriveDownload size={48} color="#ffffff" />
             ) : (
-              <Disc3 size={64} color="#64748b" />
+              <Disc3 size={48} color="#64748b" />
             )}
           </div>
         )}
@@ -178,17 +167,7 @@ export default function LibraryView({
       </div>
 
       {/* Action Row & In-Playlist Search */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '20px 32px',
-          gap: 16,
-          flexWrap: 'wrap',
-          borderBottom: '1px solid var(--border-subtle)',
-        }}
-      >
+      <div className="pulse-playlist-actions">
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           {/* Main Play/Pause Button */}
           <button
@@ -234,20 +213,7 @@ export default function LibraryView({
         </div>
 
         {/* IN-PLAYLIST SEARCH BAR (Fast Filter) */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            background: 'var(--aura-bg-elevated)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 8,
-            padding: '6px 12px',
-            minWidth: 240,
-            maxWidth: 320,
-            flex: '1 1 240px',
-          }}
-        >
+        <div className="pulse-playlist-search">
           <Search size={15} color="#94a3b8" />
           <input
             type="text"

@@ -30,18 +30,7 @@ export default function HomeView({
   return (
     <div className="aura-scroll-area">
       {/* Top Banner / User Vault Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 32,
-          paddingBottom: 20,
-          borderBottom: '1px solid var(--border-subtle)',
-          flexWrap: 'wrap',
-          gap: 16,
-        }}
-      >
+      <div className="pulse-home-header">
         <div>
           <h1
             style={{
@@ -81,14 +70,7 @@ export default function HomeView({
       </div>
 
       {/* Primary Collections Cards (Favorites, Offline, All Tracks) */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: 16,
-          marginBottom: 36,
-        }}
-      >
+      <div className="pulse-collections-grid">
         {/* Favorites / Liked Songs */}
         <div
           className="aura-glass-card aura-playlist-card"
@@ -234,13 +216,7 @@ export default function HomeView({
           </span>
         </div>
 
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-            gap: 18,
-          }}
-        >
+        <div className="pulse-playlists-grid">
           {/* Create New Playlist Card */}
           <div
             onClick={onCreatePlaylist}

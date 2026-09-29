@@ -30,22 +30,22 @@ export default function TopBar({
   return (
     <header className="aura-top-bar">
       {/* Left: Brand Identity & Navigation history */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div className="aura-topbar-left">
         <div style={{ display: 'flex', gap: 6 }}>
           <button
             className="aura-circle-btn"
             disabled={!canGoBack}
             onClick={onGoBack}
             title="Go back"
-            style={{ width: 34, height: 34 }}
+            style={{ width: 34, height: 34, opacity: canGoBack ? 1 : 0.4 }}
           >
             <ChevronLeft size={18} />
           </button>
           <button
-            className="aura-circle-btn"
+            className="aura-circle-btn hide-on-mobile"
             disabled
             title="Go forward"
-            style={{ width: 34, height: 34 }}
+            style={{ width: 34, height: 34, opacity: 0.3 }}
           >
             <ChevronRight size={18} />
           </button>
@@ -63,6 +63,7 @@ export default function TopBar({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              flexShrink: 0,
             }}
           >
             <Activity size={16} color="var(--pulse-accent)" />
@@ -74,7 +75,7 @@ export default function TopBar({
       </div>
 
       {/* Right Actions & Account Status */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div className="aura-topbar-right">
         {/* User Account / Device Sync Button */}
         {user ? (
           <button
@@ -87,7 +88,7 @@ export default function TopBar({
               gap: 8,
               padding: '6px 12px',
               borderRadius: 20,
-              background: 'var(--aura-bg-elevated)',
+              background: 'var(--pulse-bg-raised)',
               border: '1px solid var(--border-subtle)',
               color: '#f8fafc',
               cursor: 'pointer',
@@ -111,7 +112,7 @@ export default function TopBar({
             >
               {(user.email || 'U')[0].toUpperCase()}
             </div>
-            <span style={{ maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <span className="hide-on-mobile" style={{ maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {user.email?.split('@')[0]}
             </span>
             <span
@@ -127,7 +128,7 @@ export default function TopBar({
         ) : (
           <button
             onClick={onOpenAuth}
-            className="aura-btn-secondary"
+            className="aura-btn-secondary hide-on-mobile"
             title="Sign in to sync between phone and laptop"
             style={{ padding: '6px 14px', fontSize: 12.5 }}
           >
@@ -142,9 +143,9 @@ export default function TopBar({
           <span>{currentTrack?.bitrate || '320K'}</span>
         </div>
 
-        {/* Add Audio Button */}
+        {/* Add Audio Button (hidden on mobile, accessible via bottom nav) */}
         <button
-          className="aura-btn-primary"
+          className="aura-btn-primary hide-on-mobile"
           onClick={onOpenDownloader}
           title="Import music & podcasts"
           style={{ padding: '7px 14px', fontSize: 12.5 }}
@@ -153,9 +154,9 @@ export default function TopBar({
           <span>Add Audio</span>
         </button>
 
-        {/* Equalizer */}
+        {/* Equalizer (hidden on mobile, accessible in full player) */}
         <button
-          className="aura-circle-btn"
+          className="aura-circle-btn hide-on-mobile"
           onClick={onOpenEqualizer}
           title="Audio Equalizer & Visualizer"
           style={{ width: 34, height: 34 }}
@@ -186,9 +187,9 @@ export default function TopBar({
           )}
         </button>
 
-        {/* Share */}
+        {/* Share (hidden on mobile, accessible in full player) */}
         <button
-          className="aura-circle-btn"
+          className="aura-circle-btn hide-on-mobile"
           onClick={onOpenShare}
           title="Share Pulse"
           style={{ width: 34, height: 34 }}

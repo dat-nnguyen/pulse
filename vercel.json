@@ -1,7 +1,8 @@
 {
+  "framework": "vite",
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/((?!assets/|favicon|icon|manifest|sw.js).*)",
       "destination": "/index.html"
     }
   ]

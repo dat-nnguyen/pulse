@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     
     <!-- PWA & Mobile Support for iPhone & Android -->
-    <meta name="theme-color" content="#080A10" />
+    <meta name="theme-color" content="#0a0d14" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -21,17 +21,70 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="manifest" href="/manifest.json" />
+
+    <style>
+      /* Fallback background so page is never white */
+      html, body {
+        background-color: #0a0d14;
+        color: #f1f5f9;
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        width: 100%;
+      }
+      #root {
+        height: 100%;
+        width: 100%;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0a0d14;color:#94a3b8;font-family:sans-serif;font-size:14px;flex-direction:column;gap:12px;">
+        <div style="width:36px;height:36px;border:3px solid rgba(0,194,209,0.2);border-top-color:#00c2d1;border-radius:50%;animation:pulseSpin 0.8s linear infinite;"></div>
+        <div style="font-weight:600;letter-spacing:1px;color:#f1f5f9;">PULSE</div>
+      </div>
+      <style>
+        @keyframes pulseSpin { to { transform: rotate(360deg); } }
+      </style>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
+      // Service worker management
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch((err) => {
-            console.log('SW registration error:', err);
+        const isLocalhost = Boolean(
+          window.location.hostname === 'localhost' ||
+          window.location.hostname === '[::1]' ||
+          window.location.hostname.match(/^127(?:\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$/)
+        );
+
+        if (isLocalhost) {
+          // On localhost, unregister any existing service worker to prevent caching dev files
+          navigator.serviceWorker.getRegistrations().then((registrations) => {
+            for (const registration of registrations) {
+              registration.unregister();
+            }
           });
-        });
+        } else {
+          // In production, register the service worker
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').then((reg) => {
+              reg.onupdatefound = () => {
+                const installingWorker = reg.installing;
+                if (installingWorker) {
+                  installingWorker.onstatechange = () => {
+                    if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                      // New content available, automatic claim
+                      console.log('Pulse update ready.');
+                    }
+                  };
+                }
+              };
+            }).catch((err) => {
+              console.log('SW registration error:', err);
+            });
+          });
+        }
       }
     </script>
   </body>

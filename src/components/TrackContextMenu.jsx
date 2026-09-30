@@ -7,7 +7,9 @@ import {
   ListX,
   Disc3,
   Plus,
+  Download,
 } from 'lucide-react';
+import { downloadTrackAudioFile } from '../services/storageService';
 
 /**
  * Right-click context menu for tracks.
@@ -173,6 +175,13 @@ export default function TrackContextMenu({
         <Heart size={15} fill={isLiked ? '#f43f5e' : 'none'} color={isLiked ? '#f43f5e' : 'currentColor'} />,
         isLiked ? 'Remove from Favorites' : 'Add to Favorites',
         onToggleLike
+      )}
+
+      {/* Download Audio File to Device */}
+      {menuItem(
+        <Download size={15} color="var(--pulse-accent)" />,
+        'Download audio file',
+        () => downloadTrackAudioFile(track)
       )}
 
       {divider('d1')}

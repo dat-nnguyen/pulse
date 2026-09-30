@@ -18,13 +18,16 @@ import {
   testSupabaseConnection,
   isSupabaseConfigured
 } from '../services/supabaseClient';
+import { syncLibraryWithCloud } from '../services/storageService';
 
-export default function SupabaseModal({ isOpen, onClose }) {
+export default function SupabaseModal({ isOpen, onClose, onSyncSuccess }) {
   const credentials = getSupabaseCredentials();
   const [supabaseUrl, setSupabaseUrl] = useState(credentials.url || '');
   const [supabaseKey, setSupabaseKey] = useState(credentials.key || '');
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState(null);
   const { confirm, dialogProps } = useConfirm();
 
   const handleTestAndSave = async (e) => {
@@ -43,6 +46,27 @@ export default function SupabaseModal({ isOpen, onClose }) {
       setTimeout(() => {
         window.location.reload();
       }, 1200);
+    }
+  };
+
+  const handleSyncNow = async () => {
+    setIsSyncing(true);
+    setSyncStatus(null);
+    try {
+      const res = await syncLibraryWithCloud(true);
+      if (res.synced) {
+        setSyncStatus({
+          type: 'success',
+          message: `Synced: ${res.tracks?.length || 0} tracks, ${res.playlists?.length || 0} playlists, ${res.likedIds?.size || 0} favorites!`,
+        });
+        if (onSyncSuccess) onSyncSuccess(res);
+      } else {
+        setSyncStatus({ type: 'error', message: res.error || 'Sync could not be completed.' });
+      }
+    } catch (err) {
+      setSyncStatus({ type: 'error', message: err.message || 'Sync failed.' });
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -92,6 +116,7 @@ export default function SupabaseModal({ isOpen, onClose }) {
             alignItems: 'center',
             justifyContent: 'space-between',
             marginBottom: 20,
+            gap: 12,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -109,17 +134,55 @@ export default function SupabaseModal({ isOpen, onClose }) {
           </div>
 
           {isConnected && (
-            <button
-              onClick={handleDisconnect}
-              className="aura-circle-btn"
-              style={{ width: 'auto', padding: '4px 10px', fontSize: 11, color: '#f43f5e', border: 'none' }}
-              title="Disconnect cloud"
-            >
-              <Trash2 size={13} />
-              <span>Disconnect</span>
-            </button>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={handleSyncNow}
+                disabled={isSyncing}
+                className="aura-btn-secondary"
+                style={{ padding: '6px 12px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}
+                title="Force full library sync with cloud"
+              >
+                <RefreshCw size={13} className={isSyncing ? 'spin' : ''} />
+                <span>{isSyncing ? 'Syncing...' : 'Sync Now'}</span>
+              </button>
+              <button
+                onClick={handleDisconnect}
+                className="aura-circle-btn"
+                style={{ width: 'auto', padding: '4px 10px', fontSize: 11, color: '#f43f5e', border: 'none' }}
+                title="Disconnect cloud"
+              >
+                <Trash2 size={13} />
+                <span>Disconnect</span>
+              </button>
+            </div>
           )}
         </div>
+
+        {syncStatus && (
+          <div
+            style={{
+              padding: '10px 14px',
+              borderRadius: 8,
+              background: syncStatus.type === 'success' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(244, 63, 94, 0.12)',
+              border: `1px solid ${syncStatus.type === 'success' ? '#10b981' : '#f43f5e'}`,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              fontSize: 13,
+              marginBottom: 16,
+            }}
+          >
+            {syncStatus.type === 'success' ? (
+              <CheckCircle size={18} color="#10b981" />
+            ) : (
+              <AlertCircle size={18} color="#f43f5e" />
+            )}
+            <span style={{ color: syncStatus.type === 'success' ? '#10b981' : '#f43f5e' }}>
+              {syncStatus.message}
+            </span>
+          </div>
+        )}
 
         {/* Configuration Form */}
         <form onSubmit={handleTestAndSave} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -206,7 +269,7 @@ export default function SupabaseModal({ isOpen, onClose }) {
               ) : (
                 <>
                   <Save size={15} />
-                  <span>Connect & Sync</span>
+                  <span>Connect & Save</span>
                 </>
               )}
             </button>

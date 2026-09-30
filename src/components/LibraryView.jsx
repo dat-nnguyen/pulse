@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { ConfirmDialog, useConfirm } from './ConfirmDialog';
 import TrackContextMenu from './TrackContextMenu';
+import { downloadTrackAudioFile } from '../services/storageService';
 
 export default function LibraryView({
   playlistId,
@@ -226,6 +227,29 @@ export default function LibraryView({
           >
             <Shuffle size={18} />
           </button>
+
+          {/* Download Audio Files to Device (up to 10) */}
+          {displayTracks.length > 0 && (
+            <button
+              className="aura-circle-btn"
+              title={`Download audio files to device (${Math.min(displayTracks.length, 10)} tracks max)`}
+              onClick={async () => {
+                const toDownload = displayTracks.slice(0, 10);
+                if (toast) toast.info(`Starting download of ${toDownload.length} audio file(s)...`, { title: 'Downloading Audio' });
+                for (const t of toDownload) {
+                  try {
+                    await downloadTrackAudioFile(t);
+                    await new Promise((r) => setTimeout(r, 450));
+                  } catch (e) {
+                    console.warn('Failed to download track file:', t.title, e);
+                  }
+                }
+                if (toast) toast.success(`Finished downloading ${toDownload.length} track(s)!`, { title: 'Download Complete' });
+              }}
+            >
+              <Download size={18} />
+            </button>
+          )}
 
           {/* Delete Playlist Button */}
           {isCustomPlaylist && onDeletePlaylist && (

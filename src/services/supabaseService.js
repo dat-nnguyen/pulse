@@ -6,15 +6,27 @@ export async function uploadAudioToSupabaseStorage(trackId, fileBlob, filename =
   const client = getSupabaseClient();
   if (!client) throw new Error('Supabase is not configured');
 
-  const fileExt = filename.split('.').pop() || 'mp3';
+  const fileExt = (filename.split('.').pop() || 'mp3').toLowerCase();
   const filePath = `audio/${trackId}.${fileExt}`;
+
+  let contentType = fileBlob.type;
+  if (!contentType || contentType === 'application/octet-stream') {
+    if (fileExt === 'm4a') contentType = 'audio/mp4';
+    else if (fileExt === 'flac') contentType = 'audio/flac';
+    else if (fileExt === 'wav') contentType = 'audio/wav';
+    else if (fileExt === 'aac') contentType = 'audio/aac';
+    else contentType = 'audio/mpeg';
+  }
 
   const { error } = await client.storage.from('audio-files').upload(filePath, fileBlob, {
     upsert: true,
-    contentType: fileBlob.type || 'audio/mpeg',
+    contentType,
   });
 
-  if (error) throw error;
+  if (error) {
+    console.warn(`Supabase Storage upload warning for ${filePath}:`, error.message);
+    throw error;
+  }
 
   const { data } = client.storage.from('audio-files').getPublicUrl(filePath);
   return data.publicUrl;
@@ -43,8 +55,8 @@ export async function saveTrackToSupabase(track) {
 
   const record = {
     id: track.id,
-    title: track.title,
-    artist: track.artist,
+    title: track.title || 'Untitled Track',
+    artist: track.artist || 'Unknown Artist',
     album: track.album || 'Single',
     duration: Math.round(track.duration || 180),
     cover_url: track.coverUrl || null,
@@ -120,10 +132,12 @@ export async function fetchPlaylistsFromSupabase() {
   return (playlistsData || []).map((pl) => ({
     id: pl.id,
     name: pl.name,
+    title: pl.name,
     description: pl.description,
     coverUrl: pl.cover_url,
     trackIds: junctionMap[pl.id] || [],
     createdAt: new Date(pl.created_at).getTime(),
+    isCloudSynced: true,
   }));
 }
 
@@ -134,12 +148,15 @@ export async function savePlaylistToSupabase(playlist) {
 
   const { error: plError } = await client.from('playlists').upsert({
     id: playlist.id,
-    name: playlist.name,
+    name: playlist.name || playlist.title || 'Untitled Playlist',
     description: playlist.description || '',
     cover_url: playlist.coverUrl || null,
   });
 
-  if (plError) return null;
+  if (plError) {
+    console.warn('Supabase playlist save error:', plError.message);
+    return null;
+  }
 
   // Sync track junction
   if (Array.isArray(playlist.trackIds)) {
@@ -154,7 +171,7 @@ export async function savePlaylistToSupabase(playlist) {
     }
   }
 
-  return playlist;
+  return { ...playlist, isCloudSynced: true };
 }
 
 // Sync likes
@@ -197,4 +214,32 @@ export async function deletePlaylistFromSupabase(playlistId) {
   } catch (err) {
     console.warn('Failed to delete playlist from Supabase:', err);
   }
+}
+
+// Realtime Changes Listener
+export function subscribeToCloudChanges(onSyncNeeded) {
+  const client = getSupabaseClient();
+  if (!client) return () => {};
+
+  const channel = client
+    .channel('pulse-realtime-sync')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'tracks' }, (payload) => {
+      onSyncNeeded('tracks', payload);
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'playlists' }, (payload) => {
+      onSyncNeeded('playlists', payload);
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'playlist_tracks' }, (payload) => {
+      onSyncNeeded('playlist_tracks', payload);
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'likes' }, (payload) => {
+      onSyncNeeded('likes', payload);
+    })
+    .subscribe();
+
+  return () => {
+    try {
+      client.removeChannel(channel);
+    } catch (e) {}
+  };
 }

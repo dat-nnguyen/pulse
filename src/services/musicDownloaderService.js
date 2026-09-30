@@ -127,3 +127,59 @@ export async function downloadFromWebUrl(inputUrl, customMeta = {}) {
 
   throw new Error('Please enter a valid YouTube link or direct audio URL (.mp3, .m4a, .flac).');
 }
+
+// Download up to 10 tracks from a list of URLs
+export async function downloadMultipleFromWebUrls(urls = [], onProgress = () => {}) {
+  const cleanUrls = urls
+    .map((u) => u.trim())
+    .filter((u) => u.length > 0)
+    .slice(0, 10); // Enforce max 10
+
+  if (cleanUrls.length === 0) {
+    throw new Error('No valid URLs provided.');
+  }
+
+  const results = {
+    total: cleanUrls.length,
+    successful: [],
+    failed: [],
+  };
+
+  for (let i = 0; i < cleanUrls.length; i++) {
+    const url = cleanUrls[i];
+    onProgress({
+      index: i,
+      total: cleanUrls.length,
+      currentUrl: url,
+      status: 'downloading',
+      percent: Math.round((i / cleanUrls.length) * 100),
+    });
+
+    try {
+      const track = await downloadFromWebUrl(url);
+      results.successful.push({ url, track });
+      onProgress({
+        index: i,
+        total: cleanUrls.length,
+        currentUrl: url,
+        track,
+        status: 'success',
+        percent: Math.round(((i + 1) / cleanUrls.length) * 100),
+      });
+    } catch (err) {
+      console.warn(`Failed to download ${url}:`, err);
+      results.failed.push({ url, error: err.message || 'Download failed' });
+      onProgress({
+        index: i,
+        total: cleanUrls.length,
+        currentUrl: url,
+        error: err.message || 'Download failed',
+        status: 'error',
+        percent: Math.round(((i + 1) / cleanUrls.length) * 100),
+      });
+    }
+  }
+
+  return results;
+}
+

@@ -9,7 +9,9 @@ import {
   getAllPlaylists,
   savePlaylist,
   deletePlaylist as removePlaylistFromDB,
+  syncLibraryWithCloud,
 } from './services/storageService';
+import { subscribeToCloudChanges } from './services/supabaseService';
 
 // Components
 import Sidebar from './components/Sidebar';
@@ -206,8 +208,22 @@ export default function App() {
 
     // Check user authentication & listen for recovery / auth changes
     getCurrentUser().then((u) => setUser(u));
-    const unsubscribe = subscribeAuthChange(
-      (u) => setUser(u),
+    const unsubscribeAuth = subscribeAuthChange(
+      async (u) => {
+        setUser(u);
+        if (u) {
+          try {
+            const res = await syncLibraryWithCloud(true);
+            if (res.synced) {
+              if (res.tracks) setTracks(res.tracks);
+              if (res.playlists) setPlaylists(res.playlists);
+              if (res.likedIds) setLikedIds(res.likedIds);
+            }
+          } catch (e) {
+            console.warn('Auth change sync error:', e);
+          }
+        }
+      },
       () => {
         // PASSWORD_RECOVERY event
         setAuthModalMode('recovery');
@@ -215,12 +231,34 @@ export default function App() {
       }
     );
 
+    // Setup real-time cloud sync listener across devices
+    let syncTimeout = null;
+    const unsubscribeCloud = subscribeToCloudChanges(() => {
+      if (syncTimeout) clearTimeout(syncTimeout);
+      syncTimeout = setTimeout(async () => {
+        try {
+          const res = await syncLibraryWithCloud();
+          if (res.synced) {
+            if (res.tracks) setTracks(res.tracks);
+            if (res.playlists) setPlaylists(res.playlists);
+            if (res.likedIds) setLikedIds(res.likedIds);
+          }
+        } catch (e) {
+          console.warn('Realtime cloud sync error:', e);
+        }
+      }, 600);
+    });
+
     if (window.location.hash.includes('type=recovery')) {
       setAuthModalMode('recovery');
       setShowAuthModal(true);
     }
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAuth();
+      unsubscribeCloud();
+      if (syncTimeout) clearTimeout(syncTimeout);
+    };
   }, []);
 
   // Play a specific track
@@ -612,8 +650,13 @@ export default function App() {
             <DownloaderView
               prefilledQuery={prefilledDownloaderQuery}
               onTrackAdded={(newTrack) => {
-                setTracks((prev) => [newTrack, ...prev]);
-                handlePlayTrack(newTrack);
+                setTracks((prev) => {
+                  const filtered = prev.filter((t) => t.id !== newTrack.id);
+                  return [newTrack, ...filtered];
+                });
+                if (!currentTrackRef.current) {
+                  handlePlayTrack(newTrack);
+                }
               }}
               onPlayTrack={handlePlayTrack}
               toast={toast}
@@ -734,6 +777,11 @@ export default function App() {
       <SupabaseModal
         isOpen={showSupabaseModal}
         onClose={() => setShowSupabaseModal(false)}
+        onSyncSuccess={(res) => {
+          if (res.tracks) setTracks(res.tracks);
+          if (res.playlists) setPlaylists(res.playlists);
+          if (res.likedIds) setLikedIds(res.likedIds);
+        }}
       />
 
       <AuthModal

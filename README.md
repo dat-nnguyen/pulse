@@ -1,37 +1,60 @@
-# 🎵 Aura — Lossless Audio Lounge
+# ⚡ Pulse — Free Lossless Music Player
 
-> **Personal, ad-free, high-fidelity music & podcast player for Mac, iPhone, and Android.**  
-> Zero subscriptions. Zero advertisements. Bit-perfect original audio with continuous background lock-screen playback.
+> **Personal, ad-free, high-fidelity music & podcast player for macOS, iOS, Android, and Web.**  
+> Zero subscriptions. Zero advertisements. Bit-perfect original audio with continuous background lock-screen playback and cloud library sync.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20iOS%20%7C%20Android%20%7C%20Web-00c2d1.svg)](https://github.com/dat-nnguyen/real-free-music-player)
 [![Node.js](https://img.shields.io/badge/Node.js-v20%2B-green.svg)](https://nodejs.org/)
 [![Vite](https://img.shields.io/badge/Vite-8.x-646CFF.svg)](https://vitejs.dev/)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://www.docker.com/)
+[![Electron](https://img.shields.io/badge/Electron-44.x-47848F.svg)](https://www.electronjs.org/)
+[![Supabase](https://img.shields.io/badge/Supabase-Cloud%20Sync-3ECF8E.svg)](https://supabase.com/)
 
 ---
 
 ## ✨ Features
 
 - **💎 Bit-Perfect High-Fidelity Audio**: Preserves original 320kbps MP3, FLAC (24-bit lossless), WAV, and M4A audio without lossy re-encoding or artificial degradation.
-- **📱 Background Lock-Screen Playback (iPhone & Android)**: Keeps playing continuously when your phone screen turns off, locks, or you switch apps. Full native lock screen media controls (album artwork, scrub bar, play/pause/skip).
-- **💻 Desktop Background Audio (macOS & Windows)**: Music continues uninterrupted when the app or browser window is minimized or hidden.
+- **🖥️ Native macOS Desktop App**:
+  - Packaged native macOS app (`Pulse.app` in `/Applications`) and `.dmg` installer.
+  - Native window dragging with sleek traffic light window control placement.
+  - Transparent dock icon integration matching macOS design standards.
+- **📱 Seamless iPhone & Android Support**:
+  - **Instant Safari PWA**: Add to Home Screen directly from Safari for a fullscreen, borderless native feel.
+  - **Native iOS Project**: Pre-configured Capacitor iOS project ready for Xcode compilation.
+  - **Continuous Lock-Screen Playback**: Keeps playing when the screen is locked or while multitasking, with native lock-screen media controls and album artwork via MediaSession.
+- **☁️ Cloud Sync (Supabase Backend)**:
+  - Synchronize playlists, favorites, and library tracks across your Mac, iPhone, and Web in real time.
+  - Secure authentication with email & password, password reset, and encrypted sessions.
+  - Direct offline backup & restore via JSON export/import (AirDrop / file transfer).
+- **🧭 Two-Way History Navigation Stack**:
+  - Interactive TopBar navigation with **Back (`<`)**, **Forward (`>`)**, and **Home (`🏠`)** buttons.
+  - Full keyboard shortcuts: <kbd>⌘</kbd> + <kbd>[</kbd> / <kbd>Alt</kbd> + <kbd>←</kbd> (Back) and <kbd>⌘</kbd> + <kbd>]</kbd> / <kbd>Alt</kbd> + <kbd>→</kbd> (Forward).
 - **📥 Music & Podcast Ingestion Engine**:
-  - **YouTube & Web Audio**: Ingest from YouTube, SoundCloud, or direct audio links in 320kbps master quality.
-  - **Apple Podcasts Directory & RSS**: Search millions of podcasts, stream live, or download episodes offline.
-  - **Local Audio Drag-and-Drop**: Drop your existing `.mp3`, `.flac`, `.wav`, or `.m4a` files with automatic metadata extraction.
-- **💾 100% Offline Vault**: Downloaded audio is stored in your device's local IndexedDB storage. Listen anywhere on airplanes or off-grid without data usage.
-- **🎛️ Hardware-Accelerated Equalizer**: 5-band Web Audio EQ (60Hz, 250Hz, 1kHz, 4kHz, 16kHz), Bass Boost control, presets (*Bass Boost, Vocal, Acoustic, Rock, Electronic, Flat, Treble Boost*), and real-time live spectrum visualizer canvas.
-- **🎤 Synchronized Karaoke Lyrics**: Synced `.lrc` lyrics with real-time active line highlighting, smooth auto-scroll, and click-to-seek functionality.
-- **🤝 Zero-Friction Sharing**: Share a simple URL with friends. They can install it immediately on iOS or Android as a standalone PWA with zero App Store fees or ads.
+  - **YouTube & Web Audio**: Download songs, albums, and playlists in master 320kbps quality directly into your library.
+  - **Apple Podcasts Directory**: Search millions of podcasts, stream live, or download episodes for offline listening.
+  - **Local Audio Drag & Drop**: Drop `.mp3`, `.flac`, `.wav`, or `.m4a` files directly into the window with automatic metadata and cover art extraction.
+- **💾 100% Offline Vault**:
+  - All downloaded audio tracks are stored locally in your device's persistent IndexedDB storage.
+  - Listen offline on airplanes, commutes, or off-grid without data usage.
+- **🎛️ Hardware-Accelerated 5-Band Equalizer**:
+  - Parametric Web Audio EQ (60Hz, 250Hz, 1kHz, 4kHz, 16kHz) with dedicated Bass Boost.
+  - Studio presets: *Bass Boost, Vocal, Acoustic, Rock, Electronic, Flat, Treble Boost*.
+  - Real-time frequency spectrum visualizer canvas.
+- **🎤 Synchronized Karaoke Lyrics**:
+  - Time-synced `.lrc` lyrics with live active line highlighting, auto-scrolling, and click-to-seek playback.
+- **📋 Right-Click Context Menus**:
+  - Desktop-native contextual right-click menus on tracks and playlists (Play, Add to Playlist, Remove from Playlist, Delete).
 
 ---
 
-## 🚀 Quick Start (Local)
+## 🚀 Quick Start (Local Development)
 
 ### Prerequisites
 
-- Node.js 18+ (tested on Node.js 20 and 26)
+- Node.js 18+ (tested on Node.js 20 and Node.js 26)
 - npm or pnpm
+- macOS (for macOS native desktop app and Xcode iOS build)
 
 ### Installation
 
@@ -43,125 +66,129 @@ cd real-free-music-player
 # Install dependencies
 npm install
 
-# Start the development server (binds to 0.0.0.0 for mobile network access)
+# Start the local development server (binds to 0.0.0.0 for LAN access)
 npm run dev
 ```
 
 - Open **[http://localhost:5173](http://localhost:5173)** on your Mac or PC.
-- Open **`http://<your-mac-ip>:5173`** on your iPhone or Android phone connected to the same Wi-Fi.
+- Open **`http://<your-mac-ip>:5173`** on your iPhone or Android phone connected to the same Wi-Fi network.
 
-### Production Run
+---
+
+## 💻 macOS Native Desktop App
+
+Pulse can be compiled and installed directly to your Mac's `/Applications` folder as a native desktop application:
 
 ```bash
-# Build frontend and launch the unified production server on port 3001
-npm run start
+# Build frontend and install directly to /Applications/Pulse.app
+npm run install:mac
+
+# Or build the standalone DMG installer in release/
+npm run dist:mac
 ```
 
----
-
-## ⚡ Cloud Deployment (Vercel Frontend + Supabase Backend)
-
-Aura can be deployed **100% serverless, zero-cost, and maintenance-free** using Vercel for the frontend and Supabase for cloud database and audio file storage.
-
-### 1. Set Up Supabase Backend (Free)
-
-1. Create a free account at [supabase.com](https://supabase.com) and create a new project.
-2. In your Supabase dashboard, navigate to **SQL Editor**.
-3. Open [`supabase/schema.sql`](supabase/schema.sql) from this repository, paste the entire SQL code, and click **Run**.
-   - This creates the `tracks`, `playlists`, `playlist_tracks`, and `likes` tables.
-   - It sets up the public `audio-files` storage bucket.
-   - It configures Row Level Security (RLS) policies for secure anonymous streaming and uploads.
-4. Go to **Project Settings** → **API** to copy your:
-   - **Project URL** (`https://xyzcompany.supabase.co`)
-   - **anon / public key** (`eyJhbGciOi...`)
-
-### 2. Deploy Frontend to Vercel (Free)
-
-1. Push this repository to your GitHub account (or fork it).
-2. Go to [vercel.com](https://vercel.com) and click **"Add New Project"**.
-3. Import your GitHub repository (`real-free-music-player`).
-4. In the **Environment Variables** section, add:
-   - `VITE_SUPABASE_URL`: `https://your-project.supabase.co`
-   - `VITE_SUPABASE_ANON_KEY`: your Supabase anon key
-5. Click **Deploy**. Vercel will build and deploy the application in ~30 seconds with a global CDN and automatic SSL!
-
-> **Alternative: UI Config**: You can also deploy to Vercel without environment variables. Users can click the **Database (Cloud)** icon in the top bar or sidebar to enter their Supabase credentials directly in the app.
+Once installed, launch **Pulse** from Spotlight (<kbd>⌘</kbd> + <kbd>Space</kbd>) or Launchpad.
 
 ---
 
-## 🐳 Self-Hosting with Docker
+## 📲 iPhone & Mobile Installation
 
-The fastest way to deploy your personal music server on a VPS, home lab, or Synology NAS:
+### Option 1: Instant Safari PWA (Recommended — Fast & Wireless)
 
-```bash
-# Start with Docker Compose
-docker compose up -d
+1. Make sure your iPhone is connected to the same Wi-Fi network as your Mac.
+2. In **Safari** on your iPhone, navigate to your Mac's LAN IP:
+   ```text
+   http://<your-mac-ip>:5173
+   ```
+3. Tap the **Share** button at the bottom of Safari (the square with the upward arrow `[↑]`).
+4. Scroll down and tap **"Add to Home Screen"** (*Thêm vào MH chính*).
+5. Tap **Add**. Pulse will appear on your home screen as a standalone, fullscreen app with lock-screen playback.
+
+### Option 2: Native iOS Build via Xcode (Capacitor)
+
+1. Sync the latest web build to the iOS project:
+   ```bash
+   npm run ios:sync
+   ```
+2. Open the project in Xcode:
+   ```bash
+   npm run ios:open
+   ```
+3. In Xcode, connect your iPhone via USB, select your personal signing team under **Signing & Capabilities**, and press **⌘ + R** to run.
+
+---
+
+## ☁️ Cloud Sync (Supabase Backend)
+
+Pulse supports real-time cloud synchronization for playlists, favorites, and audio across all your devices using Supabase.
+
+### 1. Environment Setup
+
+Create a `.env` file in the root directory (based on `.env.example`):
+
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-public-key
 ```
 
-Your server will be running on `http://localhost:3001` with `audio_cache` persistent storage.
+### 2. Database Schema
+
+1. Create a free account at [supabase.com](https://supabase.com) and create a project.
+2. In the Supabase Dashboard, open the **SQL Editor**.
+3. Paste the contents of [`supabase/schema.sql`](supabase/schema.sql) and click **Run**.
+   - Creates `tracks`, `playlists`, `playlist_tracks`, and `likes` tables.
+   - Configures the `audio-files` storage bucket.
+   - Sets up Row Level Security (RLS) policies for user data isolation.
+
+### 3. In-App Sync & Authentication
+
+- Tap the **Cloud Sync icon** (green dot indicator) in Pulse's TopBar or Sidebar to sign in, register, or enter credentials on any device.
+- Alternatively, use the **Share / Install** modal (<kbd>Smartphone</kbd> icon) to **Export** or **Import** your entire library as a `.json` backup file via AirDrop or iCloud.
 
 ---
 
-## 📲 Mobile Installation Guide
+## 📦 Available Scripts
 
-### Apple iPhone (iOS)
-
-1. Open the player URL in **Safari**.
-2. Tap the **Share** button (box with upward arrow).
-3. Scroll down and tap **"Add to Home Screen"**.
-4. The app launches full-screen with no browser borders and plays continuously with lock-screen controls when your iPhone screen is turned off.
-
-### Android (Chrome / Brave / Edge)
-
-1. Open the player URL in **Chrome**.
-2. Tap the **⋮ (Menu)** button in the top right.
-3. Tap **"Install app"** or **"Add to Home screen"**.
-4. Aura runs as a native standalone app with background notification media controls.
-
----
-
-## 🛠️ Native iOS Xcode Build
-
-A pre-configured Capacitor iOS project with native background audio entitlements (`UIBackgroundModes: ["audio"]` and `AVAudioSessionCategoryPlayback`) is included in `ios/App/App`:
-
-```bash
-# Sync web build to iOS
-npm run ios:sync
-
-# Open in Xcode (requires Mac with Xcode installed)
-npm run ios:open
-```
-
-You can build and deploy the `.ipa` directly to your iPhone via Xcode, AltStore, or Sideloadly.
+| Command | Description |
+| :--- | :--- |
+| `npm run dev` | Launch Vite dev server bound to `--host` for local & mobile access |
+| `npm run build` | Build the optimized client bundle into `dist/` |
+| `npm run server` | Launch the audio extraction & metadata backend server on port 3001 |
+| `npm run desktop` | Launch the native desktop app with Electron in development mode |
+| `npm run install:mac` | Build, package, and install `Pulse.app` to `/Applications` |
+| `npm run dist:mac` | Package the release `.dmg` installer for macOS |
+| `npm run pack:mac` | Package the macOS directory bundle without generating a DMG |
+| `npm run ios:sync` | Sync frontend assets from `dist/` to the Capacitor iOS project |
+| `npm run ios:open` | Open the native iOS project in Xcode |
+| `npm run start` | Build the client and run the unified production server |
+| `npm run lint` | Run the linter (`oxlint`) |
 
 ---
 
 ## 📁 Architecture Overview
 
 ```text
-├── public/                 # Static assets, PWA manifest, service worker
-│   ├── favicon.svg         # Signature Aura glowing soundwave icon
-│   ├── manifest.json       # Web App Manifest (Android & iOS PWA)
-│   └── sw.js               # Offline caching service worker
+├── electron/               # Native macOS Electron desktop integration
+│   ├── main.js             # Main process, window lifecycle, dock icon
+│   └── preload.js          # Secure IPC preload bridge
+├── ios/App/                # Native Capacitor iOS project (Xcode workspace)
 ├── server/                 # Production Node.js backend
-│   ├── config/             # Environment & path configuration
-│   ├── controllers/        # Download, podcast, and lyrics controllers
-│   ├── middleware/         # Security, CORS, and error handlers
-│   ├── routes/             # Clean REST API endpoints
-│   ├── services/           # Audio extraction, RSS parser, and lyrics API
-│   └── server.js           # Production Express app
-├── src/                    # Frontend React application
-│   ├── components/         # Aura UI components (Soundstage, Dock, Modals)
-│   ├── services/           # AudioEngine, IndexedDB storage, Web Audio EQ
-│   ├── App.jsx             # Master application coordinator
-│   └── index.css           # Bespoke Aura design tokens & glassmorphism
-├── Dockerfile              # Multi-stage production container
-├── docker-compose.yml      # 1-command container orchestration
-└── capacitor.config.json   # Native mobile configuration
+│   ├── controllers/        # Download, podcast search, and lyrics controllers
+│   ├── services/           # yt-dlp audio extraction, RSS parser, lyrics API
+│   └── server.js           # Express API server
+├── src/                    # Frontend React 19 application
+│   ├── components/         # TopBar, Sidebar, PlayerBar, Library, Equalizer, Modals
+│   ├── services/           # AudioEngine, IndexedDB storageService, SupabaseClient
+│   ├── App.jsx             # Root application coordinator & navigation stack
+│   └── index.css           # Pulse bespoke design tokens, glassmorphism, responsive CSS
+├── build/                  # App icons (icon.icns, icon.png)
+├── supabase/               # Database migration schema & storage policies
+├── capacitor.config.json   # Native mobile packaging configuration
+└── package.json            # Scripts and project dependencies
 ```
 
 ---
 
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE) — free for personal, educational, and commercial open-source use.
+This project is licensed under the [MIT License](LICENSE) — free for personal, educational, and open-source use.

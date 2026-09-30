@@ -1,6 +1,6 @@
 {
-  "appId": "com.spotify.localplayer",
-  "appName": "Spotify Local",
+  "appId": "com.pulse.musicplayer",
+  "appName": "Pulse",
   "webDir": "dist",
   "bundledWebRuntime": false,
   "ios": {
@@ -11,7 +11,7 @@
   "plugins": {
     "SplashScreen": {
       "launchShowDuration": 1500,
-      "backgroundColor": "#121212",
+      "backgroundColor": "#07090e",
       "showSpinner": false
     }
   }

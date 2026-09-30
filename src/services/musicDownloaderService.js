@@ -105,81 +105,65 @@ export async function downloadTrackToLocal(track, onProgress = () => {}) {
   }
 }
 
-// Download from YouTube or direct URL via local backend or free public resolver
+// Download from YouTube or direct URL via local backend or direct audio stream
 export async function downloadFromWebUrl(inputUrl, customMeta = {}) {
-  // Try local backend server first (runs yt-dlp)
+  const trimmedUrl = inputUrl.trim();
+
+  // 1. Try local companion backend server first (runs native yt-dlp)
   try {
     const res = await fetch('/api/download', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: inputUrl, ...customMeta }),
-      signal: AbortSignal.timeout(5000),
+      body: JSON.stringify({ url: trimmedUrl, ...customMeta }),
+      signal: AbortSignal.timeout(60000), // Allow 60s for high-quality audio extraction
     });
+
     if (res.ok) {
       const data = await res.json();
-      return saveTrack(data.track);
+      if (data && data.success && data.track) {
+        return saveTrack(data.track);
+      }
+    } else {
+      const errData = await res.json().catch(() => ({}));
+      if (errData.error) {
+        throw new Error(errData.error);
+      }
     }
   } catch (backendErr) {
-    // Local server not running or network timeout, proceed with fallback
+    // If backend threw an explicit error from server
+    if (backendErr.message && !backendErr.message.includes('fetch') && !backendErr.message.includes('timeout')) {
+      throw backendErr;
+    }
+    // Otherwise backend server is not running or unreachable (e.g. on Vercel standalone), proceed to fallback
   }
 
-  // Fallback: If it's a direct audio URL (.mp3, .m4a, .flac, .wav, .ogg)
-  const isDirectAudio = /\.(mp3|m4a|wav|flac|ogg|aac)(\?.*)?$/i.test(inputUrl);
+  // 2. Direct Audio URL (.mp3, .m4a, .flac, .wav, .ogg, .aac)
+  const isDirectAudio = /\.(mp3|m4a|wav|flac|ogg|aac)(\?.*)?$/i.test(trimmedUrl);
   if (isDirectAudio) {
-    const filename = inputUrl.split('/').pop().split('?')[0];
+    const filename = trimmedUrl.split('/').pop().split('?')[0];
     const cleanTitle = decodeURIComponent(filename.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '));
     const track = {
       id: `web_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       title: customMeta.title || cleanTitle,
       artist: customMeta.artist || 'Web Stream',
       album: customMeta.album || 'Downloaded Tracks',
-      audioUrl: inputUrl,
+      audioUrl: trimmedUrl,
       coverUrl: customMeta.coverUrl || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80',
       duration: 180,
       bitrate: '320 kbps Original',
-      format: inputUrl.split('.').pop().split('?')[0].toUpperCase(),
+      format: trimmedUrl.split('.').pop().split('?')[0].toUpperCase(),
       type: 'music',
     };
     return downloadTrackToLocal(track);
   }
 
-  // For YouTube / SoundCloud: extract using public Cobalt API
-  try {
-    const cobaltRes = await fetch('https://api.cobalt.tools/api/json', {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        url: inputUrl,
-        downloadMode: 'audio',
-        audioFormat: 'mp3',
-        audioBitrate: '320',
-      }),
-    });
-
-    if (cobaltRes.ok) {
-      const cobaltData = await cobaltRes.json();
-      if (cobaltData.url) {
-        const track = {
-          id: `yt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-          title: customMeta.title || cobaltData.filename || 'Downloaded Audio',
-          artist: customMeta.artist || 'Unknown Artist',
-          album: customMeta.album || 'YouTube Downloads',
-          audioUrl: cobaltData.url,
-          coverUrl: customMeta.coverUrl || 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop&q=80',
-          duration: 200,
-          bitrate: '320 kbps (Original)',
-          format: 'MP3',
-          type: 'music',
-        };
-        return downloadTrackToLocal(track);
-      }
-    }
-  } catch (cobaltErr) {
-    console.warn('Cobalt download attempt failed:', cobaltErr);
+  // 3. YouTube link on standalone web / Vercel without local backend server
+  const isYouTube = /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/i.test(trimmedUrl);
+  if (isYouTube) {
+    throw new Error(
+      'YouTube audio extraction requires the Pulse local server running on your Mac (run "npm run server" in terminal). Alternatively, you can paste any direct .mp3 / .m4a link or import local files directly!'
+    );
   }
 
-  throw new Error('Unable to extract audio. Ensure the link is valid or run the companion Mac backend server.');
+  throw new Error('Please enter a valid YouTube link or direct audio URL (.mp3, .m4a, .flac).');
 }

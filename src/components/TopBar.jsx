@@ -187,14 +187,14 @@ export default function TopBar({
           )}
         </button>
 
-        {/* Share (hidden on mobile, accessible in full player) */}
+        {/* Install App on Phone & Desktop / Share */}
         <button
-          className="aura-circle-btn hide-on-mobile"
+          className="aura-circle-btn"
           onClick={onOpenShare}
-          title="Share Pulse"
+          title="Install App on Phone (iOS/Android) & Share"
           style={{ width: 34, height: 34 }}
         >
-          <Share2 size={15} />
+          <Share2 size={15} color="var(--pulse-accent)" />
         </button>
       </div>
     </header>

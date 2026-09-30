@@ -1,7 +1,7 @@
 import React from 'react';
-import { Library, CloudDownload, User } from 'lucide-react';
+import { Library, CloudDownload, User, Smartphone } from 'lucide-react';
 
-export default function MobileBottomNav({ currentView, setCurrentView, user, onOpenAuth }) {
+export default function MobileBottomNav({ currentView, setCurrentView, user, onOpenAuth, onOpenShare }) {
   return (
     <nav className="aura-mobile-nav">
       <button
@@ -18,6 +18,14 @@ export default function MobileBottomNav({ currentView, setCurrentView, user, onO
       >
         <CloudDownload size={22} />
         <span>Add Audio</span>
+      </button>
+
+      <button
+        className="aura-mobile-tab"
+        onClick={onOpenShare}
+      >
+        <Smartphone size={22} color="var(--pulse-accent)" />
+        <span>Install App</span>
       </button>
 
       <button

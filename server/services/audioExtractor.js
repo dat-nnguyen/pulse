@@ -8,57 +8,62 @@ export async function extractAudioFromUrl(url, customMeta = {}) {
   const outputId = `track_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
   const outputPath = path.join(config.cacheDir, `${outputId}.%(ext)s`);
 
-  return new Promise((resolve) => {
-    // Try yt-dlp first
-    const cmd = `"${ytDlpCmd}" -x --audio-format mp3 --audio-quality 0 --embed-thumbnail --add-metadata -o "${outputPath}" --print-json "${url}"`;
+  return new Promise((resolve, reject) => {
+    // Download best available audio stream (prefers m4a/aac, falls back to webm/opus) without needing ffmpeg
+    const cmd = `"${ytDlpCmd}" -f "ba[ext=m4a]/ba/b" --no-playlist -o "${outputPath}" --print-json "${url}"`;
 
-    exec(cmd, { timeout: 60000 }, (error, stdout) => {
-      if (!error && stdout) {
+    exec(cmd, { timeout: 60000 }, (error, stdout, stderr) => {
+      let info = null;
+      if (stdout) {
         try {
-          const info = JSON.parse(stdout.split('\n')[0]);
-          const trackTitle = customMeta.title || info.title || 'Downloaded Audio';
-          const trackArtist = customMeta.artist || info.uploader || info.channel || 'Various Artists';
-          const trackDuration = Math.round(info.duration || 180);
-          const coverUrl = info.thumbnail || '';
-          const filename = `${outputId}.mp3`;
-
-          return resolve({
-            success: true,
-            track: {
-              id: outputId,
-              title: trackTitle,
-              artist: trackArtist,
-              album: info.album || 'Web Audio Downloads',
-              duration: trackDuration,
-              coverUrl,
-              audioUrl: `/audio/${filename}`,
-              bitrate: '320 kbps (Original Master)',
-              format: 'MP3',
-              type: 'music',
-              isDownloaded: true,
-            },
-          });
+          const lines = stdout.trim().split('\n');
+          // Last JSON object in output
+          for (let i = lines.length - 1; i >= 0; i--) {
+            try {
+              info = JSON.parse(lines[i]);
+              if (info && info.id) break;
+            } catch (e) {}
+          }
         } catch (parseErr) {
-          // Fall through
+          // Continue
         }
       }
 
-      // Stream fallback
-      resolve({
-        success: true,
-        track: {
-          id: outputId,
-          title: customMeta.title || 'Web Audio Stream',
-          artist: customMeta.artist || 'Online Master',
-          album: 'Web Audio Downloads',
-          duration: 210,
-          coverUrl: customMeta.coverUrl || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80',
-          audioUrl: url,
-          bitrate: '320 kbps (Original)',
-          format: 'MP3',
-          type: 'music',
-        },
-      });
+      // Check if file was downloaded to cache
+      const files = fs.readdirSync(config.cacheDir);
+      const downloadedFile = files.find((f) => f.startsWith(outputId));
+
+      if (downloadedFile) {
+        const ext = path.extname(downloadedFile).replace('.', '').toUpperCase() || 'M4A';
+        const trackTitle = customMeta.title || (info && info.title) || 'Downloaded Audio';
+        const trackArtist = customMeta.artist || (info && (info.uploader || info.channel)) || 'Various Artists';
+        const trackDuration = Math.round((info && info.duration) || 180);
+        const coverUrl = (info && info.thumbnail) || '';
+
+        return resolve({
+          success: true,
+          track: {
+            id: outputId,
+            title: trackTitle,
+            artist: trackArtist,
+            album: (info && info.album) || 'Web Audio Downloads',
+            duration: trackDuration,
+            coverUrl,
+            audioUrl: `/audio/${downloadedFile}`,
+            bitrate: '320 kbps (High Quality)',
+            format: ext,
+            type: 'music',
+            isDownloaded: true,
+          },
+        });
+      }
+
+      if (error) {
+        console.error('yt-dlp execution error:', error.message, stderr);
+        return reject(new Error('Failed to extract audio from link. Please verify the URL.'));
+      }
+
+      reject(new Error('Audio file was not generated.'));
     });
   });
 }

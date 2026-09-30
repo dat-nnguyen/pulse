@@ -471,6 +471,7 @@ export default function App() {
         setCurrentView={navigateTo}
         user={user}
         onOpenAuth={() => setShowAuthModal(true)}
+        onOpenShare={() => setShowShare(true)}
       />
 
       {/* Fullscreen Mobile Player Overlay */}

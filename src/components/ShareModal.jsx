@@ -83,8 +83,13 @@ export default function ShareModal({ isOpen, onClose, tracks = [], playlists = [
         {/* Header */}
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Share2 size={22} color="#00f2fe" />
-            <h2 className="modal-title" style={{ fontFamily: 'Outfit, sans-serif' }}>Share Aura Sound Lounge</h2>
+            <Smartphone size={22} color="var(--pulse-accent)" />
+            <div>
+              <h2 className="modal-title" style={{ fontFamily: 'var(--font-display)', margin: 0 }}>Install Pulse on Phone & PC</h2>
+              <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-secondary)' }}>
+                Download as native app • Background audio • Lock-screen controls
+              </p>
+            </div>
           </div>
           <button className="aura-circle-btn" onClick={onClose}>
             <X size={18} />
@@ -92,79 +97,78 @@ export default function ShareModal({ isOpen, onClose, tracks = [], playlists = [
         </div>
 
         {/* Share Link Box */}
-        <div style={{ background: 'rgba(255, 255, 255, 0.04)', padding: 16, borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', marginBottom: 20 }}>
-          <label style={{ fontSize: 11, fontWeight: 800, color: '#00f2fe', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 8 }}>
-            Free & Open Link (No Ads • No Subscription)
+        <div style={{ background: 'var(--pulse-bg-raised)', padding: 14, borderRadius: 12, border: '1px solid var(--border-subtle)', marginBottom: 20 }}>
+          <label style={{ fontSize: 11, fontWeight: 800, color: 'var(--pulse-accent)', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 8 }}>
+            Web App URL (No Ads • Free & Open)
           </label>
           <div style={{ display: 'flex', gap: 10 }}>
             <input
               type="text"
               readOnly
               value={currentUrl}
-              className="aura-search-input"
-              style={{ flex: 1, borderRadius: 8, padding: '10px 14px', background: 'rgba(0,0,0,0.4)', color: '#fff' }}
+              className="pulse-input"
+              style={{ flex: 1, padding: '10px 14px' }}
             />
             <button
               className="aura-btn-primary"
-              style={{ padding: '10px 20px', borderRadius: 8 }}
+              style={{ padding: '10px 18px', borderRadius: 8, whiteSpace: 'nowrap' }}
               onClick={handleCopyLink}
             >
               {copied ? <Check size={16} /> : <Copy size={16} />}
-              <span>{copied ? 'Copied Link' : 'Copy'}</span>
+              <span>{copied ? 'Copied!' : 'Copy Link'}</span>
             </button>
           </div>
         </div>
 
-        {/* Platform Guides: Android, iPhone, Mac */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 24 }}>
-          {/* Android Guide */}
-          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(0, 242, 254, 0.15)', padding: 14, borderRadius: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#00f2fe', marginBottom: 8 }}>
+        {/* Platform Guides: iPhone, Android, Mac */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, marginBottom: 20 }}>
+          {/* iPhone Guide */}
+          <div style={{ background: 'var(--pulse-bg-raised)', border: '1px solid rgba(0, 194, 209, 0.25)', padding: 14, borderRadius: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--pulse-accent)', marginBottom: 8 }}>
               <Smartphone size={18} />
-              <h4 style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc' }}>Android Devices</h4>
+              <h4 style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc', margin: 0 }}>Apple iPhone / iPad</h4>
             </div>
-            <ol style={{ fontSize: 12, color: '#94a3b8', paddingLeft: 16, lineHeight: 1.6 }}>
-              <li>Open link in <strong>Chrome</strong></li>
-              <li>Tap the <strong>⋮ (Menu)</strong></li>
-              <li>Select <strong>"Install app"</strong> or "Add to Home screen"</li>
-              <li>Runs standalone with lock screen controls!</li>
+            <ol style={{ fontSize: 12, color: 'var(--text-secondary)', paddingLeft: 16, lineHeight: 1.7, margin: 0 }}>
+              <li>Open this site in <strong>Safari</strong></li>
+              <li>Tap the <strong>Share</strong> button (box with ↑ arrow)</li>
+              <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
+              <li>Tap <strong>Add</strong> — runs as full screen app!</li>
             </ol>
           </div>
 
-          {/* iPhone Guide */}
-          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(79, 172, 254, 0.15)', padding: 14, borderRadius: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#4facfe', marginBottom: 8 }}>
+          {/* Android Guide */}
+          <div style={{ background: 'var(--pulse-bg-raised)', border: '1px solid rgba(16, 185, 129, 0.25)', padding: 14, borderRadius: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#10b981', marginBottom: 8 }}>
               <Smartphone size={18} />
-              <h4 style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc' }}>Apple iPhone</h4>
+              <h4 style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc', margin: 0 }}>Android Phone</h4>
             </div>
-            <ol style={{ fontSize: 12, color: '#94a3b8', paddingLeft: 16, lineHeight: 1.6 }}>
-              <li>Open link in <strong>Safari</strong></li>
-              <li>Tap <strong>Share</strong> (box with arrow)</li>
-              <li>Tap <strong>"Add to Home Screen"</strong></li>
-              <li>Plays when phone is locked or screen off</li>
+            <ol style={{ fontSize: 12, color: 'var(--text-secondary)', paddingLeft: 16, lineHeight: 1.7, margin: 0 }}>
+              <li>Open this site in <strong>Chrome</strong></li>
+              <li>Tap the <strong>⋮ (three dots)</strong> menu top right</li>
+              <li>Tap <strong>"Install app"</strong> or "Add to Home screen"</li>
+              <li>Opens instantly with lock-screen player!</li>
             </ol>
           </div>
 
           {/* Mac / PC Guide */}
-          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(127, 0, 255, 0.15)', padding: 14, borderRadius: 12 }}>
+          <div style={{ background: 'var(--pulse-bg-raised)', border: '1px solid rgba(168, 85, 247, 0.25)', padding: 14, borderRadius: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#a855f7', marginBottom: 8 }}>
               <Laptop size={18} />
-              <h4 style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc' }}>Mac & Desktop</h4>
+              <h4 style={{ fontSize: 14, fontWeight: 700, color: '#f8fafc', margin: 0 }}>Mac & PC Desktop</h4>
             </div>
-            <ol style={{ fontSize: 12, color: '#94a3b8', paddingLeft: 16, lineHeight: 1.6 }}>
-              <li>In Safari: <strong>File → Add to Dock</strong></li>
-              <li>In Chrome: Click <strong>"Install"</strong> in URL bar</li>
-              <li>Plays in background when minimized</li>
-              <li>Zero ads and lossless master sound</li>
+            <ol style={{ fontSize: 12, color: 'var(--text-secondary)', paddingLeft: 16, lineHeight: 1.7, margin: 0 }}>
+              <li>Safari: Click <strong>File ➔ Add to Dock</strong></li>
+              <li>Chrome: Click the <strong>Install</strong> icon in URL bar</li>
+              <li>Enjoy lossless playback in background!</li>
             </ol>
           </div>
         </div>
 
         {/* Sync & Backup */}
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: 13.5, fontWeight: 700, color: '#f8fafc' }}>Aura Sync & Backup</div>
-            <div style={{ fontSize: 11.5, color: '#64748b' }}>Export your curated collection to share with friends</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#f8fafc' }}>Library Backup & Transfer</div>
+            <div style={{ fontSize: 11.5, color: 'var(--text-secondary)' }}>Export your playlists to JSON or transfer to another phone</div>
           </div>
 
           <div style={{ display: 'flex', gap: 10 }}>

@@ -40,10 +40,16 @@ export async function signUp(email, password) {
       password,
     });
     if (error) throw error;
-    if (data.user) {
+    if (data.session && data.user) {
       const userObj = { id: data.user.id, email: data.user.email, provider: 'supabase' };
       localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(userObj));
-      return userObj;
+      return { user: userObj, needsConfirmation: false };
+    }
+    if (data.user) {
+      return {
+        user: { id: data.user.id, email: data.user.email, provider: 'supabase' },
+        needsConfirmation: true,
+      };
     }
   }
 
@@ -54,7 +60,7 @@ export async function signUp(email, password) {
     provider: 'local',
   };
   localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(localUser));
-  return localUser;
+  return { user: localUser, needsConfirmation: false };
 }
 
 export async function signIn(email, password) {
@@ -84,6 +90,30 @@ export async function signIn(email, password) {
   return localUser;
 }
 
+export async function resendConfirmation(email) {
+  if (!email) throw new Error('Please enter your email');
+  const client = getSupabaseClient();
+  if (!client) throw new Error('Supabase is not configured');
+  const { error } = await client.auth.resend({
+    type: 'signup',
+    email: email.trim(),
+  });
+  if (error) throw error;
+  return true;
+}
+
+export function setPassphraseUser(passphrase) {
+  if (!passphrase || !passphrase.trim()) throw new Error('Passphrase cannot be empty');
+  const clean = passphrase.trim();
+  const userObj = {
+    id: 'sync_' + clean.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+    email: clean + ' (Passphrase Sync)',
+    provider: 'passphrase',
+  };
+  localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(userObj));
+  return userObj;
+}
+
 export async function signOut() {
   const client = getSupabaseClient();
   if (client) {
@@ -108,12 +138,19 @@ export function subscribeAuthChange(callback) {
           provider: 'supabase',
         });
       } else {
+        // Fallback to local stored session if signed in via passphrase
+        try {
+          const raw = localStorage.getItem(LOCAL_USER_KEY);
+          if (raw) {
+            callback(JSON.parse(raw));
+            return;
+          }
+        } catch (e) {}
         callback(null);
       }
     });
     return () => subscription.unsubscribe();
   }
 
-  // No-op unsubscribe for local mode
   return () => {};
 }

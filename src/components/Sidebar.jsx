@@ -36,7 +36,9 @@ export default function Sidebar({
   return (
     <aside className="aura-sidebar">
       {/* Brand & Main Navigation Card */}
-      <div className="aura-glass-card">
+      <div className="aura-glass-card aura-sidebar-top-card">
+        {/* macOS Traffic Lights Clearance & Window Drag Handle */}
+        <div className="aura-sidebar-drag-handle" title="Drag to move Pulse" />
         <div className="aura-brand-header">
           <div className="aura-logo-icon">
             <Activity size={20} color="var(--pulse-accent)" />

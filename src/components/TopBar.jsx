@@ -73,6 +73,9 @@ export default function TopBar({
         </div>
       </div>
 
+      {/* Draggable Window Region for desktop */}
+      <div className="aura-topbar-drag-spacer" title="Drag to move Pulse" />
+
       {/* Right Actions & Account Status */}
       <div className="aura-topbar-right">
         {/* User Account / Device Sync Button */}

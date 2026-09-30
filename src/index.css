@@ -145,6 +145,19 @@ html, body, #root {
   padding: 14px;
 }
 
+/* Sidebar macOS traffic light clearance & window drag handle */
+.aura-sidebar-drag-handle {
+  height: 22px;
+  width: 100%;
+  -webkit-app-region: drag;
+  user-select: none;
+  cursor: grab;
+}
+
+.aura-sidebar-drag-handle:active {
+  cursor: grabbing;
+}
+
 /* Brand */
 .aura-brand-header {
   display: flex;
@@ -153,6 +166,12 @@ html, body, #root {
   padding-bottom: 12px;
   border-bottom: 1px solid var(--border-subtle);
   margin-bottom: 10px;
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.aura-brand-header * {
+  -webkit-app-region: no-drag;
 }
 
 .aura-logo-icon {
@@ -371,6 +390,38 @@ html, body, #root {
   gap: 12px;
   background: var(--pulse-surface);
   min-height: var(--topbar-height);
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+/* Draggable space between left and right controls in TopBar */
+.aura-topbar-drag-spacer {
+  flex: 1;
+  height: 100%;
+  min-height: 36px;
+  min-width: 40px;
+  -webkit-app-region: drag;
+  user-select: none;
+  cursor: grab;
+}
+
+.aura-topbar-drag-spacer:active {
+  cursor: grabbing;
+}
+
+.aura-topbar-left,
+.aura-topbar-right,
+.aura-top-bar button,
+.aura-top-bar a,
+.aura-top-bar input,
+.aura-top-bar select,
+.aura-top-bar .aura-circle-btn,
+.aura-top-bar .aura-btn-primary,
+.aura-top-bar .aura-btn-secondary,
+.aura-top-bar .aura-account-pill,
+.aura-top-bar [role="button"],
+.desktop-no-drag {
+  -webkit-app-region: no-drag !important;
 }
 
 /* Circle buttons (used everywhere) */

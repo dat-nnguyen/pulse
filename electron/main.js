@@ -73,12 +73,17 @@ async function ensureBackendServer() {
 
 async function createWindow() {
   const icnsPath = path.join(rootDir, 'build', 'icon.icns');
-  const pngPath = path.join(rootDir, 'public', 'icon-512.png');
+  const pngPath = path.join(rootDir, 'build', 'icon.png');
   const activeIcon = fs.existsSync(icnsPath) ? icnsPath : pngPath;
 
-  if (process.platform === 'darwin' && app.dock) {
+  // On macOS: In packaged production, macOS automatically displays the high-res transparent
+  // icon from CFBundleIconFile (icon.icns). Calling app.dock.setIcon dynamically flattens
+  // alpha transparency into a white box, so we ONLY set dock icon during development.
+  if (process.platform === 'darwin' && app.dock && !app.isPackaged) {
     try {
-      app.dock.setIcon(activeIcon);
+      if (fs.existsSync(pngPath)) {
+        app.dock.setIcon(pngPath);
+      }
     } catch (e) {}
   }
 
@@ -91,7 +96,7 @@ async function createWindow() {
     icon: activeIcon,
     backgroundColor: '#0a0d14',
     titleBarStyle: 'hiddenInset', // Sleek macOS native traffic lights in dark header
-    trafficLightPosition: { x: 16, y: 16 },
+    trafficLightPosition: { x: 18, y: 18 },
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

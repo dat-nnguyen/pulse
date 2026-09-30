@@ -32,6 +32,7 @@ export default function LibraryView({
   onRemoveTrackFromPlaylist,
   onOpenCreatePlaylist,
   onBack,
+  onOpenDownloader,
   toast,
   onDeletePlaylist,
   onPlaylistContextMenu,

@@ -35,6 +35,7 @@ export default function App() {
   // User Authentication State
   const [user, setUser] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState('login');
 
   // Toast notification system
   const { toasts, toast, removeToast } = useToast();
@@ -153,9 +154,22 @@ export default function App() {
     }
     initDB();
 
-    // Check user authentication
+    // Check user authentication & listen for recovery / auth changes
     getCurrentUser().then((u) => setUser(u));
-    const unsubscribe = subscribeAuthChange((u) => setUser(u));
+    const unsubscribe = subscribeAuthChange(
+      (u) => setUser(u),
+      () => {
+        // PASSWORD_RECOVERY event
+        setAuthModalMode('recovery');
+        setShowAuthModal(true);
+      }
+    );
+
+    if (window.location.hash.includes('type=recovery')) {
+      setAuthModalMode('recovery');
+      setShowAuthModal(true);
+    }
+
     return () => unsubscribe();
   }, []);
 
@@ -619,9 +633,13 @@ export default function App() {
 
       <AuthModal
         isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
+        onClose={() => {
+          setShowAuthModal(false);
+          setAuthModalMode('login');
+        }}
         user={user}
         onAuthSuccess={(u) => setUser(u)}
+        initialMode={authModalMode}
       />
 
       <CreatePlaylistModal

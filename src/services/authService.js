@@ -133,10 +133,24 @@ export async function resetPassword(email) {
 
   const client = getSupabaseClient();
   const { error } = await client.auth.resetPasswordForEmail(email.trim(), {
-    redirectTo: window.location.origin,
+    redirectTo: `${window.location.origin}${window.location.pathname}#type=recovery`,
   });
   if (error) throw error;
   return true;
+}
+
+export async function updatePassword(newPassword) {
+  if (!newPassword || newPassword.length < 6) {
+    throw new Error('Password must be at least 6 characters long');
+  }
+  const client = getSupabaseClient();
+  if (!client) {
+    throw new Error('Supabase is not configured.');
+  }
+
+  const { data, error } = await client.auth.updateUser({ password: newPassword });
+  if (error) throw error;
+  return data;
 }
 
 export function setPassphraseUser(passphrase) {
@@ -164,10 +178,14 @@ export async function signOut() {
   return true;
 }
 
-export function subscribeAuthChange(callback) {
+export function subscribeAuthChange(callback, onRecovery = null) {
   const client = getSupabaseClient();
   if (client) {
     const { data: { subscription } } = client.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        if (onRecovery) onRecovery(session);
+        return;
+      }
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (session?.user) {
           const userObj = {

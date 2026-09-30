@@ -21,14 +21,17 @@ import {
   resendConfirmation,
   setPassphraseUser,
   resetPassword,
+  updatePassword,
 } from '../services/authService';
 import { isSupabaseConfigured } from '../services/supabaseClient';
 
-export default function AuthModal({ isOpen, onClose, user, onAuthSuccess }) {
+export default function AuthModal({ isOpen, onClose, user, onAuthSuccess, initialMode = 'login' }) {
   const [authMethod, setAuthMethod] = useState('email'); // 'email' | 'passphrase'
-  const [mode, setMode] = useState('login'); // 'login' | 'signup'
+  const [mode, setMode] = useState(initialMode); // 'login' | 'signup' | 'recovery'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [passphrase, setPassphrase] = useState('');
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
@@ -36,6 +39,10 @@ export default function AuthModal({ isOpen, onClose, user, onAuthSuccess }) {
   const [successMsg, setSuccessMsg] = useState('');
   const [showResendBtn, setShowResendBtn] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+
+  useEffect(() => {
+    if (initialMode) setMode(initialMode);
+  }, [initialMode, isOpen]);
 
   if (!isOpen) return null;
 
@@ -79,9 +86,13 @@ export default function AuthModal({ isOpen, onClose, user, onAuthSuccess }) {
       }
     } catch (err) {
       const msg = err.message || '';
-      if (msg.toLowerCase().includes('email not confirmed')) {
+      if (msg.toLowerCase().includes('rate limit')) {
         setErrorMsg(
-          'Your email is not confirmed yet. Check your inbox (and spam folder) for the confirmation link, then try signing in again.'
+          '⚠️ Email rate limit exceeded: Supabase free projects limit emails (max 3-4/hour). You can set your password instantly in Supabase Dashboard: Go to Authentication → Users → click "..." next to your email → "Edit user" and set your new password directly!'
+        );
+      } else if (msg.toLowerCase().includes('email not confirmed')) {
+        setErrorMsg(
+          'Your email is not confirmed yet. Check your inbox (and spam folder) for the confirmation link, or confirm your user in the Supabase Dashboard.'
         );
         setShowResendBtn(true);
       } else {
@@ -102,10 +113,47 @@ export default function AuthModal({ isOpen, onClose, user, onAuthSuccess }) {
     setErrorMsg('');
     try {
       await resetPassword(email.trim());
-      setSuccessMsg('Password reset email sent! Check your inbox.');
+      setSuccessMsg('✅ Password reset email sent! Please check your inbox (and spam folder) for the reset link.');
       setShowForgotPassword(false);
     } catch (err) {
-      setErrorMsg(err.message || 'Failed to send reset email.');
+      const msg = err.message || '';
+      if (msg.toLowerCase().includes('rate limit')) {
+        setErrorMsg(
+          '⚠️ Email rate limit exceeded: Supabase free tier projects limit emails to max 3-4 per hour. To set a new password right away without waiting, go to your Supabase Dashboard: Authentication → Users → click "..." next to your email → "Edit user" and enter your new password directly!'
+        );
+      } else {
+        setErrorMsg(msg || 'Failed to send reset email.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+    if (!newPassword || newPassword.length < 6) {
+      setErrorMsg('New password must be at least 6 characters long.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setErrorMsg('Passwords do not match. Please re-enter.');
+      return;
+    }
+
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      await updatePassword(newPassword);
+      setSuccessMsg('✅ Password updated successfully! Redirecting...');
+      if (window.location.hash.includes('type=recovery')) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+      setTimeout(() => {
+        onClose();
+        window.location.reload();
+      }, 1500);
+    } catch (err) {
+      setErrorMsg(err.message || 'Failed to update password.');
     } finally {
       setLoading(false);
     }
@@ -478,151 +526,235 @@ export default function AuthModal({ isOpen, onClose, user, onAuthSuccess }) {
             {/* METHOD 1: EMAIL / PASSWORD */}
             {authMethod === 'email' && (
               <div>
-                {/* Sign In vs Sign Up Tab */}
-                <div
-                  style={{
-                    display: 'flex',
-                    borderBottom: '1px solid var(--border-subtle)',
-                    marginBottom: 16,
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMode('login');
-                      setErrorMsg('');
-                    }}
-                    style={{
-                      flex: 1,
-                      padding: '8px 12px',
-                      background: 'transparent',
-                      border: 'none',
-                      borderBottom: mode === 'login' ? '2px solid var(--pulse-accent)' : '2px solid transparent',
-                      color: mode === 'login' ? '#f8fafc' : 'var(--text-muted)',
-                      fontSize: 13,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Sign In
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMode('signup');
-                      setErrorMsg('');
-                    }}
-                    style={{
-                      flex: 1,
-                      padding: '8px 12px',
-                      background: 'transparent',
-                      border: 'none',
-                      borderBottom: mode === 'signup' ? '2px solid var(--pulse-accent)' : '2px solid transparent',
-                      color: mode === 'signup' ? '#f8fafc' : 'var(--text-muted)',
-                      fontSize: 13,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Create Account
-                  </button>
-                </div>
+                {mode === 'recovery' ? (
+                  <form onSubmit={handleUpdatePassword} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div style={{ textAlign: 'center', marginBottom: 4 }}>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
+                        Set New Password
+                      </div>
+                      <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 4 }}>
+                        Enter a new password for your account (minimum 6 characters).
+                      </div>
+                    </div>
 
-                <form onSubmit={handleEmailSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                      Email Address
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      placeholder="name@gmail.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="pulse-input"
-                      style={{ padding: '10px 14px' }}
-                    />
-                  </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                        New Password
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        placeholder="At least 6 characters"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="pulse-input"
+                        style={{ padding: '10px 14px' }}
+                      />
+                    </div>
 
-                  <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                      Password
-                    </label>
-                    <input
-                      type="password"
-                      required
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="pulse-input"
-                      style={{ padding: '10px 14px' }}
-                    />
-                  </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                        Confirm New Password
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        placeholder="Re-enter new password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="pulse-input"
+                        style={{ padding: '10px 14px' }}
+                      />
+                    </div>
 
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="aura-btn-primary"
-                    style={{
-                      width: '100%',
-                      marginTop: 4,
-                      padding: '12px 16px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 8,
-                      fontSize: 14,
-                    }}
-                  >
-                    {loading ? (
-                      <Loader2 size={16} className="animate-spin" />
-                    ) : mode === 'login' ? (
-                      <LogIn size={16} />
-                    ) : (
-                      <UserPlus size={16} />
-                    )}
-                    <span>{mode === 'login' ? 'Sign In & Sync' : 'Create Account'}</span>
-                  </button>
-                  {/* Forgot password link — only in login mode */}
-                  {mode === 'login' && (
-                    <div style={{ textAlign: 'center', marginTop: 6 }}>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="aura-btn-primary"
+                      style={{
+                        width: '100%',
+                        marginTop: 4,
+                        padding: '12px 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        fontSize: 14,
+                      }}
+                    >
+                      {loading ? <Loader2 size={16} className="animate-spin" /> : <KeyRound size={16} />}
+                      <span>Save New Password</span>
+                    </button>
+
+                    <div style={{ textAlign: 'center', marginTop: 4 }}>
                       <button
                         type="button"
-                        onClick={handleForgotPassword}
+                        onClick={() => {
+                          setMode('login');
+                          setErrorMsg('');
+                        }}
                         style={{
                           background: 'none',
                           border: 'none',
-                          color: 'var(--pulse-accent)',
+                          color: 'var(--text-muted)',
                           fontSize: 12,
                           cursor: 'pointer',
-                          textDecoration: 'underline',
                           padding: 0,
                         }}
                       >
-                        Forgot password?
+                        Back to Sign In
                       </button>
                     </div>
-                  )}
-                </form>
+                  </form>
+                ) : (
+                  <>
+                    {/* Sign In vs Sign Up Tab */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        borderBottom: '1px solid var(--border-subtle)',
+                        marginBottom: 16,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMode('login');
+                          setErrorMsg('');
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '8px 12px',
+                          background: 'transparent',
+                          border: 'none',
+                          borderBottom: mode === 'login' ? '2px solid var(--pulse-accent)' : '2px solid transparent',
+                          color: mode === 'login' ? '#f8fafc' : 'var(--text-muted)',
+                          fontSize: 13,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Sign In
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMode('signup');
+                          setErrorMsg('');
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '8px 12px',
+                          background: 'transparent',
+                          border: 'none',
+                          borderBottom: mode === 'signup' ? '2px solid var(--pulse-accent)' : '2px solid transparent',
+                          color: mode === 'signup' ? '#f8fafc' : 'var(--text-muted)',
+                          fontSize: 13,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Create Account
+                      </button>
+                    </div>
 
-                {/* Confirmation tip */}
-                <div
-                  style={{
-                    marginTop: 16,
-                    padding: 10,
-                    borderRadius: 8,
-                    background: 'rgba(255, 255, 255, 0.02)',
-                    border: '1px dashed var(--border-subtle)',
-                    fontSize: 11,
-                    color: 'var(--text-muted)',
-                    lineHeight: 1.5,
-                  }}
-                >
-                  <strong style={{ color: 'var(--text-secondary)' }}>💡 Can't sign in?</strong>
-                  <br />
-                  If you just registered, check your inbox/spam for the confirmation email first. Or disable it in Supabase Dashboard:{' '}
-                  <strong>Auth → Providers → Email → turn OFF "Confirm email"</strong> for instant sign in.
-                </div>
+                    <form onSubmit={handleEmailSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                          Email Address
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          placeholder="name@gmail.com"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="pulse-input"
+                          style={{ padding: '10px 14px' }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                          Password
+                        </label>
+                        <input
+                          type="password"
+                          required
+                          placeholder="••••••••"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="pulse-input"
+                          style={{ padding: '10px 14px' }}
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="aura-btn-primary"
+                        style={{
+                          width: '100%',
+                          marginTop: 4,
+                          padding: '12px 16px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 8,
+                          fontSize: 14,
+                        }}
+                      >
+                        {loading ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : mode === 'login' ? (
+                          <LogIn size={16} />
+                        ) : (
+                          <UserPlus size={16} />
+                        )}
+                        <span>{mode === 'login' ? 'Sign In & Sync' : 'Create Account'}</span>
+                      </button>
+                      {/* Forgot password link — only in login mode */}
+                      {mode === 'login' && (
+                        <div style={{ textAlign: 'center', marginTop: 6 }}>
+                          <button
+                            type="button"
+                            onClick={handleForgotPassword}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--pulse-accent)',
+                              fontSize: 12,
+                              cursor: 'pointer',
+                              textDecoration: 'underline',
+                              padding: 0,
+                            }}
+                          >
+                            Forgot password?
+                          </button>
+                        </div>
+                      )}
+                    </form>
+
+                    {/* Confirmation tip */}
+                    <div
+                      style={{
+                        marginTop: 16,
+                        padding: 10,
+                        borderRadius: 8,
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        border: '1px dashed var(--border-subtle)',
+                        fontSize: 11,
+                        color: 'var(--text-muted)',
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      <strong style={{ color: 'var(--text-secondary)' }}>💡 Can't sign in?</strong>
+                      <br />
+                      If you just registered, check your inbox/spam for the confirmation email first. Or disable it in Supabase Dashboard:{' '}
+                      <strong>Auth → Providers → Email → turn OFF "Confirm email"</strong> for instant sign in.
+                    </div>
+                  </>
+                )}
               </div>
             )}
 

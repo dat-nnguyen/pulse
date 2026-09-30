@@ -55,6 +55,7 @@ export default function App() {
   const [showSupabaseModal, setShowSupabaseModal] = useState(false);
   const [showFullMobilePlayer, setShowFullMobilePlayer] = useState(false);
   const [showCreatePlaylistModal, setShowCreatePlaylistModal] = useState(false);
+  const [pendingAddTrackId, setPendingAddTrackId] = useState(null);
 
   // Library & Audio Data
   const [tracks, setTracks] = useState([]);
@@ -301,10 +302,51 @@ export default function App() {
   };
 
   const handlePlaylistCreated = (newPlaylist) => {
-    setPlaylists((prev) => [...prev, newPlaylist]);
+    // If a track was pending to be added (via context menu "New playlist…"), add it now
+    if (pendingAddTrackId) {
+      const updated = { ...newPlaylist, trackIds: [pendingAddTrackId] };
+      savePlaylist(updated).catch(console.error);
+      setPlaylists((prev) => [...prev, updated]);
+      setPendingAddTrackId(null);
+    } else {
+      setPlaylists((prev) => [...prev, newPlaylist]);
+    }
     setSelectedPlaylistId(newPlaylist.id);
     setCurrentView('playlist');
   };
+
+  // Add track to a playlist (without navigating away)
+  const handleAddTrackToPlaylist = useCallback(async (trackId, targetPlaylistId) => {
+    if (targetPlaylistId === '__new__') {
+      // Open the create-playlist modal; track will be added after creation via a pending ref
+      setPendingAddTrackId(trackId);
+      setShowCreatePlaylistModal(true);
+      return;
+    }
+    setPlaylists((prev) =>
+      prev.map((pl) => {
+        if (pl.id !== targetPlaylistId) return pl;
+        if (pl.trackIds?.includes(trackId)) return pl;
+        const updated = { ...pl, trackIds: [...(pl.trackIds || []), trackId] };
+        savePlaylist(updated).catch(console.error);
+        return updated;
+      })
+    );
+    toast.success('Added to playlist', { title: 'Done' });
+  }, [toast]);
+
+  // Remove track from a specific playlist only (does NOT delete from library)
+  const handleRemoveTrackFromPlaylist = useCallback(async (trackId, targetPlaylistId) => {
+    setPlaylists((prev) =>
+      prev.map((pl) => {
+        if (pl.id !== targetPlaylistId) return pl;
+        const updated = { ...pl, trackIds: (pl.trackIds || []).filter((id) => id !== trackId) };
+        savePlaylist(updated).catch(console.error);
+        return updated;
+      })
+    );
+    toast.info('Removed from playlist', { title: 'Done' });
+  }, [toast]);
 
   // Open Downloader with optional query
   const handleOpenDownloader = (query = '') => {
@@ -396,11 +438,15 @@ export default function App() {
               onTogglePlay={handleTogglePlay}
               onToggleLike={handleToggleLike}
               onDeleteTrack={handleDeleteTrack}
+              onAddTrackToPlaylist={handleAddTrackToPlaylist}
+              onRemoveTrackFromPlaylist={handleRemoveTrackFromPlaylist}
               onBack={() => {
                 setSelectedPlaylistId(null);
                 setCurrentView('home');
               }}
               onOpenDownloader={() => setCurrentView('downloader')}
+              onOpenCreatePlaylist={() => setShowCreatePlaylistModal(true)}
+              toast={toast}
             />
           )}
 

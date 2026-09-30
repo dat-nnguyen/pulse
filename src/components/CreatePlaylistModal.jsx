@@ -53,7 +53,7 @@ export default function CreatePlaylistModal({
         description: description.trim() || 'Custom playlist',
         coverUrl: coverUrl || null,
         createdAt: Date.now(),
-        trackIds: currentTrackId ? [currentTrackId] : [],
+        trackIds: [],
       };
 
       await savePlaylist(newPlaylist);

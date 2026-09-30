@@ -16,6 +16,7 @@ import {
   Download
 } from 'lucide-react';
 import { ConfirmDialog, useConfirm } from './ConfirmDialog';
+import TrackContextMenu from './TrackContextMenu';
 
 export default function LibraryView({
   playlistId,
@@ -28,10 +29,15 @@ export default function LibraryView({
   onTogglePlay,
   onToggleLike,
   onDeleteTrack,
+  onAddTrackToPlaylist,
+  onRemoveTrackFromPlaylist,
+  onOpenCreatePlaylist,
   onBack,
   onOpenDownloader,
+  toast,
 }) {
   const [playlistFilter, setPlaylistFilter] = useState('');
+  const [contextMenu, setContextMenu] = useState(null); // { x, y, track }
 
   // Determine tracks to display based on selected playlist
   let title = 'Your Library';
@@ -84,6 +90,20 @@ export default function LibraryView({
     currentTrack && displayTracks.some((t) => t.id === currentTrack.id);
 
   const { confirm, dialogProps } = useConfirm();
+
+  // Whether we're inside a named user playlist (not liked/downloaded/all)
+  const isInUserPlaylist =
+    playlistId &&
+    playlistId !== 'liked' &&
+    playlistId !== 'downloaded' &&
+    playlistId !== 'all';
+
+  const handleContextMenu = (e, track) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, track });
+  };
+
+  const closeContextMenu = () => setContextMenu(null);
 
   return (
     <div className="aura-scroll-area" style={{ padding: 0 }}>
@@ -277,6 +297,7 @@ export default function LibraryView({
                     key={track.id}
                     className={`track-table-row ${isCurrent ? 'active' : ''}`}
                     onClick={() => onPlayTrack(track)}
+                    onContextMenu={(e) => handleContextMenu(e, track)}
                   >
                     <td className="track-table-index">
                       {isCurrent && isPlaying ? (
@@ -366,7 +387,7 @@ export default function LibraryView({
                             color={isTrackLiked ? '#f43f5e' : '#94a3b8'}
                           />
                         </button>
-                        {onDeleteTrack && (
+                        {(onDeleteTrack || onRemoveTrackFromPlaylist) && (
                           <button
                             className="aura-control-btn track-delete-btn"
                             style={{
@@ -382,15 +403,21 @@ export default function LibraryView({
                               color: 'var(--text-muted)',
                               transition: 'all 0.15s ease',
                             }}
-                            onClick={async () => {
-                              const ok = await confirm({
-                                title: 'Remove from library?',
-                                message: `"${track.title}" will be permanently deleted from your library.`,
-                                confirmLabel: 'Delete',
-                                cancelLabel: 'Keep',
-                                variant: 'danger',
-                              });
-                              if (ok) onDeleteTrack(track.id);
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (isInUserPlaylist && onRemoveTrackFromPlaylist) {
+                                // Just remove from this playlist, no confirm needed
+                                onRemoveTrackFromPlaylist(track.id, playlistId);
+                              } else {
+                                const ok = await confirm({
+                                  title: 'Delete from library?',
+                                  message: `"${track.title}" will be permanently deleted from your library.`,
+                                  confirmLabel: 'Delete',
+                                  cancelLabel: 'Keep',
+                                  variant: 'danger',
+                                });
+                                if (ok) onDeleteTrack?.(track.id);
+                              }
                             }}
                             title="Delete track"
                           >
@@ -406,6 +433,45 @@ export default function LibraryView({
           </table>
         )}
       </div>
+
+      {/* Right-click Context Menu */}
+      {contextMenu && (
+        <TrackContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          track={contextMenu.track}
+          playlists={playlists}
+          playlistId={playlistId}
+          isLiked={likedIds.has(contextMenu.track.id)}
+          onClose={closeContextMenu}
+          onPlay={() => { onPlayTrack(contextMenu.track); closeContextMenu(); }}
+          onToggleLike={() => { onToggleLike(contextMenu.track.id); closeContextMenu(); }}
+          onAddToPlaylist={(trackId, targetPlaylistId) => {
+            closeContextMenu();
+            if (targetPlaylistId === '__new__') {
+              onOpenCreatePlaylist?.();
+            } else {
+              onAddTrackToPlaylist?.(trackId, targetPlaylistId);
+            }
+          }}
+          onRemoveFromPlaylist={(trackId, pid) => {
+            closeContextMenu();
+            onRemoveTrackFromPlaylist?.(trackId, pid);
+          }}
+          onDeleteFromLibrary={async (trackId) => {
+            closeContextMenu();
+            const ok = await confirm({
+              title: 'Delete from library?',
+              message: `"${contextMenu.track.title}" will be permanently removed from your entire library.`,
+              confirmLabel: 'Delete',
+              cancelLabel: 'Cancel',
+              variant: 'danger',
+            });
+            if (ok) onDeleteTrack?.(trackId);
+          }}
+        />
+      )}
+
       <ConfirmDialog {...dialogProps} />
     </div>
   );

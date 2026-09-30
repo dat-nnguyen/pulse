@@ -124,6 +124,7 @@ export default function DownloaderView({
                 ...item,
                 status: progress.status === 'success' ? 'success' : progress.status === 'error' ? 'error' : 'downloading',
                 title: progress.track?.title || item.title,
+                artist: progress.track?.artist || item.artist,
                 error: progress.error || null,
               };
             }
@@ -461,9 +462,16 @@ export default function DownloaderView({
                           fontSize: 12,
                         }}
                       >
-                        <span style={{ maxWidth: '80%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}>
-                          {idx + 1}. {item.title}
-                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', maxWidth: '80%', minWidth: 0 }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#ffffff', fontWeight: 700, fontSize: 12.5 }}>
+                            {idx + 1}. {item.title}
+                          </span>
+                          {item.artist && (
+                            <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>
+                              {item.artist}
+                            </span>
+                          )}
+                        </div>
                         <span>
                           {item.status === 'downloading' && <Loader2 size={14} className="spin" color="var(--pulse-accent)" />}
                           {item.status === 'success' && <CheckCircle size={14} color="#10b981" />}

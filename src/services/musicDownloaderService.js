@@ -100,12 +100,21 @@ export async function downloadFromWebUrl(inputUrl, customMeta = {}) {
   // 2. Direct Audio URL (.mp3, .m4a, .flac, .wav, .ogg, .aac)
   const isDirectAudio = /\.(mp3|m4a|wav|flac|ogg|aac)(\?.*)?$/i.test(trimmedUrl);
   if (isDirectAudio) {
-    const filename = trimmedUrl.split('/').pop().split('?')[0];
-    const cleanTitle = decodeURIComponent(filename.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '));
+    const rawFilename = trimmedUrl.split('/').pop().split('?')[0];
+    const cleanName = decodeURIComponent(rawFilename.replace(/\.[^/.]+$/, '').replace(/[_]/g, ' ')).trim();
+    let title = customMeta.title || cleanName;
+    let artist = customMeta.artist || 'Web Audio';
+
+    if (!customMeta.title && !customMeta.artist && cleanName.includes(' - ')) {
+      const parts = cleanName.split(' - ');
+      artist = parts[0].trim();
+      title = parts.slice(1).join(' - ').trim();
+    }
+
     const track = {
       id: `web_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      title: customMeta.title || cleanTitle,
-      artist: customMeta.artist || 'Web Stream',
+      title,
+      artist,
       album: customMeta.album || 'Downloaded Tracks',
       audioUrl: trimmedUrl,
       coverUrl: customMeta.coverUrl || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80',

@@ -3,6 +3,88 @@ import path from 'path';
 import fs from 'fs';
 import { config } from '../config/index.js';
 
+/**
+ * Intelligently parse artist and song title from YouTube metadata and video titles.
+ * Handles official music tags, "Artist - Title" video syntax, channel cleanup, and junk stripping.
+ */
+export function parseTitleAndArtist(info, customMeta = {}) {
+  let title = customMeta.title?.trim();
+  let artist = customMeta.artist?.trim();
+
+  // 1. Official YouTube Music or ID3 tags parsed by yt-dlp
+  const officialTrack = info?.track?.trim();
+  const officialArtist = info?.artist?.trim() || info?.creator?.trim() || (Array.isArray(info?.artists) ? info.artists[0]?.trim() : null);
+
+  if (!title && officialTrack) {
+    title = officialTrack;
+  }
+  if (!artist && officialArtist) {
+    artist = officialArtist;
+  }
+
+  // 2. Clean up common YouTube video decorations
+  const cleanDecorations = (str) => {
+    return str
+      .replace(/\s*[\(\[](?:official\s*(?:music\s*)?video|official\s*audio|official|music\s*video|lyric\s*video|lyrics|audio|visualizer|hd|4k|hq|remastered|explicit|clean\s*version|extended\s*mix)[\)\]]/gi, '')
+      .replace(/\s*[\(\[]\s*[\)\]]/g, '')
+      .replace(/^["“”'']+|["“”'']+$/g, '')
+      .trim();
+  };
+
+  const rawTitle = info?.title?.trim() || '';
+
+  // 3. Try splitting video title on "Artist - Title" (e.g. "The Weeknd - Blinding Lights")
+  if ((!title || !artist) && rawTitle) {
+    const cleanedRawTitle = cleanDecorations(rawTitle);
+    const separatorMatch = cleanedRawTitle.match(/^(.*?)\s*[-–—|:]\s*(.*)$/);
+
+    if (separatorMatch) {
+      const part1 = separatorMatch[1].trim();
+      const part2 = separatorMatch[2].trim();
+
+      if (!artist && !title) {
+        artist = part1;
+        title = part2;
+      } else if (!artist && title) {
+        artist = part1;
+      } else if (artist && !title) {
+        title = part2;
+      }
+    } else {
+      if (!title) {
+        title = cleanedRawTitle;
+      }
+    }
+  }
+
+  // 4. Fallback for artist from channel / uploader
+  if (!artist) {
+    let uploader = info?.uploader?.trim() || info?.channel?.trim() || '';
+    if (uploader) {
+      uploader = uploader
+        .replace(/\s*-\s*Topic$/i, '')
+        .replace(/VEVO$/i, '')
+        .replace(/\s+Official(?:\s+Channel)?$/i, '')
+        .replace(/\s+Records$/i, '')
+        .trim();
+      artist = uploader || 'Various Artists';
+    } else {
+      artist = 'Various Artists';
+    }
+  }
+
+  // Fallback for title
+  if (!title) {
+    title = cleanDecorations(rawTitle) || 'Downloaded Audio';
+  }
+
+  // Final trim and cleanup
+  title = title.replace(/^[-–—\s]+|[-–—\s]+$/g, '').trim() || 'Downloaded Audio';
+  artist = artist.replace(/^[-–—\s]+|[-–—\s]+$/g, '').trim() || 'Various Artists';
+
+  return { title, artist };
+}
+
 export async function extractAudioFromUrl(url, customMeta = {}) {
   const ytDlpCmd = fs.existsSync(config.venvYtDlp) ? config.venvYtDlp : 'yt-dlp';
   const outputId = `track_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -35,8 +117,7 @@ export async function extractAudioFromUrl(url, customMeta = {}) {
 
       if (downloadedFile) {
         const ext = path.extname(downloadedFile).replace('.', '').toUpperCase() || 'M4A';
-        const trackTitle = customMeta.title || (info && info.title) || 'Downloaded Audio';
-        const trackArtist = customMeta.artist || (info && (info.uploader || info.channel)) || 'Various Artists';
+        const { title: trackTitle, artist: trackArtist } = parseTitleAndArtist(info, customMeta);
         const trackDuration = Math.round((info && info.duration) || 180);
         const coverUrl = (info && info.thumbnail) || '';
 

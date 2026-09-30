@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import http from 'http';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -10,15 +11,34 @@ const rootDir = path.resolve(__dirname, '../');
 
 let mainWindow = null;
 let serverProcess = null;
+let embeddedServer = null;
+
+// Determine writable paths on macOS
+const userDataDir = app.getPath('userData');
+const cacheDir = path.join(userDataDir, 'audio_cache');
+if (!fs.existsSync(cacheDir)) {
+  fs.mkdirSync(cacheDir, { recursive: true });
+}
+process.env.CACHE_DIR = cacheDir;
+
+// On macOS, add homebrew & venv paths so CLI tools like yt-dlp or ffmpeg are accessible
+if (process.platform === 'darwin') {
+  const extraPaths = [
+    '/opt/homebrew/bin',
+    '/usr/local/bin',
+    path.join(rootDir, '.venv', 'bin')
+  ];
+  process.env.PATH = `${extraPaths.join(':')}:${process.env.PATH || ''}`;
+}
 
 // Check if backend server is already running on port 3030
 function isServerRunning(port = 3030) {
   return new Promise((resolve) => {
-    const req = http.get(`http://localhost:${port}/api/status`, (res) => {
+    const req = http.get(`http://127.0.0.1:${port}/api/status`, (res) => {
       resolve(res.statusCode === 200);
     });
     req.on('error', () => resolve(false));
-    req.setTimeout(1000, () => {
+    req.setTimeout(800, () => {
       req.destroy();
       resolve(false);
     });
@@ -29,26 +49,36 @@ function isServerRunning(port = 3030) {
 async function ensureBackendServer() {
   const running = await isServerRunning(3030);
   if (!running) {
-    console.log('🚀 Spawning Pulse Audio Companion Server on port 3030...');
-    serverProcess = spawn('node', ['server.js'], {
-      cwd: rootDir,
-      stdio: 'inherit',
-      env: { ...process.env, PORT: '3030' },
-    });
-
-    serverProcess.on('error', (err) => {
-      console.warn('Failed to start backend server process:', err);
-    });
+    try {
+      console.log('🚀 Spawning embedded Pulse Audio Server on port 3030...');
+      const serverModule = await import('../server/server.js');
+      embeddedServer = serverModule.server || serverModule.default;
+      console.log('✅ Pulse Audio Server running in-process');
+    } catch (err) {
+      console.warn('In-process server launch failed, falling back to node spawn:', err);
+      try {
+        serverProcess = spawn('node', ['server.js'], {
+          cwd: rootDir,
+          stdio: 'inherit',
+          env: { ...process.env, PORT: '3030' },
+        });
+      } catch (spawnErr) {
+        console.error('Spawn fallback error:', spawnErr);
+      }
+    }
   } else {
     console.log('✅ Pulse Audio Companion Server is already active on port 3030');
   }
 }
 
 async function createWindow() {
-  const iconPath = path.join(rootDir, 'public', 'icon-512.png');
+  const icnsPath = path.join(rootDir, 'build', 'icon.icns');
+  const pngPath = path.join(rootDir, 'public', 'icon-512.png');
+  const activeIcon = fs.existsSync(icnsPath) ? icnsPath : pngPath;
+
   if (process.platform === 'darwin' && app.dock) {
     try {
-      app.dock.setIcon(iconPath);
+      app.dock.setIcon(activeIcon);
     } catch (e) {}
   }
 
@@ -58,7 +88,7 @@ async function createWindow() {
     minWidth: 960,
     minHeight: 640,
     title: 'Pulse Music Player',
-    icon: iconPath,
+    icon: activeIcon,
     backgroundColor: '#0a0d14',
     titleBarStyle: 'hiddenInset', // Sleek macOS native traffic lights in dark header
     trafficLightPosition: { x: 16, y: 16 },
@@ -69,22 +99,22 @@ async function createWindow() {
     },
   });
 
-  // Check if dev server is up, else load production local server or dist
-  const isDevRunning = await isServerRunning(5173);
+  // Check if dev server is up (only in non-packaged dev mode)
+  const isDevRunning = !app.isPackaged && (await isServerRunning(5173));
   if (isDevRunning) {
     mainWindow.loadURL('http://localhost:5173');
   } else {
-    // Wait slightly for port 3030 to be ready if server was just spawned
+    // Wait slightly for port 3030 to be ready
     let ready = await isServerRunning(3030);
     let attempts = 0;
-    while (!ready && attempts < 10) {
-      await new Promise((r) => setTimeout(r, 400));
+    while (!ready && attempts < 15) {
+      await new Promise((r) => setTimeout(r, 200));
       ready = await isServerRunning(3030);
       attempts++;
     }
 
     if (ready) {
-      mainWindow.loadURL('http://localhost:3030');
+      mainWindow.loadURL('http://127.0.0.1:3030');
     } else {
       mainWindow.loadFile(path.join(rootDir, 'dist', 'index.html'));
     }
@@ -114,6 +144,11 @@ app.on('window-all-closed', () => {
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
+  if (embeddedServer && typeof embeddedServer.close === 'function') {
+    try {
+      embeddedServer.close();
+    } catch (e) {}
+  }
   if (serverProcess) {
     try {
       serverProcess.kill();

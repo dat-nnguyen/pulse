@@ -38,3 +38,8 @@ android/app/build/
 # IDE & agent configs
 .agents/
 skills-lock.json
+
+# Electron & desktop packaging
+release/
+build/icon.iconset/
+

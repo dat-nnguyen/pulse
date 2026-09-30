@@ -18,7 +18,7 @@ export const config = {
   port: process.env.PORT || 3030,
   host: process.env.HOST || '0.0.0.0',
   cacheDir: CACHE_DIR,
-  distDir: path.join(rootDir, 'dist'),
-  venvYtDlp: path.join(rootDir, '.venv', 'bin', 'yt-dlp'),
+  distDir: process.env.DIST_DIR || path.join(rootDir, 'dist'),
+  venvYtDlp: process.env.YT_DLP_PATH || path.join(rootDir, '.venv', 'bin', 'yt-dlp'),
   corsOrigins: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : '*',
 };

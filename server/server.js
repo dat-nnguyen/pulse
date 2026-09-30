@@ -31,9 +31,10 @@ if (fs.existsSync(config.distDir)) {
 app.use(errorHandler);
 
 // Start server
-app.listen(config.port, config.host, () => {
-  console.log(`🎵 Aura Audio Server running at http://${config.host}:${config.port}`);
+const server = app.listen(config.port, config.host, () => {
+  console.log(`🎵 Pulse Audio Server running at http://${config.host}:${config.port}`);
   console.log(`📁 Audio cache directory: ${config.cacheDir}`);
 });
 
+export { app, server };
 export default app;

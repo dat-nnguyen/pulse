@@ -3,18 +3,64 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "main": "electron/main.js",
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
     "server": "node server.js",
     "desktop": "electron electron/main.js",
     "app": "npm run build && electron electron/main.js",
+    "pack:mac": "npm run build && electron-builder --mac --dir",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "install:mac": "npm run build && electron-builder --mac --dir && rm -rf /Applications/Pulse.app && cp -R release/mac/Pulse.app /Applications/Pulse.app && xattr -cr /Applications/Pulse.app && echo '✅ Pulse.app installed to /Applications!'",
     "start": "npm run build && node server.js",
     "ios:init": "cap add ios",
     "ios:sync": "cap sync ios",
     "ios:open": "cap open ios",
     "lint": "oxlint",
     "preview": "vite preview"
+  },
+  "build": {
+    "appId": "com.pulse.musicplayer",
+    "productName": "Pulse",
+    "copyright": "Copyright © 2026 Pulse",
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "category": "public.app-category.music",
+      "icon": "build/icon.icns",
+      "target": [
+        "dmg",
+        "dir"
+      ],
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "identity": null
+    },
+    "dmg": {
+      "title": "Pulse Music Player",
+      "icon": "build/icon.icns",
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "server/**/*",
+      "public/**/*",
+      "package.json"
+    ]
   },
   "dependencies": {
     "@capacitor/cli": "^8.5.2",
@@ -34,6 +80,7 @@
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
     "electron": "^44.5.0",
+    "electron-builder": "^26.15.3",
     "oxlint": "^1.81.0",
     "vite": "^8.3.0"
   }

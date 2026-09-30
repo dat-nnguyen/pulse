@@ -60,11 +60,10 @@ export async function saveTrackToSupabase(track) {
     album: track.album || 'Single',
     duration: Math.round(track.duration || 180),
     cover_url: track.coverUrl || null,
-    audio_url: track.audioUrl,
+    audio_url: track.cloudAudioUrl || track.audioUrl,
     bitrate: track.bitrate || '320kbps Original',
     format: track.format || 'MP3',
     type: track.type || 'music',
-    lyrics: track.lyrics || null,
   };
 
   const { data, error } = await client.from('tracks').upsert(record).select().single();

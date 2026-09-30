@@ -46,6 +46,11 @@ export async function saveTrack(track) {
     isDownloaded: Boolean(track.audioBlob || track.isDownloaded),
   };
 
+  // Preserve local URL for instant offline/desktop playback
+  if (item.audioUrl && (item.audioUrl.startsWith('/audio/') || item.audioUrl.includes('localhost') || item.audioUrl.includes('127.0.0.1'))) {
+    item.localAudioUrl = item.localAudioUrl || item.audioUrl;
+  }
+
   // If Supabase is configured, upload audio file & metadata to cloud
   if (isSupabaseConfigured() && navigator.onLine) {
     try {
@@ -57,7 +62,12 @@ export async function saveTrack(track) {
             item.audioBlob,
             `${item.title || 'track'}.${(item.format || 'mp3').toLowerCase()}`
           );
-          item.audioUrl = cloudAudioUrl;
+          if (cloudAudioUrl) {
+            item.cloudAudioUrl = cloudAudioUrl;
+            if (!item.localAudioUrl) {
+              item.audioUrl = cloudAudioUrl;
+            }
+          }
         } catch (uploadErr) {
           console.warn('Audio storage upload warning:', uploadErr.message);
         }
@@ -70,7 +80,7 @@ export async function saveTrack(track) {
         // If downloaded via local Mac backend, fetch the audio and upload to Supabase Storage
         // so iPhone and Web can stream it globally!
         try {
-          let fetchTarget = item.audioUrl;
+          let fetchTarget = item.localAudioUrl || item.audioUrl;
           if (fetchTarget.startsWith('/audio/')) {
             const host = (typeof window !== 'undefined' && window.location?.origin?.startsWith('http'))
               ? window.location.origin
@@ -86,7 +96,9 @@ export async function saveTrack(track) {
               blob,
               `${item.title || 'track'}.${(item.format || 'm4a').toLowerCase()}`
             );
-            item.audioUrl = cloudAudioUrl;
+            if (cloudAudioUrl) {
+              item.cloudAudioUrl = cloudAudioUrl;
+            }
           }
         } catch (fetchErr) {
           console.warn('Local audio stream to Supabase upload warning:', fetchErr.message);

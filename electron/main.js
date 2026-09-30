@@ -55,15 +55,17 @@ async function ensureBackendServer() {
       embeddedServer = serverModule.server || serverModule.default;
       console.log('✅ Pulse Audio Server running in-process');
     } catch (err) {
-      console.warn('In-process server launch failed, falling back to node spawn:', err);
-      try {
-        serverProcess = spawn('node', ['server.js'], {
-          cwd: rootDir,
-          stdio: 'inherit',
-          env: { ...process.env, PORT: '3030' },
-        });
-      } catch (spawnErr) {
-        console.error('Spawn fallback error:', spawnErr);
+      console.warn('In-process server launch failed:', err);
+      if (!app.isPackaged) {
+        try {
+          serverProcess = spawn('node', ['server.js'], {
+            cwd: rootDir,
+            stdio: 'inherit',
+            env: { ...process.env, PORT: '3030' },
+          });
+        } catch (spawnErr) {
+          console.error('Spawn fallback error:', spawnErr);
+        }
       }
     }
   } else {
@@ -109,11 +111,11 @@ async function createWindow() {
   if (isDevRunning) {
     mainWindow.loadURL('http://localhost:5173');
   } else {
-    // Wait slightly for port 3030 to be ready
+    // Wait for embedded port 3030 to be ready
     let ready = await isServerRunning(3030);
     let attempts = 0;
-    while (!ready && attempts < 15) {
-      await new Promise((r) => setTimeout(r, 200));
+    while (!ready && attempts < 30) {
+      await new Promise((r) => setTimeout(r, 150));
       ready = await isServerRunning(3030);
       attempts++;
     }

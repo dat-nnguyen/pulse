@@ -360,6 +360,11 @@ export default function App() {
       handlePrevTrack();
     });
 
+    const unsubError = audioEngine.on('error', (err) => {
+      console.warn('Audio playback error handled in App:', err);
+      toast('Playback error. Please check audio file or network connection.', 'error');
+    });
+
     return () => {
       unsubTime();
       unsubDuration();
@@ -367,6 +372,7 @@ export default function App() {
       unsubEnded();
       unsubNextReq();
       unsubPrevReq();
+      unsubError();
     };
   }, [handleNextTrack, handlePrevTrack]);
 

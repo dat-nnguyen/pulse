@@ -4,7 +4,6 @@ class AudioEngine {
   constructor() {
     this.audio = new Audio();
     this.audio.preload = 'auto';
-    this.audio.crossOrigin = 'anonymous';
 
     this.audioCtx = null;
     this.sourceNode = null;
@@ -12,6 +11,7 @@ class AudioEngine {
     this.bassNode = null;
     this.eqNodes = [];
     this.isWebAudioInitialized = false;
+    this.currentBlobUrl = null;
 
     this.currentTrack = null;
     this.isPlaying = false;
@@ -48,7 +48,7 @@ class AudioEngine {
     this.audio.addEventListener('play', () => {
       this.isPlaying = true;
       if (this.audioCtx && this.audioCtx.state === 'suspended') {
-        this.audioCtx.resume();
+        this.audioCtx.resume().catch(() => {});
       }
       this.notify('playState', true);
       if ('mediaSession' in navigator) {
@@ -69,7 +69,23 @@ class AudioEngine {
     });
 
     this.audio.addEventListener('error', (e) => {
-      console.warn('Audio playback error:', e);
+      const mediaErr = this.audio.error;
+      console.warn('Audio playback error:', mediaErr ? `code ${mediaErr.code}: ${mediaErr.message}` : e);
+
+      // Automatic CORS fallback: if failed with crossOrigin, retry without crossOrigin
+      if (this.audio.crossOrigin) {
+        console.log('CORS playback issue detected. Retrying without crossOrigin attribute...');
+        this.audio.removeAttribute('crossOrigin');
+        const currentSrc = this.audio.src;
+        this.audio.src = '';
+        this.audio.src = currentSrc;
+        this.audio.load();
+        if (this.isPlaying) {
+          this.audio.play().catch((playErr) => console.warn('CORS fallback play error:', playErr));
+        }
+        return;
+      }
+
       this.notify('error', e);
     });
   }
@@ -81,7 +97,12 @@ class AudioEngine {
       if (!AudioContextClass) return;
 
       this.audioCtx = new AudioContextClass();
-      this.sourceNode = this.audioCtx.createMediaElementSource(this.audio);
+      try {
+        this.sourceNode = this.audioCtx.createMediaElementSource(this.audio);
+      } catch (nodeErr) {
+        console.warn('createMediaElementSource notice (audio may still play normally):', nodeErr);
+        return;
+      }
 
       // Create Equalizer bands: 60Hz, 250Hz, 1kHz, 4kHz, 16kHz
       const frequencies = [60, 250, 1000, 4000, 16000];
@@ -206,35 +227,82 @@ class AudioEngine {
   }
 
   async loadTrack(track) {
+    if (!track) return;
     this.currentTrack = track;
     this.initWebAudio();
 
     if (this.audioCtx && this.audioCtx.state === 'suspended') {
-      await this.audioCtx.resume();
+      try {
+        await this.audioCtx.resume();
+      } catch (e) {}
     }
 
     // Determine audio URL (blob url or streaming url)
-    let src = track.audioUrl;
-    if (track.audioBlob) {
-      src = URL.createObjectURL(track.audioBlob);
+    let src = '';
+    let isLocalBlob = false;
+
+    if (track.audioBlob && track.audioBlob instanceof Blob && track.audioBlob.size > 0) {
+      if (this.currentBlobUrl) {
+        try {
+          URL.revokeObjectURL(this.currentBlobUrl);
+        } catch (e) {}
+      }
+      this.currentBlobUrl = URL.createObjectURL(track.audioBlob);
+      src = this.currentBlobUrl;
+      isLocalBlob = true;
+    } else {
+      src = track.localAudioUrl || track.audioUrl || '';
+    }
+
+    // If relative audio path, resolve to local backend server
+    if (src && src.startsWith('/audio/')) {
+      const origin = (typeof window !== 'undefined' && window.location?.origin?.startsWith('http'))
+        ? window.location.origin
+        : 'http://127.0.0.1:3030';
+      src = `${origin}${src}`;
+    }
+
+    // Blob and data URLs must NEVER have crossOrigin set in WebKit/Chromium
+    if (isLocalBlob || src.startsWith('blob:') || src.startsWith('data:') || src.startsWith('file:')) {
+      this.audio.removeAttribute('crossOrigin');
+    } else if (src.startsWith('http://') || src.startsWith('https://')) {
+      this.audio.crossOrigin = 'anonymous';
+    } else {
+      this.audio.removeAttribute('crossOrigin');
     }
 
     this.audio.src = src;
+    this.audio.load();
     this.updateMediaSessionMetadata(track);
     this.notify('trackChange', track);
   }
 
   async play() {
-    if (!this.audio.src) return;
+    if (!this.audio.src) {
+      console.warn('AudioEngine: No audio source loaded to play');
+      return;
+    }
     this.initWebAudio();
     if (this.audioCtx && this.audioCtx.state === 'suspended') {
-      await this.audioCtx.resume();
+      try {
+        await this.audioCtx.resume();
+      } catch (e) {}
     }
     try {
       await this.audio.play();
     } catch (e) {
       console.warn('Playback error / autoplay prevention:', e);
-      throw e;
+      if (this.audio.crossOrigin) {
+        console.log('Retrying audio.play() without crossOrigin attribute...');
+        this.audio.removeAttribute('crossOrigin');
+        const currSrc = this.audio.src;
+        this.audio.src = '';
+        this.audio.src = currSrc;
+        this.audio.load();
+        await this.audio.play();
+      } else {
+        throw e;
+      }
     }
   }
 
@@ -246,6 +314,10 @@ class AudioEngine {
     if (this.isPlaying) {
       this.pause();
     } else {
+      if (!this.audio.src && this.currentTrack) {
+        this.loadTrack(this.currentTrack).then(() => this.play().catch(() => {}));
+        return;
+      }
       if (!this.audio.src) return;
       this.play().catch(() => {});
     }

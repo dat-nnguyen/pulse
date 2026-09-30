@@ -116,10 +116,10 @@ export default function MobileFullPlayer({
       {/* Track Title, Artist & Like Button */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div style={{ minWidth: 0, flex: 1, paddingRight: 16 }}>
-          <h2 style={{ fontSize: 24, fontWeight: 800, color: '#f8fafc', letterSpacing: -0.5, marginBottom: 4 }}>
+          <h2 style={{ fontSize: 24, fontWeight: 800, color: '#ffffff', letterSpacing: -0.5, marginBottom: 4 }}>
             {currentTrack.title}
           </h2>
-          <div style={{ fontSize: 15, color: '#94a3b8' }}>{currentTrack.artist}</div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-secondary)' }}>{currentTrack.artist}</div>
         </div>
 
         <button
@@ -141,8 +141,8 @@ export default function MobileFullPlayer({
             color: '#ffffff',
             borderRadius: 20,
             padding: '5px 12px',
-            fontSize: 12,
-            fontWeight: 600,
+            fontSize: 12.5,
+            fontWeight: 700,
             display: 'flex',
             alignItems: 'center',
             gap: 6,
@@ -171,10 +171,10 @@ export default function MobileFullPlayer({
           }}
         />
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-          <span style={{ fontSize: 12, color: '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>
+          <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
             {formatTime(currentTime)}
           </span>
-          <span style={{ fontSize: 12, color: '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>
+          <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
             {formatTime(duration)}
           </span>
         </div>

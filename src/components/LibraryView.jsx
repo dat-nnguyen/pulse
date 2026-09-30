@@ -169,13 +169,13 @@ export default function LibraryView({
               fontWeight: 800,
               letterSpacing: '-0.02em',
               margin: '2px 0',
-              color: '#f8fafc',
+              color: '#ffffff',
             }}
           >
             {title}
           </h1>
-          <p style={{ color: '#94a3b8', fontSize: 13.5, margin: 0 }}>{description}</p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: '#e2e8f0', marginTop: 4 }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 14, fontWeight: 600, margin: 0 }}>{description}</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginTop: 4 }}>
             <span>Pulse Audio</span>
             <span>•</span>
             <span>{rawTracks.length} {rawTracks.length === 1 ? 'track' : 'tracks'}</span>
@@ -400,11 +400,11 @@ export default function LibraryView({
                       </div>
                     </td>
 
-                    <td style={{ color: '#94a3b8', fontSize: 13 }}>
+                    <td style={{ color: 'var(--text-secondary)', fontSize: 13.5, fontWeight: 600 }}>
                       {track.album || 'Single'}
                     </td>
 
-                    <td style={{ textAlign: 'right', color: 'var(--text-secondary)', fontSize: 13, fontVariantNumeric: 'tabular-nums', paddingRight: 16 }}>
+                    <td style={{ textAlign: 'right', color: 'var(--text-secondary)', fontSize: 13.5, fontWeight: 650, fontVariantNumeric: 'tabular-nums', paddingRight: 16 }}>
                       {formatTime(track.duration)}
                     </td>
 

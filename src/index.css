@@ -23,15 +23,15 @@
   --pulse-danger: #f43f5e;
   --pulse-warning: #fbbf24;
 
-  /* Text */
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  /* Text — High-Contrast & Clear Legibility */
+  --text-primary: #ffffff;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
 
   /* Borders */
-  --border-subtle: rgba(255, 255, 255, 0.07);
-  --border-medium: rgba(255, 255, 255, 0.12);
-  --border-strong: rgba(255, 255, 255, 0.18);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-medium: rgba(255, 255, 255, 0.14);
+  --border-strong: rgba(255, 255, 255, 0.22);
 
   /* Radii */
   --radius-sm: 6px;
@@ -47,7 +47,7 @@
   --mobile-mini-height: 58px;
 
   /* Type */
-  --font-body: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-body: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Outfit', 'Plus Jakarta Sans', sans-serif;
 
   /* Motion */
@@ -72,16 +72,23 @@ html, body, #root {
   background: var(--pulse-bg);
   color: var(--text-primary);
   font-family: var(--font-body);
+  font-weight: 500;
+  text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   line-height: 1.5;
+  letter-spacing: -0.01em;
+}
+
+button, input, optgroup, select, textarea {
+  font-family: inherit;
 }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
 
 /* Spin animation for loaders */
 @keyframes spin {
@@ -188,16 +195,16 @@ html, body, #root {
 
 .aura-brand-name {
   font-family: var(--font-display);
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 800;
   letter-spacing: -0.3px;
   color: #fff;
 }
 
 .aura-brand-tag {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
   color: var(--pulse-accent);
 }
 
@@ -205,7 +212,7 @@ html, body, #root {
 .aura-nav-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 
 .aura-nav-btn {
@@ -213,9 +220,10 @@ html, body, #root {
   align-items: center;
   gap: 10px;
   color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 600;
-  padding: 8px 10px;
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.1px;
+  padding: 9px 11px;
   border-radius: var(--radius-sm);
   background: transparent;
   border: none;
@@ -226,7 +234,7 @@ html, body, #root {
 }
 
 .aura-nav-btn:hover {
-  color: var(--text-primary);
+  color: #fff;
   background: var(--pulse-surface-hover);
 }
 
@@ -256,16 +264,16 @@ html, body, #root {
 }
 
 .aura-shelf-title {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.4px;
-  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
   text-transform: uppercase;
 }
 
 .aura-shelf-chips {
   display: flex;
-  gap: 5px;
+  gap: 6px;
   padding: 0 2px 8px;
   overflow-x: auto;
 }
@@ -273,9 +281,9 @@ html, body, #root {
 .aura-chip {
   background: var(--pulse-bg-raised);
   color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 600;
-  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 11px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border-subtle);
   cursor: pointer;
@@ -284,14 +292,14 @@ html, body, #root {
 }
 
 .aura-chip:hover {
-  color: var(--text-primary);
+  color: #fff;
   background: var(--pulse-surface-hover);
 }
 
 .aura-chip.active {
-  background: var(--text-primary);
+  background: #fff;
   color: var(--pulse-bg);
-  border-color: var(--text-primary);
+  border-color: #fff;
 }
 
 .aura-library-scroll {
@@ -307,7 +315,7 @@ html, body, #root {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 8px;
+  padding: 7px 9px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   background: transparent;
@@ -343,17 +351,18 @@ html, body, #root {
 }
 
 .aura-item-title {
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 600;
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .aura-item-meta {
-  color: var(--text-muted);
-  font-size: 11px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -467,9 +476,9 @@ html, body, #root {
   background: var(--pulse-accent);
   color: #07090e;
   border: none;
-  font-size: 12.5px;
-  font-weight: 700;
-  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 8px 16px;
   border-radius: var(--radius-pill);
   cursor: pointer;
   display: flex;
@@ -477,6 +486,7 @@ html, body, #root {
   gap: 6px;
   transition: all var(--transition);
   white-space: nowrap;
+  letter-spacing: 0.1px;
 }
 
 .aura-btn-primary:hover {
@@ -491,11 +501,11 @@ html, body, #root {
 /* Secondary button */
 .aura-btn-secondary {
   background: var(--pulse-surface-hover);
-  color: var(--text-primary);
+  color: #ffffff;
   border: 1px solid var(--border-medium);
-  font-size: 12.5px;
-  font-weight: 600;
-  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 7px 16px;
   border-radius: var(--radius-pill);
   cursor: pointer;
   display: flex;
@@ -518,11 +528,11 @@ html, body, #root {
   background: var(--pulse-accent-muted);
   border: 1px solid var(--pulse-accent-border);
   color: var(--pulse-accent);
-  font-size: 10.5px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 800;
   padding: 3px 9px;
   border-radius: var(--radius-pill);
-  letter-spacing: 0.3px;
+  letter-spacing: 0.4px;
   white-space: nowrap;
 }
 
@@ -547,10 +557,10 @@ html, body, #root {
 
 .aura-section-title {
   font-family: var(--font-display);
-  font-size: 19px;
+  font-size: 20px;
   font-weight: 800;
   letter-spacing: -0.3px;
-  color: var(--text-primary);
+  color: #ffffff;
 }
 
 .aura-cards-grid {
@@ -618,9 +628,9 @@ html, body, #root {
 }
 
 .aura-card-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 800;
+  color: #ffffff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -628,8 +638,9 @@ html, body, #root {
 }
 
 .aura-card-subtitle {
-  font-size: 11px;
-  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -682,12 +693,12 @@ html, body, #root {
 
 .track-table th {
   text-align: left;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.3px;
-  padding: 8px 10px;
+  letter-spacing: 0.5px;
+  padding: 10px 10px;
   white-space: nowrap;
 }
 
@@ -697,7 +708,7 @@ html, body, #root {
 }
 
 .track-table-row {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .track-table-row:hover {
@@ -709,26 +720,29 @@ html, body, #root {
 }
 
 .track-table-row td {
-  padding: 8px 10px;
+  padding: 9px 10px;
   vertical-align: middle;
-  font-size: 13px;
+  font-size: 13.5px;
+  font-weight: 550;
   color: var(--text-secondary);
 }
 
 .track-table-index {
   width: 44px;
   text-align: center;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 13px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
 .index-number {
-  color: var(--text-muted);
+  color: var(--text-secondary);
+  font-weight: 700;
 }
 
 .track-table-row:hover .index-number {
-  color: var(--text-primary);
+  color: #ffffff;
 }
 
 /* Inline track info cell */
@@ -755,21 +769,23 @@ html, body, #root {
 }
 
 .track-cell-title {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #ffffff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  letter-spacing: -0.1px;
 }
 
 .track-cell-artist {
-  font-size: 12px;
-  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-top: 1px;
+  margin-top: 2px;
 }
 
 /* Animated EQ bars for currently playing */
@@ -837,21 +853,23 @@ html, body, #root {
 }
 
 .aura-dock-title {
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 700;
+  color: #ffffff;
+  font-size: 14.5px;
+  font-weight: 800;
+  letter-spacing: -0.15px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .aura-dock-artist {
-  color: var(--text-muted);
-  font-size: 11px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-top: 1px;
+  margin-top: 2px;
 }
 
 .aura-dock-center {
@@ -883,7 +901,7 @@ html, body, #root {
 }
 
 .aura-control-btn:hover {
-  color: var(--text-primary);
+  color: #ffffff;
 }
 
 .aura-control-btn.active {
@@ -918,10 +936,11 @@ html, body, #root {
 }
 
 .aura-time-label {
-  font-size: 10.5px;
-  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
-  width: 36px;
+  width: 40px;
   text-align: center;
   flex-shrink: 0;
 }
@@ -1217,16 +1236,16 @@ html, body, #root {
     gap: 3px;
     background: transparent;
     border: none;
-    color: var(--text-muted);
-    font-size: 10.5px;
-    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 11.5px;
+    font-weight: 700;
     cursor: pointer;
     padding: 6px 16px;
     transition: color var(--transition);
   }
 
   .aura-mobile-tab.active {
-    color: var(--text-primary);
+    color: #ffffff;
   }
 
   .aura-mobile-tab.active svg {
@@ -1328,6 +1347,8 @@ html, body, #root {
 
   .track-table th {
     padding: 8px 4px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
   }
 
   .track-table-row {
@@ -1340,11 +1361,15 @@ html, body, #root {
   }
 
   .track-cell-title {
-    font-size: 13.5px !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    color: #ffffff !important;
   }
 
   .track-cell-artist {
-    font-size: 11.5px !important;
+    font-size: 12.5px !important;
+    font-weight: 600 !important;
+    color: var(--text-secondary) !important;
   }
 }
 
@@ -1576,9 +1601,9 @@ html, body, #root {
   background: transparent;
   border: 1px solid var(--border-subtle);
   color: var(--text-secondary);
-  font-size: 12.5px;
-  font-weight: 600;
-  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 7px 16px;
   border-radius: var(--radius-pill);
   cursor: pointer;
   white-space: nowrap;
@@ -1586,22 +1611,23 @@ html, body, #root {
 }
 
 .pulse-tab:hover {
-  color: var(--text-primary);
+  color: #ffffff;
   background: var(--pulse-surface-hover);
 }
 
 .pulse-tab.active {
-  background: var(--text-primary);
+  background: #ffffff;
   color: var(--pulse-bg);
-  border-color: var(--text-primary);
+  border-color: #ffffff;
 }
 
 .pulse-input {
   width: 100%;
   background: var(--pulse-bg-raised);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-primary);
-  font-size: 13px;
+  border: 1px solid var(--border-medium);
+  color: #ffffff;
+  font-size: 13.5px;
+  font-weight: 600;
   font-family: var(--font-body);
   padding: 10px 14px;
   border-radius: 8px;
@@ -1615,6 +1641,7 @@ html, body, #root {
 
 .pulse-input::placeholder {
   color: var(--text-muted);
+  font-weight: 500;
 }
 
 /* Drop zone */
@@ -1756,11 +1783,12 @@ input[type="range"].eq-vertical-slider {
 .aura-search-input {
   width: 100%;
   background: var(--pulse-bg-raised);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-primary);
-  font-size: 13px;
+  border: 1px solid var(--border-medium);
+  color: #ffffff;
+  font-size: 13.5px;
+  font-weight: 600;
   font-family: var(--font-body);
-  padding: 7px 14px 7px 36px;
+  padding: 8px 14px 8px 36px;
   border-radius: var(--radius-pill);
   outline: none;
   transition: border-color var(--transition);
@@ -1770,12 +1798,17 @@ input[type="range"].eq-vertical-slider {
   border-color: var(--pulse-accent);
 }
 
+.aura-search-input::placeholder {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
 .aura-search-icon {
   position: absolute;
   left: 12px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--text-muted);
+  color: var(--text-secondary);
   pointer-events: none;
 }
 

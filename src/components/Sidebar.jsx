@@ -291,12 +291,12 @@ export default function Sidebar({
                 justifyContent: 'center',
                 gap: 6,
                 cursor: 'pointer',
-                color: '#94a3b8',
-                fontSize: 12,
-                fontWeight: 600,
+                color: 'var(--text-secondary)',
+                fontSize: 12.5,
+                fontWeight: 700,
               }}
             >
-              <LogIn size={13} />
+              <LogIn size={14} />
               <span>Sign In to Sync</span>
             </button>
           )}

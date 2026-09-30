@@ -6,6 +6,7 @@ import {
   Share2,
   Sliders,
   Database,
+  Cloud,
   User,
   LogIn,
   Activity
@@ -165,20 +166,22 @@ export default function TopBar({
         <button
           className="aura-circle-btn"
           onClick={onOpenSupabase}
-          title={isCloudConnected ? "Supabase Cloud: Connected" : "Connect Supabase Cloud"}
+          title={isCloudConnected ? "Cloud Sync: Connected (Supabase)" : "Cloud Sync: Connect Supabase"}
           style={{ width: 34, height: 34, position: 'relative' }}
+          aria-label="Cloud Sync"
         >
-          <Database size={15} color={isCloudConnected ? "var(--pulse-accent)" : "inherit"} />
+          <Cloud size={16} color={isCloudConnected ? "var(--pulse-accent)" : "currentColor"} />
           {isCloudConnected && (
             <span
               style={{
                 position: 'absolute',
-                top: 6,
-                right: 6,
-                width: 5,
-                height: 5,
+                top: 5,
+                right: 5,
+                width: 6,
+                height: 6,
                 borderRadius: '50%',
-                background: 'var(--pulse-accent)',
+                background: '#10b981',
+                boxShadow: '0 0 6px rgba(16, 185, 129, 0.8)',
               }}
             />
           )}

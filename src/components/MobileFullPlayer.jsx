@@ -12,7 +12,8 @@ import {
   Mic2,
   Sliders,
   Share2,
-  Database
+  Database,
+  Cloud
 } from 'lucide-react';
 import { isSupabaseConfigured } from '../services/supabaseClient';
 
@@ -76,19 +77,20 @@ export default function MobileFullPlayer({
             className="aura-circle-btn"
             onClick={onOpenSupabase}
             style={{ width: 40, height: 40, position: 'relative' }}
-            title={isCloudConnected ? "Supabase Cloud: Connected" : "Supabase Cloud"}
+            title={isCloudConnected ? "Cloud Sync: Connected" : "Cloud Sync Settings"}
+            aria-label="Cloud Sync Settings"
           >
-            <Database size={18} color={isCloudConnected ? "var(--pulse-accent)" : "inherit"} />
+            <Cloud size={18} color={isCloudConnected ? "var(--pulse-accent)" : "currentColor"} />
             {isCloudConnected && (
               <span
                 style={{
                   position: 'absolute',
-                  top: 8,
-                  right: 8,
+                  top: 7,
+                  right: 7,
                   width: 6,
                   height: 6,
                   borderRadius: '50%',
-                  background: 'var(--pulse-accent)',
+                  background: '#10b981',
                 }}
               />
             )}

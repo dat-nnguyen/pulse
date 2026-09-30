@@ -9,6 +9,7 @@ import {
   Disc3,
   Activity,
   Database,
+  Cloud,
   User,
   LogIn
 } from 'lucide-react';
@@ -117,20 +118,21 @@ export default function Sidebar({
             <button
               className="aura-circle-btn"
               style={{ width: 28, height: 28, position: 'relative' }}
-              title={isCloudConnected ? "Supabase Cloud: Connected" : "Supabase Cloud Sync"}
+              title={isCloudConnected ? "Cloud Sync: Connected" : "Cloud Sync Settings"}
               onClick={onOpenSupabase}
+              aria-label="Cloud Sync Settings"
             >
-              <Database size={13} color={isCloudConnected ? "var(--pulse-accent)" : "inherit"} />
+              <Cloud size={14} color={isCloudConnected ? "var(--pulse-accent)" : "currentColor"} />
               {isCloudConnected && (
                 <span
                   style={{
                     position: 'absolute',
-                    top: 4,
-                    right: 4,
+                    top: 3,
+                    right: 3,
                     width: 5,
                     height: 5,
                     borderRadius: '50%',
-                    background: 'var(--pulse-accent)',
+                    background: '#10b981',
                   }}
                 />
               )}

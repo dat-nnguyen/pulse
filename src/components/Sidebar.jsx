@@ -31,8 +31,18 @@ export default function Sidebar({
   selectedPlaylistId,
   setSelectedPlaylistId,
   onPlaylistContextMenu,
+  onNavigate,
 }) {
   const isCloudConnected = isSupabaseConfigured();
+
+  const handleNav = (view, playlistId = null) => {
+    if (onNavigate) {
+      onNavigate(view, playlistId);
+    } else {
+      if (setSelectedPlaylistId) setSelectedPlaylistId(playlistId);
+      if (setCurrentView) setCurrentView(view);
+    }
+  };
 
   return (
     <aside className="aura-sidebar">
@@ -53,10 +63,7 @@ export default function Sidebar({
         <nav className="aura-nav-list">
           <button
             className={`aura-nav-btn ${currentView === 'home' && !selectedPlaylistId ? 'active' : ''}`}
-            onClick={() => {
-              setCurrentView('home');
-              setSelectedPlaylistId(null);
-            }}
+            onClick={() => handleNav('home', null)}
           >
             <Library size={19} />
             <span>Playlists</span>
@@ -64,10 +71,7 @@ export default function Sidebar({
 
           <button
             className={`aura-nav-btn ${currentView === 'downloader' ? 'active' : ''}`}
-            onClick={() => {
-              setCurrentView('downloader');
-              setSelectedPlaylistId(null);
-            }}
+            onClick={() => handleNav('downloader', null)}
           >
             <CloudDownload size={19} />
             <span>Download</span>
@@ -169,10 +173,7 @@ export default function Sidebar({
           {(activeFilter === 'all' || activeFilter === 'downloaded') && (
             <button
               className={`aura-item-row ${selectedPlaylistId === 'downloaded' ? 'active' : ''}`}
-              onClick={() => {
-                setCurrentView('playlist');
-                setSelectedPlaylistId('downloaded');
-              }}
+              onClick={() => handleNav('playlist', 'downloaded')}
             >
               <div
                 className="aura-item-cover"
@@ -197,10 +198,7 @@ export default function Sidebar({
             <button
               key={pl.id}
               className={`aura-item-row ${selectedPlaylistId === pl.id ? 'active' : ''}`}
-              onClick={() => {
-                setCurrentView('playlist');
-                setSelectedPlaylistId(pl.id);
-              }}
+              onClick={() => handleNav('playlist', pl.id)}
               onContextMenu={(e) => {
                 if (onPlaylistContextMenu) onPlaylistContextMenu(e, pl);
               }}

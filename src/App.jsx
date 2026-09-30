@@ -48,10 +48,54 @@ export default function App() {
 
   // Navigation & View State
   const [currentView, setCurrentView] = useState('home'); // 'home' | 'playlist' | 'downloader' | 'lyrics'
-  const [viewHistory, setViewHistory] = useState(['home']);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState(null);
+  const [navHistory, setNavHistory] = useState([
+    { view: 'home', playlistId: null },
+  ]);
+  const [navIndex, setNavIndex] = useState(0);
   const [sidebarFilter, setSidebarFilter] = useState('all');
   const [prefilledDownloaderQuery, setPrefilledDownloaderQuery] = useState('');
+
+  // Two-way Navigation History Stack
+  const navigateTo = useCallback((view, playlistId = null) => {
+    const current = navHistory[navIndex];
+    if (current && current.view === view && current.playlistId === playlistId) {
+      return;
+    }
+    const nextEntry = { view, playlistId };
+    const newHistory = navHistory.slice(0, navIndex + 1).concat(nextEntry);
+    setNavHistory(newHistory);
+    setNavIndex(newHistory.length - 1);
+    setCurrentView(view);
+    setSelectedPlaylistId(playlistId);
+  }, [navIndex, navHistory]);
+
+  const canGoBack = navIndex > 0;
+  const canGoForward = navIndex < navHistory.length - 1;
+
+  const handleGoBack = useCallback(() => {
+    if (navIndex > 0) {
+      const prevIndex = navIndex - 1;
+      const target = navHistory[prevIndex];
+      setNavIndex(prevIndex);
+      setCurrentView(target.view);
+      setSelectedPlaylistId(target.playlistId);
+    }
+  }, [navIndex, navHistory]);
+
+  const handleGoForward = useCallback(() => {
+    if (navIndex < navHistory.length - 1) {
+      const nextIndex = navIndex + 1;
+      const target = navHistory[nextIndex];
+      setNavIndex(nextIndex);
+      setCurrentView(target.view);
+      setSelectedPlaylistId(target.playlistId);
+    }
+  }, [navIndex, navHistory]);
+
+  const handleGoHome = useCallback(() => {
+    navigateTo('home', null);
+  }, [navigateTo]);
 
   // Modals & Overlays
   const [showLyrics, setShowLyrics] = useState(false);
@@ -370,8 +414,7 @@ export default function App() {
     } else {
       setPlaylists((prev) => [...prev, newPlaylist]);
     }
-    setSelectedPlaylistId(newPlaylist.id);
-    setCurrentView('playlist');
+    navigateTo('playlist', newPlaylist.id);
   };
 
   // Add track to a playlist (without navigating away)
@@ -413,15 +456,14 @@ export default function App() {
       await removePlaylistFromDB(playlistId);
       setPlaylists((prev) => prev.filter((p) => p.id !== playlistId));
       if (selectedPlaylistId === playlistId) {
-        setSelectedPlaylistId(null);
-        setCurrentView('home');
+        navigateTo('home', null);
       }
       toast.success('Playlist deleted', { title: 'Deleted' });
     } catch (err) {
       console.error('Failed to delete playlist:', err);
       toast.error('Failed to delete playlist');
     }
-  }, [selectedPlaylistId, toast]);
+  }, [selectedPlaylistId, toast, navigateTo]);
 
   // Open right-click context menu for playlists
   const handlePlaylistContextMenu = useCallback((e, playlist) => {
@@ -452,24 +494,32 @@ export default function App() {
   // Open Downloader with optional query
   const handleOpenDownloader = (query = '') => {
     setPrefilledDownloaderQuery(query);
-    setCurrentView('downloader');
+    navigateTo('downloader', null);
   };
 
-  // Navigation History
-  const navigateTo = (view) => {
-    setViewHistory((prev) => [...prev, view]);
-    setCurrentView(view);
-  };
 
-  const handleGoBack = () => {
-    if (viewHistory.length > 1) {
-      const newHist = [...viewHistory];
-      newHist.pop();
-      const prevView = newHist[newHist.length - 1];
-      setViewHistory(newHist);
-      setCurrentView(prevView);
-    }
-  };
+
+  // Keyboard navigation shortcuts (⌘[ / ⌘] or Alt+Left / Alt+Right)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (['INPUT', 'TEXTAREA'].includes(e.target?.tagName)) return;
+      if ((e.metaKey || e.altKey) && e.key === 'ArrowLeft') {
+        e.preventDefault();
+        handleGoBack();
+      } else if ((e.metaKey || e.altKey) && e.key === 'ArrowRight') {
+        e.preventDefault();
+        handleGoForward();
+      } else if (e.metaKey && e.key === '[') {
+        e.preventDefault();
+        handleGoBack();
+      } else if (e.metaKey && e.key === ']') {
+        e.preventDefault();
+        handleGoForward();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleGoBack, handleGoForward]);
 
   return (
     <div className="aura-app-layout">
@@ -478,7 +528,8 @@ export default function App() {
         {/* Desktop Sidebar */}
         <Sidebar
           currentView={currentView}
-          setCurrentView={navigateTo}
+          setCurrentView={(v) => navigateTo(v, null)}
+          onNavigate={navigateTo}
           playlists={playlists}
           likedCount={likedIds.size}
           user={user}
@@ -498,15 +549,19 @@ export default function App() {
         <main className="aura-main-content">
           <TopBar
             currentView={currentView}
+            selectedPlaylistId={selectedPlaylistId}
             user={user}
             onOpenAuth={() => setShowAuthModal(true)}
             onOpenShare={() => setShowShare(true)}
             onOpenEqualizer={() => setShowEqualizer(true)}
             onOpenSupabase={() => setShowSupabaseModal(true)}
             currentTrack={currentTrack}
-            onOpenDownloader={() => setCurrentView('downloader')}
-            canGoBack={viewHistory.length > 1}
+            onOpenDownloader={() => navigateTo('downloader', null)}
+            canGoBack={canGoBack}
+            canGoForward={canGoForward}
             onGoBack={handleGoBack}
+            onGoForward={handleGoForward}
+            onGoHome={handleGoHome}
           />
 
           {/* Pure Playlists & Collection Main View */}
@@ -517,11 +572,10 @@ export default function App() {
               likedCount={likedIds.size}
               onPlayTrack={handlePlayTrack}
               onOpenPlaylist={(type) => {
-                setSelectedPlaylistId(type);
-                setCurrentView('playlist');
+                navigateTo('playlist', type);
               }}
               onCreatePlaylist={handleCreatePlaylist}
-              onOpenDownloader={() => setCurrentView('downloader')}
+              onOpenDownloader={() => navigateTo('downloader', null)}
               currentTrack={currentTrack}
               isPlaying={isPlaying}
               onTogglePlay={handleTogglePlay}
@@ -544,10 +598,9 @@ export default function App() {
               onAddTrackToPlaylist={handleAddTrackToPlaylist}
               onRemoveTrackFromPlaylist={handleRemoveTrackFromPlaylist}
               onBack={() => {
-                setSelectedPlaylistId(null);
-                setCurrentView('home');
+                handleGoBack();
               }}
-              onOpenDownloader={() => setCurrentView('downloader')}
+              onOpenDownloader={() => navigateTo('downloader', null)}
               onOpenCreatePlaylist={() => setShowCreatePlaylistModal(true)}
               onDeletePlaylist={handleDeletePlaylist}
               onPlaylistContextMenu={handlePlaylistContextMenu}
@@ -572,7 +625,7 @@ export default function App() {
               currentTrack={currentTrack}
               currentTime={currentTime}
               onSeek={handleSeek}
-              onClose={() => setCurrentView('home')}
+              onClose={() => handleGoBack()}
               onTrackUpdated={(updated) => {
                 setTracks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
                 setCurrentTrack(updated);
@@ -602,7 +655,7 @@ export default function App() {
         onToggleShuffle={handleToggleShuffle}
         onToggleRepeat={handleToggleRepeat}
         onToggleLike={() => handleToggleLike()}
-        onToggleLyrics={() => setCurrentView(currentView === 'lyrics' ? 'home' : 'lyrics')}
+        onToggleLyrics={() => (currentView === 'lyrics' ? handleGoBack() : navigateTo('lyrics', null))}
         onToggleQueue={() => setShowQueue(!showQueue)}
         onOpenEqualizer={() => setShowEqualizer(true)}
         onOpenFullscreen={() => setShowFullMobilePlayer(true)}
@@ -650,7 +703,7 @@ export default function App() {
         onToggleLike={() => handleToggleLike()}
         onOpenLyrics={() => {
           setShowFullMobilePlayer(false);
-          setCurrentView('lyrics');
+          navigateTo('lyrics', null);
         }}
         onOpenEqualizer={() => setShowEqualizer(true)}
         onOpenShare={() => setShowShare(true)}
@@ -710,8 +763,7 @@ export default function App() {
           playlist={playlistContextMenu.playlist}
           onClose={() => setPlaylistContextMenu(null)}
           onOpen={() => {
-            setSelectedPlaylistId(playlistContextMenu.playlist.id);
-            setCurrentView('playlist');
+            navigateTo('playlist', playlistContextMenu.playlist.id);
             setPlaylistContextMenu(null);
           }}
           onPlay={() => {

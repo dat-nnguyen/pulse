@@ -446,6 +446,12 @@ html, body, #root {
   border-color: var(--border-medium);
 }
 
+.aura-circle-btn.active {
+  background: var(--pulse-accent-muted);
+  border-color: var(--pulse-accent-border);
+  color: var(--pulse-accent);
+}
+
 .aura-circle-btn:disabled {
   opacity: 0.3;
   cursor: not-allowed;

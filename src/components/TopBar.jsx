@@ -2,19 +2,19 @@ import React from 'react';
 import {
   ChevronLeft,
   ChevronRight,
+  Home,
   Download,
   Share2,
   Sliders,
-  Database,
   Cloud,
   User,
-  LogIn,
-  Activity
+  LogIn
 } from 'lucide-react';
 import { isSupabaseConfigured } from '../services/supabaseClient';
 
 export default function TopBar({
   currentView,
+  selectedPlaylistId,
   user,
   onOpenAuth,
   onOpenShare,
@@ -23,54 +23,57 @@ export default function TopBar({
   currentTrack,
   onOpenDownloader,
   canGoBack,
+  canGoForward,
   onGoBack,
+  onGoForward,
+  onGoHome,
 }) {
   const isCloudConnected = isSupabaseConfigured();
 
   return (
     <header className="aura-top-bar">
-      {/* Left: Brand Identity & Navigation history */}
+      {/* Left: Navigation history & Home */}
       <div className="aura-topbar-left">
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <button
             className="aura-circle-btn"
             disabled={!canGoBack}
             onClick={onGoBack}
-            title="Go back"
-            style={{ width: 34, height: 34, opacity: canGoBack ? 1 : 0.4 }}
+            title="Go back (⌘[ or Alt+←)"
+            style={{
+              width: 34,
+              height: 34,
+              opacity: canGoBack ? 1 : 0.35,
+              cursor: canGoBack ? 'pointer' : 'not-allowed',
+            }}
+            aria-label="Back"
           >
             <ChevronLeft size={18} />
           </button>
           <button
             className="aura-circle-btn hide-on-mobile"
-            disabled
-            title="Go forward"
-            style={{ width: 34, height: 34, opacity: 0.3 }}
+            disabled={!canGoForward}
+            onClick={onGoForward}
+            title="Go forward (⌘] or Alt+→)"
+            style={{
+              width: 34,
+              height: 34,
+              opacity: canGoForward ? 1 : 0.35,
+              cursor: canGoForward ? 'pointer' : 'not-allowed',
+            }}
+            aria-label="Forward"
           >
             <ChevronRight size={18} />
           </button>
-        </div>
-
-        {/* Pulse Brand in Top Bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: 8,
-              background: '#0e1420',
-              border: '1px solid var(--pulse-accent-border)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
+          <button
+            className={`aura-circle-btn ${currentView === 'home' && !selectedPlaylistId ? 'active' : ''}`}
+            onClick={onGoHome}
+            title="Go to Home / Playlists"
+            style={{ width: 34, height: 34 }}
+            aria-label="Home"
           >
-            <Activity size={16} color="var(--pulse-accent)" />
-          </div>
-          <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.02em', color: '#f8fafc' }}>
-            PULSE
-          </span>
+            <Home size={17} />
+          </button>
         </div>
       </div>
 

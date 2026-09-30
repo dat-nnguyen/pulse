@@ -15,6 +15,7 @@ import {
   Plus,
   Download
 } from 'lucide-react';
+import { ConfirmDialog, useConfirm } from './ConfirmDialog';
 
 export default function LibraryView({
   playlistId,
@@ -81,6 +82,8 @@ export default function LibraryView({
 
   const isPlaylistActive =
     currentTrack && displayTracks.some((t) => t.id === currentTrack.id);
+
+  const { confirm, dialogProps } = useConfirm();
 
   return (
     <div className="aura-scroll-area" style={{ padding: 0 }}>
@@ -379,10 +382,15 @@ export default function LibraryView({
                               color: 'var(--text-muted)',
                               transition: 'all 0.15s ease',
                             }}
-                            onClick={() => {
-                              if (window.confirm(`Delete "${track.title}" from library?`)) {
-                                onDeleteTrack(track.id);
-                              }
+                            onClick={async () => {
+                              const ok = await confirm({
+                                title: 'Remove from library?',
+                                message: `"${track.title}" will be permanently deleted from your library.`,
+                                confirmLabel: 'Delete',
+                                cancelLabel: 'Keep',
+                                variant: 'danger',
+                              });
+                              if (ok) onDeleteTrack(track.id);
                             }}
                             title="Delete track"
                           >
@@ -398,6 +406,7 @@ export default function LibraryView({
           </table>
         )}
       </div>
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 }

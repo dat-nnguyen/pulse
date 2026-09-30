@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ConfirmDialog, useConfirm } from './ConfirmDialog';
 import {
   X,
   Database,
@@ -24,6 +25,7 @@ export default function SupabaseModal({ isOpen, onClose }) {
   const [supabaseKey, setSupabaseKey] = useState(credentials.key || '');
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
+  const { confirm, dialogProps } = useConfirm();
 
   const handleTestAndSave = async (e) => {
     e.preventDefault();
@@ -44,8 +46,15 @@ export default function SupabaseModal({ isOpen, onClose }) {
     }
   };
 
-  const handleDisconnect = () => {
-    if (window.confirm('Disconnect Supabase and switch to Local Offline Mode?')) {
+  const handleDisconnect = async () => {
+    const ok = await confirm({
+      title: 'Disconnect cloud sync?',
+      message: 'This will switch to Local Offline Mode. Your local library will remain intact.',
+      confirmLabel: 'Disconnect',
+      cancelLabel: 'Keep Connected',
+      variant: 'warning',
+    });
+    if (ok) {
       setSupabaseConfig('', '');
       setSupabaseUrl('');
       setSupabaseKey('');
@@ -216,6 +225,7 @@ export default function SupabaseModal({ isOpen, onClose }) {
           </ol>
         </div>
       </div>
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 }

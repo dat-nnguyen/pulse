@@ -67,7 +67,7 @@ export default function Sidebar({
             }}
           >
             <CloudDownload size={19} />
-            <span>Add Audio</span>
+            <span>Download</span>
           </button>
         </nav>
       </div>

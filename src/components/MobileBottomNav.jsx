@@ -17,7 +17,7 @@ export default function MobileBottomNav({ currentView, setCurrentView, user, onO
         onClick={() => setCurrentView('downloader')}
       >
         <CloudDownload size={22} />
-        <span>Add Audio</span>
+        <span>Download</span>
       </button>
 
       <button

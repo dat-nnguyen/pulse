@@ -10,7 +10,8 @@ import {
   FolderPlus,
   Sparkles,
   ArrowRight,
-  CloudDownload
+  CloudDownload,
+  Download
 } from 'lucide-react';
 
 export default function HomeView({
@@ -63,8 +64,8 @@ export default function HomeView({
             onClick={onOpenDownloader}
             style={{ fontSize: 13 }}
           >
-            <CloudDownload size={16} />
-            <span>Add Audio</span>
+            <Download size={16} />
+            <span>Download Music</span>
           </button>
         </div>
       </div>

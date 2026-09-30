@@ -121,10 +121,10 @@ export default function DownloaderView({
             margin: '0 0 6px',
           }}
         >
-          Add Audio
+          Download & Add Music
         </h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: 13.5, margin: 0 }}>
-          Import music & audio — 320kbps and lossless audio preserved
+          Download from YouTube or import local audio — 320kbps and lossless quality preserved
         </p>
       </div>
 

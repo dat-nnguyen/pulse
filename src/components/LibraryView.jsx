@@ -12,7 +12,8 @@ import {
   Search,
   ChevronLeft,
   Music,
-  Plus
+  Plus,
+  Download
 } from 'lucide-react';
 
 export default function LibraryView({
@@ -244,8 +245,8 @@ export default function LibraryView({
                 onClick={onOpenDownloader}
                 style={{ marginTop: 12, fontSize: 13 }}
               >
-                <Plus size={16} />
-                <span>Import Music</span>
+                <Download size={16} />
+                <span>Download Music</span>
               </button>
             )}
           </div>

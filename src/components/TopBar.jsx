@@ -143,15 +143,15 @@ export default function TopBar({
           <span>{currentTrack?.bitrate || '320K'}</span>
         </div>
 
-        {/* Add Audio Button (hidden on mobile, accessible via bottom nav) */}
+        {/* Download Audio Button */}
         <button
-          className="aura-btn-primary hide-on-mobile"
+          className="aura-btn-primary"
           onClick={onOpenDownloader}
-          title="Import music & audio"
+          title="Download & Import Music (YouTube / Local Files)"
           style={{ padding: '7px 14px', fontSize: 12.5 }}
         >
           <Download size={14} />
-          <span>Add Audio</span>
+          <span>Download</span>
         </button>
 
         {/* Equalizer (hidden on mobile, accessible in full player) */}

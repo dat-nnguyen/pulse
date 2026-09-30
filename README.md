@@ -41,8 +41,6 @@
   - Parametric Web Audio EQ (60Hz, 250Hz, 1kHz, 4kHz, 16kHz) with dedicated Bass Boost.
   - Studio presets: *Bass Boost, Vocal, Acoustic, Rock, Electronic, Flat, Treble Boost*.
   - Real-time frequency spectrum visualizer canvas.
-- **🎤 Synchronized Karaoke Lyrics**:
-  - Time-synced `.lrc` lyrics with live active line highlighting, auto-scrolling, and click-to-seek playback.
 - **📋 Right-Click Context Menus**:
   - Desktop-native contextual right-click menus on tracks and playlists (Play, Add to Playlist, Remove from Playlist, Delete).
 
@@ -173,8 +171,8 @@ VITE_SUPABASE_ANON_KEY=your-anon-public-key
 │   └── preload.js          # Secure IPC preload bridge
 ├── ios/App/                # Native Capacitor iOS project (Xcode workspace)
 ├── server/                 # Production Node.js backend
-│   ├── controllers/        # Download, podcast search, and lyrics controllers
-│   ├── services/           # yt-dlp audio extraction, RSS parser, lyrics API
+│   ├── controllers/        # Download and podcast search controllers
+│   ├── services/           # yt-dlp audio extraction, RSS podcast parser
 │   └── server.js           # Express API server
 ├── src/                    # Frontend React 19 application
 │   ├── components/         # TopBar, Sidebar, PlayerBar, Library, Equalizer, Modals

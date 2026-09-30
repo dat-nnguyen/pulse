@@ -9,7 +9,6 @@ import {
   Pause,
   Repeat,
   Repeat1,
-  Mic2,
   Sliders,
   Share2,
   Database,
@@ -34,7 +33,6 @@ export default function MobileFullPlayer({
   onToggleShuffle,
   onToggleRepeat,
   onToggleLike,
-  onOpenLyrics,
   onOpenEqualizer,
   onOpenShare,
   onOpenSupabase,
@@ -221,29 +219,6 @@ export default function MobileFullPlayer({
         >
           {repeatMode === 'one' ? <Repeat1 size={22} /> : <Repeat size={22} />}
         </button>
-      </div>
-
-      {/* Lyrics Drawer preview */}
-      <div
-        style={{
-          background: 'rgba(255, 255, 255, 0.06)',
-          border: '1px solid var(--border-medium)',
-          borderRadius: 16,
-          padding: 18,
-          cursor: 'pointer',
-          backdropFilter: 'blur(20px)',
-        }}
-        onClick={onOpenLyrics}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--pulse-accent)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Mic2 size={16} /> Karaoke Synced Lyrics
-          </span>
-          <span style={{ fontSize: 12, color: '#94a3b8' }}>Tap to Expand</span>
-        </div>
-        <p style={{ fontSize: 15, fontWeight: 600, color: '#f8fafc', lineHeight: 1.4 }}>
-          Tap to view real-time synchronized lyrics & tap-to-seek
-        </p>
       </div>
     </div>
   );

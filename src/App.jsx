@@ -23,7 +23,6 @@ import MobileFullPlayer from './components/MobileFullPlayer';
 import HomeView from './components/HomeView';
 import LibraryView from './components/LibraryView';
 import DownloaderView from './components/DownloaderView';
-import LyricsView from './components/LyricsView';
 import EqualizerModal from './components/EqualizerModal';
 import QueueModal from './components/QueueModal';
 import ShareModal from './components/ShareModal';
@@ -49,7 +48,7 @@ export default function App() {
   const [playlistContextMenu, setPlaylistContextMenu] = useState(null); // { x, y, playlist }
 
   // Navigation & View State
-  const [currentView, setCurrentView] = useState('home'); // 'home' | 'playlist' | 'downloader' | 'lyrics'
+  const [currentView, setCurrentView] = useState('home'); // 'home' | 'playlist' | 'downloader'
   const [selectedPlaylistId, setSelectedPlaylistId] = useState(null);
   const [navHistory, setNavHistory] = useState([
     { view: 'home', playlistId: null },
@@ -100,7 +99,6 @@ export default function App() {
   }, [navigateTo]);
 
   // Modals & Overlays
-  const [showLyrics, setShowLyrics] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
   const [showEqualizer, setShowEqualizer] = useState(false);
   const [showShare, setShowShare] = useState(false);
@@ -662,19 +660,6 @@ export default function App() {
               toast={toast}
             />
           )}
-
-          {currentView === 'lyrics' && (
-            <LyricsView
-              currentTrack={currentTrack}
-              currentTime={currentTime}
-              onSeek={handleSeek}
-              onClose={() => handleGoBack()}
-              onTrackUpdated={(updated) => {
-                setTracks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-                setCurrentTrack(updated);
-              }}
-            />
-          )}
         </main>
       </div>
 
@@ -688,7 +673,6 @@ export default function App() {
         isShuffle={isShuffle}
         repeatMode={repeatMode}
         isLiked={currentTrack ? likedIds.has(currentTrack.id) : false}
-        showLyrics={currentView === 'lyrics'}
         showQueue={showQueue}
         onTogglePlay={handleTogglePlay}
         onPrev={handlePrevTrack}
@@ -698,7 +682,6 @@ export default function App() {
         onToggleShuffle={handleToggleShuffle}
         onToggleRepeat={handleToggleRepeat}
         onToggleLike={() => handleToggleLike()}
-        onToggleLyrics={() => (currentView === 'lyrics' ? handleGoBack() : navigateTo('lyrics', null))}
         onToggleQueue={() => setShowQueue(!showQueue)}
         onOpenEqualizer={() => setShowEqualizer(true)}
         onOpenFullscreen={() => setShowFullMobilePlayer(true)}
@@ -744,10 +727,6 @@ export default function App() {
         onToggleShuffle={handleToggleShuffle}
         onToggleRepeat={handleToggleRepeat}
         onToggleLike={() => handleToggleLike()}
-        onOpenLyrics={() => {
-          setShowFullMobilePlayer(false);
-          navigateTo('lyrics', null);
-        }}
         onOpenEqualizer={() => setShowEqualizer(true)}
         onOpenShare={() => setShowShare(true)}
         onOpenSupabase={() => setShowSupabaseModal(true)}

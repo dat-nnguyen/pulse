@@ -11,7 +11,6 @@ import {
   VolumeX,
   Volume1,
   Heart,
-  Mic2,
   ListMusic,
   Sliders,
   Maximize2
@@ -26,7 +25,6 @@ export default function PlayerBar({
   isShuffle,
   repeatMode,
   isLiked,
-  showLyrics,
   showQueue,
   onTogglePlay,
   onPrev,
@@ -36,7 +34,6 @@ export default function PlayerBar({
   onToggleShuffle,
   onToggleRepeat,
   onToggleLike,
-  onToggleLyrics,
   onToggleQueue,
   onOpenEqualizer,
   onOpenFullscreen,
@@ -173,15 +170,8 @@ export default function PlayerBar({
         </div>
       </div>
 
-      {/* Right: Lyrics, Queue, Equalizer, Volume, Fullscreen */}
+      {/* Right: Queue, Equalizer, Volume, Fullscreen */}
       <div className="aura-dock-right">
-        <button
-          className={`aura-control-btn ${showLyrics ? 'active' : ''}`}
-          onClick={onToggleLyrics}
-          title="Karaoke Lyrics"
-        >
-          <Mic2 size={18} />
-        </button>
 
         <button
           className={`aura-control-btn ${showQueue ? 'active' : ''}`}

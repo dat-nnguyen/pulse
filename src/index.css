@@ -1522,60 +1522,6 @@ button, input, optgroup, select, textarea {
 
 
 /* ==========================================================================
-   LYRICS ENGINE (Spotify-style karaoke)
-   ========================================================================== */
-
-.spotify-lyrics-stream {
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-  padding: 36px 16px 160px;
-  max-width: 640px;
-  margin: 0 auto;
-}
-
-.spotify-lyric-line {
-  font-size: 26px;
-  font-weight: 700;
-  line-height: 1.35;
-  letter-spacing: -0.01em;
-  color: rgba(255, 255, 255, 0.25);
-  transition: color 0.3s var(--ease), transform 0.3s var(--ease);
-  cursor: pointer;
-  user-select: none;
-  transform-origin: left center;
-}
-
-.spotify-lyric-line:hover {
-  color: rgba(255, 255, 255, 0.55);
-}
-
-.spotify-lyric-line.active {
-  color: #fff;
-  font-size: 30px;
-  font-weight: 800;
-  transform: scale(1.01);
-}
-
-.spotify-lyric-line.past {
-  color: rgba(255, 255, 255, 0.45);
-}
-
-.spotify-lyric-line.future {
-  color: rgba(255, 255, 255, 0.20);
-}
-
-@media (max-width: 768px) {
-  .spotify-lyrics-stream {
-    gap: 16px;
-    padding: 20px 8px 120px;
-  }
-  .spotify-lyric-line { font-size: 20px; }
-  .spotify-lyric-line.active { font-size: 23px; }
-}
-
-
-/* ==========================================================================
    DOWNLOADER VIEW
    ========================================================================== */
 

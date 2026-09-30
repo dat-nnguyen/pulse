@@ -32,9 +32,12 @@ export default function LibraryView({
   onRemoveTrackFromPlaylist,
   onOpenCreatePlaylist,
   onBack,
-  onOpenDownloader,
   toast,
+  onDeletePlaylist,
+  onPlaylistContextMenu,
 }) {
+  const currentPlaylist = playlists.find((p) => p.id === playlistId);
+  const isCustomPlaylist = Boolean(currentPlaylist);
   const [playlistFilter, setPlaylistFilter] = useState('');
   const [contextMenu, setContextMenu] = useState(null); // { x, y, track }
 
@@ -109,6 +112,11 @@ export default function LibraryView({
       {/* Hero Banner */}
       <div
         className="pulse-playlist-hero"
+        onContextMenu={(e) => {
+          if (isCustomPlaylist && onPlaylistContextMenu) {
+            onPlaylistContextMenu(e, currentPlaylist);
+          }
+        }}
         style={{
           background: bannerGradient,
           position: 'relative',
@@ -217,6 +225,31 @@ export default function LibraryView({
           >
             <Shuffle size={18} />
           </button>
+
+          {/* Delete Playlist Button */}
+          {isCustomPlaylist && onDeletePlaylist && (
+            <button
+              className="aura-circle-btn"
+              title="Delete Playlist"
+              onClick={async () => {
+                const confirmed = await confirm({
+                  title: `Delete "${currentPlaylist.name}"?`,
+                  message: 'Are you sure you want to delete this playlist? The audio tracks will remain in your library.',
+                  confirmLabel: 'Delete Playlist',
+                  cancelLabel: 'Keep Playlist',
+                  variant: 'danger',
+                });
+                if (confirmed) {
+                  onDeletePlaylist(currentPlaylist.id);
+                }
+              }}
+              style={{ color: 'var(--text-muted)' }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--pulse-danger)')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+            >
+              <Trash2 size={18} />
+            </button>
+          )}
         </div>
 
         {/* IN-PLAYLIST SEARCH BAR (Fast Filter) */}

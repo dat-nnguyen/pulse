@@ -24,6 +24,7 @@ export default function HomeView({
   currentTrack,
   isPlaying,
   onTogglePlay,
+  onPlaylistContextMenu,
 }) {
   const offlineTracks = tracks.filter((t) => t.isDownloaded);
 
@@ -224,6 +225,9 @@ export default function HomeView({
               key={pl.id}
               className="aura-glass-card aura-playlist-card"
               onClick={() => onOpenPlaylist(pl.id)}
+              onContextMenu={(e) => {
+                if (onPlaylistContextMenu) onPlaylistContextMenu(e, pl);
+              }}
               style={{
                 cursor: 'pointer',
                 borderRadius: 14,

@@ -29,6 +29,7 @@ export default function Sidebar({
   setActiveFilter,
   selectedPlaylistId,
   setSelectedPlaylistId,
+  onPlaylistContextMenu,
 }) {
   const isCloudConnected = isSupabaseConfigured();
 
@@ -195,6 +196,9 @@ export default function Sidebar({
               onClick={() => {
                 setCurrentView('playlist');
                 setSelectedPlaylistId(pl.id);
+              }}
+              onContextMenu={(e) => {
+                if (onPlaylistContextMenu) onPlaylistContextMenu(e, pl);
               }}
             >
               {pl.coverUrl ? (

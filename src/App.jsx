@@ -28,6 +28,8 @@ import ShareModal from './components/ShareModal';
 import SupabaseModal from './components/SupabaseModal';
 import AuthModal from './components/AuthModal';
 import CreatePlaylistModal from './components/CreatePlaylistModal';
+import PlaylistContextMenu from './components/PlaylistContextMenu';
+import { ConfirmDialog, useConfirm } from './components/ConfirmDialog';
 import { ToastContainer, useToast } from './components/ToastNotification';
 import { getCurrentUser, subscribeAuthChange } from './services/authService';
 
@@ -39,6 +41,10 @@ export default function App() {
 
   // Toast notification system
   const { toasts, toast, removeToast } = useToast();
+
+  // Confirmation dialog hook
+  const { confirm, dialogProps } = useConfirm();
+  const [playlistContextMenu, setPlaylistContextMenu] = useState(null); // { x, y, playlist }
 
   // Navigation & View State
   const [currentView, setCurrentView] = useState('home'); // 'home' | 'playlist' | 'downloader' | 'lyrics'
@@ -401,6 +407,48 @@ export default function App() {
     toast.info('Removed from playlist', { title: 'Done' });
   }, [toast]);
 
+  // Delete Playlist Completely
+  const handleDeletePlaylist = useCallback(async (playlistId) => {
+    try {
+      await removePlaylistFromDB(playlistId);
+      setPlaylists((prev) => prev.filter((p) => p.id !== playlistId));
+      if (selectedPlaylistId === playlistId) {
+        setSelectedPlaylistId(null);
+        setCurrentView('home');
+      }
+      toast.success('Playlist deleted', { title: 'Deleted' });
+    } catch (err) {
+      console.error('Failed to delete playlist:', err);
+      toast.error('Failed to delete playlist');
+    }
+  }, [selectedPlaylistId, toast]);
+
+  // Open right-click context menu for playlists
+  const handlePlaylistContextMenu = useCallback((e, playlist) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setPlaylistContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      playlist,
+    });
+  }, []);
+
+  // Request deletion with confirmation dialog
+  const handleRequestDeletePlaylist = useCallback(async (playlist) => {
+    setPlaylistContextMenu(null);
+    const confirmed = await confirm({
+      title: `Delete "${playlist.name}"?`,
+      message: 'Are you sure you want to delete this playlist? The audio tracks will remain in your library.',
+      confirmLabel: 'Delete Playlist',
+      cancelLabel: 'Keep Playlist',
+      variant: 'danger',
+    });
+    if (confirmed) {
+      await handleDeletePlaylist(playlist.id);
+    }
+  }, [confirm, handleDeletePlaylist]);
+
   // Open Downloader with optional query
   const handleOpenDownloader = (query = '') => {
     setPrefilledDownloaderQuery(query);
@@ -443,6 +491,7 @@ export default function App() {
           setActiveFilter={setSidebarFilter}
           selectedPlaylistId={selectedPlaylistId}
           setSelectedPlaylistId={setSelectedPlaylistId}
+          onPlaylistContextMenu={handlePlaylistContextMenu}
         />
 
         {/* Central Viewport */}
@@ -476,6 +525,7 @@ export default function App() {
               currentTrack={currentTrack}
               isPlaying={isPlaying}
               onTogglePlay={handleTogglePlay}
+              onPlaylistContextMenu={handlePlaylistContextMenu}
             />
           )}
 
@@ -499,6 +549,8 @@ export default function App() {
               }}
               onOpenDownloader={() => setCurrentView('downloader')}
               onOpenCreatePlaylist={() => setShowCreatePlaylistModal(true)}
+              onDeletePlaylist={handleDeletePlaylist}
+              onPlaylistContextMenu={handlePlaylistContextMenu}
               toast={toast}
             />
           )}
@@ -649,6 +701,35 @@ export default function App() {
         currentTrackId={currentTrack?.id}
         toast={toast}
       />
+
+      {/* Playlist Context Menu */}
+      {playlistContextMenu && (
+        <PlaylistContextMenu
+          x={playlistContextMenu.x}
+          y={playlistContextMenu.y}
+          playlist={playlistContextMenu.playlist}
+          onClose={() => setPlaylistContextMenu(null)}
+          onOpen={() => {
+            setSelectedPlaylistId(playlistContextMenu.playlist.id);
+            setCurrentView('playlist');
+            setPlaylistContextMenu(null);
+          }}
+          onPlay={() => {
+            const pl = playlistContextMenu.playlist;
+            if (pl.trackIds && pl.trackIds.length > 0) {
+              const plTracks = tracks.filter((t) => pl.trackIds.includes(t.id));
+              if (plTracks.length > 0) {
+                handlePlayTrack(plTracks[0], plTracks);
+              }
+            }
+            setPlaylistContextMenu(null);
+          }}
+          onDelete={() => handleRequestDeletePlaylist(playlistContextMenu.playlist)}
+        />
+      )}
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog {...dialogProps} />
 
       {/* In-App Toast Notifications */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />

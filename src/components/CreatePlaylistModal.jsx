@@ -7,6 +7,7 @@ export default function CreatePlaylistModal({
   onClose,
   onPlaylistCreated,
   currentTrackId,
+  toast,
 }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -57,9 +58,15 @@ export default function CreatePlaylistModal({
 
       await savePlaylist(newPlaylist);
       onPlaylistCreated(newPlaylist);
+      if (toast) {
+        toast.success(`"${newPlaylist.name}" playlist created!`, { title: 'Playlist created' });
+      }
       handleClose();
     } catch (err) {
       console.error('Failed to create playlist:', err);
+      if (toast) {
+        toast.error('Could not create playlist. Please try again.', { title: 'Error' });
+      }
     } finally {
       setIsSubmitting(false);
     }

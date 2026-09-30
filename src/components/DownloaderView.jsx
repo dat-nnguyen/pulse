@@ -27,6 +27,7 @@ export default function DownloaderView({
   onTrackAdded,
   onPlayTrack,
   prefilledQuery = '',
+  toast,
 }) {
   const [activeTab, setActiveTab] = useState('youtube'); // 'youtube' | 'local'
 
@@ -61,6 +62,7 @@ export default function DownloaderView({
         type: 'success',
         message: `Downloaded "${track.title}" in original quality`,
       });
+      if (toast) toast.success(`"${track.title}" added to library`, { title: 'Download complete' });
       setWebUrl('');
       setCustomTitle('');
       setCustomArtist('');
@@ -70,6 +72,7 @@ export default function DownloaderView({
         type: 'error',
         message: err.message || 'Download failed. Check the URL or try a direct audio link.',
       });
+      if (toast) toast.error(err.message || 'Download failed. Check the URL or try a direct audio link.', { title: 'Download error' });
     } finally {
       setIsDownloading(false);
       setDownloadProgress(null);
@@ -97,8 +100,10 @@ export default function DownloaderView({
         type: 'success',
         message: `Added ${files.length} track(s) in original quality`,
       });
+      if (toast) toast.success(`Added ${files.length} track(s) to your library`, { title: 'Import complete' });
     } catch (err) {
       setImportStatus({ type: 'error', message: 'Import failed: ' + err.message });
+      if (toast) toast.error('Import failed: ' + err.message, { title: 'Import error' });
     }
   };
 

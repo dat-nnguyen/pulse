@@ -29,12 +29,16 @@ import ShareModal from './components/ShareModal';
 import SupabaseModal from './components/SupabaseModal';
 import AuthModal from './components/AuthModal';
 import CreatePlaylistModal from './components/CreatePlaylistModal';
+import { ToastContainer, useToast } from './components/ToastNotification';
 import { getCurrentUser, subscribeAuthChange } from './services/authService';
 
 export default function App() {
   // User Authentication State
   const [user, setUser] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
+
+  // Toast notification system
+  const { toasts, toast, removeToast } = useToast();
 
   // Navigation & View State
   const [currentView, setCurrentView] = useState('home'); // 'home' | 'playlist' | 'downloader' | 'lyrics'
@@ -408,6 +412,7 @@ export default function App() {
                 handlePlayTrack(newTrack);
               }}
               onPlayTrack={handlePlayTrack}
+              toast={toast}
             />
           )}
 
@@ -519,6 +524,7 @@ export default function App() {
         onClose={() => setShowShare(false)}
         tracks={tracks}
         playlists={playlists}
+        toast={toast}
       />
 
       <SupabaseModal
@@ -538,7 +544,11 @@ export default function App() {
         onClose={() => setShowCreatePlaylistModal(false)}
         onPlaylistCreated={handlePlaylistCreated}
         currentTrackId={currentTrack?.id}
+        toast={toast}
       />
+
+      {/* In-App Toast Notifications */}
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   );
 }

@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { saveTrack } from '../services/storageService';
 
-export default function ShareModal({ isOpen, onClose, tracks = [], playlists = [] }) {
+export default function ShareModal({ isOpen, onClose, tracks = [], playlists = [], toast }) {
   const [copied, setCopied] = useState(false);
   const currentUrl = window.location.origin;
 
@@ -65,11 +65,15 @@ export default function ShareModal({ isOpen, onClose, tracks = [], playlists = [
           for (const track of data.tracks) {
             await saveTrack(track);
           }
-          alert(`Successfully imported ${data.tracks.length} tracks into Aura!`);
-          window.location.reload();
+          if (toast) {
+            toast.success(`Imported ${data.tracks.length} tracks into Pulse!`, { title: 'Import complete' });
+          }
+          setTimeout(() => window.location.reload(), 1200);
         }
       } catch (err) {
-        alert('Invalid library backup file: ' + err.message);
+        if (toast) {
+          toast.error('Invalid library backup file: ' + err.message, { title: 'Import failed' });
+        }
       }
     };
     reader.readAsText(file);

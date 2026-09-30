@@ -1,10 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Cache client instance
+// Cache client instance — keyed so that credential changes force a new client
 let supabaseInstance = null;
-
-const DEFAULT_SUPABASE_URL = 'https://wtrlpbumpwtauvxqwrrg.supabase.co';
-const DEFAULT_SUPABASE_KEY = 'sb_publishable_46vEMz8QI1UlU8ou_etYXw_YrheuDI2';
+let cachedUrl = null;
+let cachedKey = null;
 
 export function getSupabaseCredentials() {
   const envUrl =
@@ -19,17 +18,22 @@ export function getSupabaseCredentials() {
     import.meta.env.SUPABASE_KEY ||
     import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  const localUrl = localStorage.getItem('pulse_supabase_url') || localStorage.getItem('aura_supabase_url');
-  const localKey = localStorage.getItem('pulse_supabase_key') || localStorage.getItem('aura_supabase_key');
+  const localUrl =
+    localStorage.getItem('pulse_supabase_url') ||
+    localStorage.getItem('aura_supabase_url');
+  const localKey =
+    localStorage.getItem('pulse_supabase_key') ||
+    localStorage.getItem('aura_supabase_key');
 
-  const url = (localUrl && localUrl.trim()) || (envUrl && envUrl.trim()) || DEFAULT_SUPABASE_URL;
-  const key = (localKey && localKey.trim()) || (envKey && envKey.trim()) || DEFAULT_SUPABASE_KEY;
+  const url = (localUrl && localUrl.trim()) || (envUrl && envUrl.trim()) || '';
+  const key = (localKey && localKey.trim()) || (envKey && envKey.trim()) || '';
 
   return { url, key };
 }
 
 export function isSupabaseConfigured() {
   const { url, key } = getSupabaseCredentials();
+  // Must have both a valid HTTPS URL and a non-empty key
   return Boolean(url && key && url.startsWith('https://'));
 }
 
@@ -37,11 +41,22 @@ export function getSupabaseClient() {
   if (!isSupabaseConfigured()) return null;
 
   const { url, key } = getSupabaseCredentials();
-  if (!supabaseInstance) {
-    supabaseInstance = createClient(url, key, {
-      auth: { persistSession: true },
-    });
+
+  // Re-create client if credentials changed (e.g. user entered new keys)
+  if (supabaseInstance && url === cachedUrl && key === cachedKey) {
+    return supabaseInstance;
   }
+
+  supabaseInstance = createClient(url, key, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  });
+  cachedUrl = url;
+  cachedKey = key;
+
   return supabaseInstance;
 }
 
@@ -52,15 +67,23 @@ export function setSupabaseConfig(url, key) {
   } else {
     localStorage.removeItem('aura_supabase_url');
     localStorage.removeItem('aura_supabase_key');
+    localStorage.removeItem('pulse_supabase_url');
+    localStorage.removeItem('pulse_supabase_key');
   }
+  // Force re-creation of the client on next call
   supabaseInstance = null;
+  cachedUrl = null;
+  cachedKey = null;
 }
 
 export async function testSupabaseConnection(url, key) {
   try {
-    const client = createClient(url, key);
-    const { error } = await client.from('tracks').select('id').limit(1);
-    if (error && error.code !== 'PGRST116') {
+    const client = createClient(url.trim(), key.trim(), {
+      auth: { persistSession: false },
+    });
+    // Try a lightweight auth check rather than querying a table
+    const { error } = await client.auth.getSession();
+    if (error) {
       return { success: false, error: error.message };
     }
     return { success: true };

@@ -6,23 +6,35 @@ export async function getCurrentUser() {
   const client = getSupabaseClient();
   if (client) {
     try {
-      const { data: { user }, error } = await client.auth.getUser();
-      if (user && !error) {
-        return {
-          id: user.id,
-          email: user.email,
+      // First try to restore from existing session (handles page refresh)
+      const { data: { session } } = await client.auth.getSession();
+      if (session?.user) {
+        const userObj = {
+          id: session.user.id,
+          email: session.user.email,
           provider: 'supabase',
         };
+        localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(userObj));
+        return userObj;
       }
     } catch (e) {
-      console.warn('Failed to get Supabase user:', e);
+      console.warn('Failed to get Supabase session:', e);
     }
   }
 
-  // Fallback to local stored session
+  // Fallback to locally stored session (passphrase users or offline mode)
   try {
     const raw = localStorage.getItem(LOCAL_USER_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // Don't restore a Supabase session from local storage — it may be stale
+      // Only restore passphrase/local providers
+      if (parsed.provider !== 'supabase') return parsed;
+
+      // For supabase provider: only return if we have a live session
+      // (already tried above — session was null, so clear stale entry)
+      localStorage.removeItem(LOCAL_USER_KEY);
+    }
   } catch (e) {
     // Ignore JSON error
   }
@@ -32,71 +44,96 @@ export async function getCurrentUser() {
 
 export async function signUp(email, password) {
   if (!email || !password) throw new Error('Email and password are required');
-  const client = getSupabaseClient();
 
-  if (client) {
-    const { data, error } = await client.auth.signUp({
-      email: email.trim(),
-      password,
-    });
-    if (error) throw error;
-    if (data.session && data.user) {
-      const userObj = { id: data.user.id, email: data.user.email, provider: 'supabase' };
-      localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(userObj));
-      return { user: userObj, needsConfirmation: false };
-    }
-    if (data.user) {
-      return {
-        user: { id: data.user.id, email: data.user.email, provider: 'supabase' },
-        needsConfirmation: true,
-      };
-    }
+  if (!isSupabaseConfigured()) {
+    throw new Error(
+      'Supabase is not configured. Please enter your Supabase URL and API key in Settings → Cloud Sync first.'
+    );
   }
 
-  // Local-first fallback if Supabase not yet configured
-  const localUser = {
-    id: 'usr_' + Math.random().toString(36).substring(2, 9),
+  const client = getSupabaseClient();
+  const { data, error } = await client.auth.signUp({
     email: email.trim(),
-    provider: 'local',
-  };
-  localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(localUser));
-  return { user: localUser, needsConfirmation: false };
+    password,
+  });
+
+  if (error) throw error;
+
+  // Supabase returns a user with an unconfirmed identity if email confirmation is required
+  if (data.user && !data.session) {
+    return {
+      user: { id: data.user.id, email: data.user.email, provider: 'supabase' },
+      needsConfirmation: true,
+    };
+  }
+
+  if (data.session && data.user) {
+    const userObj = { id: data.user.id, email: data.user.email, provider: 'supabase' };
+    localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(userObj));
+    return { user: userObj, needsConfirmation: false };
+  }
+
+  throw new Error('Sign up failed. Please try again.');
 }
 
 export async function signIn(email, password) {
   if (!email || !password) throw new Error('Email and password are required');
-  const client = getSupabaseClient();
 
-  if (client) {
-    const { data, error } = await client.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-    if (error) throw error;
-    if (data.user) {
-      const userObj = { id: data.user.id, email: data.user.email, provider: 'supabase' };
-      localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(userObj));
-      return userObj;
-    }
+  if (!isSupabaseConfigured()) {
+    throw new Error(
+      'Supabase is not configured. Please enter your Supabase URL and API key in Settings → Cloud Sync first.'
+    );
   }
 
-  // Local-first fallback
-  const localUser = {
-    id: 'usr_' + Math.random().toString(36).substring(2, 9),
+  const client = getSupabaseClient();
+  const { data, error } = await client.auth.signInWithPassword({
     email: email.trim(),
-    provider: 'local',
-  };
-  localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(localUser));
-  return localUser;
+    password,
+  });
+
+  if (error) {
+    // Make common errors user-friendly
+    const msg = error.message || '';
+    if (msg.toLowerCase().includes('invalid login credentials')) {
+      throw new Error('Incorrect email or password. Please try again.');
+    }
+    if (msg.toLowerCase().includes('email not confirmed')) {
+      throw new Error('email not confirmed');
+    }
+    throw error;
+  }
+
+  if (!data.user || !data.session) {
+    throw new Error('Sign in failed. Please check your credentials and try again.');
+  }
+
+  const userObj = { id: data.user.id, email: data.user.email, provider: 'supabase' };
+  localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(userObj));
+  return userObj;
 }
 
 export async function resendConfirmation(email) {
   if (!email) throw new Error('Please enter your email');
+  if (!isSupabaseConfigured()) throw new Error('Supabase is not configured');
+
   const client = getSupabaseClient();
-  if (!client) throw new Error('Supabase is not configured');
   const { error } = await client.auth.resend({
     type: 'signup',
     email: email.trim(),
+  });
+  if (error) throw error;
+  return true;
+}
+
+export async function resetPassword(email) {
+  if (!email) throw new Error('Please enter your email address');
+  if (!isSupabaseConfigured()) {
+    throw new Error('Supabase is not configured. Please set up Cloud Sync first.');
+  }
+
+  const client = getSupabaseClient();
+  const { error } = await client.auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: window.location.origin,
   });
   if (error) throw error;
   return true;
@@ -131,26 +168,45 @@ export function subscribeAuthChange(callback) {
   const client = getSupabaseClient();
   if (client) {
     const { data: { subscription } } = client.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
-        callback({
-          id: session.user.id,
-          email: session.user.email,
-          provider: 'supabase',
-        });
-      } else {
-        // Fallback to local stored session if signed in via passphrase
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (session?.user) {
+          const userObj = {
+            id: session.user.id,
+            email: session.user.email,
+            provider: 'supabase',
+          };
+          localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(userObj));
+          callback(userObj);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        // Only clear supabase sessions — preserve passphrase users
         try {
           const raw = localStorage.getItem(LOCAL_USER_KEY);
           if (raw) {
-            callback(JSON.parse(raw));
-            return;
+            const parsed = JSON.parse(raw);
+            if (parsed.provider === 'passphrase') {
+              callback(parsed);
+              return;
+            }
           }
         } catch (e) {}
+        localStorage.removeItem(LOCAL_USER_KEY);
         callback(null);
       }
     });
     return () => subscription.unsubscribe();
   }
+
+  // If Supabase not configured, check for local passphrase user
+  try {
+    const raw = localStorage.getItem(LOCAL_USER_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.provider === 'passphrase') {
+        setTimeout(() => callback(parsed), 0);
+      }
+    }
+  } catch (e) {}
 
   return () => {};
 }

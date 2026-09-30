@@ -20,6 +20,7 @@ import {
   signOut,
   resendConfirmation,
   setPassphraseUser,
+  resetPassword,
 } from '../services/authService';
 import { isSupabaseConfigured } from '../services/supabaseClient';
 
@@ -34,6 +35,7 @@ export default function AuthModal({ isOpen, onClose, user, onAuthSuccess }) {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [showResendBtn, setShowResendBtn] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   if (!isOpen) return null;
 
@@ -54,7 +56,7 @@ export default function AuthModal({ isOpen, onClose, user, onAuthSuccess }) {
         const result = await signUp(email, password);
         if (result.needsConfirmation) {
           setSuccessMsg(
-            'Account created! A confirmation email was sent to your inbox. Please click the link in your email to confirm, then sign in.'
+            '✅ Account created! Check your inbox for a confirmation email. Click the link, then come back and sign in.'
           );
           setShowResendBtn(true);
           setMode('login');
@@ -68,7 +70,7 @@ export default function AuthModal({ isOpen, onClose, user, onAuthSuccess }) {
         }, 1200);
       } else {
         const loggedUser = await signIn(email, password);
-        setSuccessMsg('Signed in successfully! Library synced.');
+        setSuccessMsg('Signed in successfully! Syncing library...');
         setTimeout(() => {
           if (onAuthSuccess) onAuthSuccess(loggedUser);
           onClose();
@@ -78,11 +80,32 @@ export default function AuthModal({ isOpen, onClose, user, onAuthSuccess }) {
     } catch (err) {
       const msg = err.message || '';
       if (msg.toLowerCase().includes('email not confirmed')) {
-        setErrorMsg('Email not confirmed yet. Please verify your email link or click Resend below.');
+        setErrorMsg(
+          'Your email is not confirmed yet. Check your inbox (and spam folder) for the confirmation link, then try signing in again.'
+        );
         setShowResendBtn(true);
       } else {
         setErrorMsg(msg || 'Authentication failed. Please check your credentials.');
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    if (!email.trim()) {
+      setErrorMsg('Please enter your email address above first.');
+      return;
+    }
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      await resetPassword(email.trim());
+      setSuccessMsg('Password reset email sent! Check your inbox.');
+      setShowForgotPassword(false);
+    } catch (err) {
+      setErrorMsg(err.message || 'Failed to send reset email.');
     } finally {
       setLoading(false);
     }
@@ -296,6 +319,25 @@ export default function AuthModal({ isOpen, onClose, user, onAuthSuccess }) {
         ) : (
           /* Sign In / Sign Up Form */
           <div>
+            {/* Warning: Supabase not yet configured */}
+            {!isSupabaseConfigured() && authMethod === 'email' && (
+              <div
+                style={{
+                  background: 'rgba(251, 191, 36, 0.10)',
+                  border: '1px solid rgba(251, 191, 36, 0.32)',
+                  borderRadius: 10,
+                  padding: '10px 14px',
+                  marginBottom: 14,
+                  fontSize: 12.5,
+                  color: '#fbbf24',
+                  lineHeight: 1.55,
+                }}
+              >
+                <strong>⚠️ Supabase not configured.</strong> You need to connect your Supabase project first — go to{' '}
+                <strong>Settings → ☁ Cloud Sync</strong> and enter your URL &amp; API key, then come back here to sign in.
+              </div>
+            )}
+
             {/* Auth Method Switcher: Email vs Instant Passcode */}
             <div
               style={{
@@ -541,9 +583,29 @@ export default function AuthModal({ isOpen, onClose, user, onAuthSuccess }) {
                     )}
                     <span>{mode === 'login' ? 'Sign In & Sync' : 'Create Account'}</span>
                   </button>
+                  {/* Forgot password link — only in login mode */}
+                  {mode === 'login' && (
+                    <div style={{ textAlign: 'center', marginTop: 6 }}>
+                      <button
+                        type="button"
+                        onClick={handleForgotPassword}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--pulse-accent)',
+                          fontSize: 12,
+                          cursor: 'pointer',
+                          textDecoration: 'underline',
+                          padding: 0,
+                        }}
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+                  )}
                 </form>
 
-                {/* Helpful Supabase Email Confirmation Tip */}
+                {/* Confirmation tip */}
                 <div
                   style={{
                     marginTop: 16,
@@ -556,9 +618,10 @@ export default function AuthModal({ isOpen, onClose, user, onAuthSuccess }) {
                     lineHeight: 1.5,
                   }}
                 >
-                  <strong style={{ color: 'var(--text-secondary)' }}>💡 Note on Supabase email confirmation:</strong>
+                  <strong style={{ color: 'var(--text-secondary)' }}>💡 Can't sign in?</strong>
                   <br />
-                  If your project requires email verification, check your inbox/spam for the confirmation link. Or in Supabase Dashboard (<strong>Auth ➔ Providers ➔ Email</strong>), turn <strong>OFF</strong> &quot;Confirm email&quot; for instant sign in.
+                  If you just registered, check your inbox/spam for the confirmation email first. Or disable it in Supabase Dashboard:{' '}
+                  <strong>Auth → Providers → Email → turn OFF "Confirm email"</strong> for instant sign in.
                 </div>
               </div>
             )}

@@ -12,7 +12,6 @@ import {
   Mic2,
   Sliders,
   Share2,
-  Sparkles,
   Database
 } from 'lucide-react';
 import { isSupabaseConfigured } from '../services/supabaseClient';
@@ -130,13 +129,8 @@ export default function MobileFullPlayer({
         </button>
       </div>
 
-      {/* Quality Badge & Equalizer */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <div className="aura-badge-lossless" style={{ fontSize: 10.5, padding: '4px 10px' }}>
-          <Sparkles size={12} />
-          <span>{currentTrack.bitrate || '320K LOSSLESS'}</span>
-        </div>
-
+      {/* Equalizer Action */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 20 }}>
         <button
           onClick={onOpenEqualizer}
           style={{

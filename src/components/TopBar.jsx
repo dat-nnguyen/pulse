@@ -2,7 +2,6 @@ import React from 'react';
 import {
   ChevronLeft,
   ChevronRight,
-  Sparkles,
   Download,
   Share2,
   Sliders,
@@ -137,11 +136,6 @@ export default function TopBar({
           </button>
         )}
 
-        {/* Audio Quality indicator */}
-        <div className="aura-badge-lossless" title="Playing original uncompressed / 320kbps audio">
-          <Sparkles size={11} />
-          <span>{currentTrack?.bitrate || '320K'}</span>
-        </div>
 
         {/* Download Audio Button */}
         <button

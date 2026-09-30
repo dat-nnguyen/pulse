@@ -6,7 +6,6 @@ import {
   Clock,
   HardDriveDownload,
   Trash2,
-  Sparkles,
   Disc3,
   Shuffle,
   Search,
@@ -280,7 +279,6 @@ export default function LibraryView({
                 <th style={{ width: 44 }}>#</th>
                 <th>Title</th>
                 <th>Album</th>
-                <th>Bitrate</th>
                 <th style={{ textAlign: 'right', width: 75 }}>
                   <Clock size={14} />
                 </th>
@@ -346,13 +344,6 @@ export default function LibraryView({
 
                     <td style={{ color: '#94a3b8', fontSize: 13 }}>
                       {track.album || 'Single'}
-                    </td>
-
-                    <td>
-                      <span className="aura-badge-lossless" style={{ fontSize: 10, padding: '2px 8px' }}>
-                        <Sparkles size={10} />
-                        <span>{track.bitrate || '320K'}</span>
-                      </span>
                     </td>
 
                     <td style={{ textAlign: 'right', color: 'var(--text-secondary)', fontSize: 13, fontVariantNumeric: 'tabular-nums', paddingRight: 16 }}>

@@ -2,7 +2,6 @@ import React from 'react';
 import {
   Library,
   Plus,
-  Heart,
   CloudDownload,
   Sliders,
   Share2,
@@ -160,32 +159,6 @@ export default function Sidebar({
 
         {/* Scrollable list */}
         <div className="aura-library-scroll">
-          {/* Liked Songs Special Row */}
-          {(activeFilter === 'all' || activeFilter === 'playlists') && (
-            <button
-              className={`aura-item-row ${selectedPlaylistId === 'liked' ? 'active' : ''}`}
-              onClick={() => {
-                setCurrentView('playlist');
-                setSelectedPlaylistId('liked');
-              }}
-            >
-              <div
-                className="aura-item-cover"
-                style={{
-                  background: 'linear-gradient(135deg, #7f00ff, #e11d48)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Heart size={16} fill="#ffffff" color="#ffffff" />
-              </div>
-              <div className="aura-item-info">
-                <span className="aura-item-title">Favorites</span>
-                <span className="aura-item-meta">{likedCount} saved tracks</span>
-              </div>
-            </button>
-          )}
 
           {/* Offline Downloads Special Row */}
           {(activeFilter === 'all' || activeFilter === 'downloaded') && (

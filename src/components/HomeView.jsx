@@ -2,7 +2,6 @@ import React from 'react';
 import {
   Play,
   Pause,
-  Heart,
   HardDriveDownload,
   Disc3,
   Plus,
@@ -45,7 +44,7 @@ export default function HomeView({
             Your Playlists
           </h1>
           <p style={{ margin: '6px 0 0 0', fontSize: 13.5, color: 'var(--text-secondary)' }}>
-            {playlists.length + 2} collections • {tracks.length} lossless & original tracks
+            {playlists.length + 2} collections • {tracks.length} tracks
           </p>
         </div>
 
@@ -70,49 +69,8 @@ export default function HomeView({
         </div>
       </div>
 
-      {/* Primary Collections Cards (Favorites, Offline, All Tracks) */}
+      {/* Primary Collections Cards (Offline, All Tracks) */}
       <div className="pulse-collections-grid">
-        {/* Favorites / Liked Songs */}
-        <div
-          className="aura-glass-card aura-playlist-card"
-          onClick={() => onOpenPlaylist('liked')}
-          style={{
-            cursor: 'pointer',
-            padding: 20,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 16,
-            background: 'var(--aura-bg-elevated)',
-            border: '1px solid var(--border-subtle)',
-            position: 'relative',
-          }}
-        >
-          <div
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: 12,
-              background: 'linear-gradient(135deg, #7f00ff, #e11d48)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            <Heart size={26} fill="#ffffff" color="#ffffff" />
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
-              Favorites
-            </div>
-            <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 2 }}>
-              {likedCount} liked tracks
-            </div>
-          </div>
-          <div className="aura-card-play-btn" title="Open Favorites">
-            <ArrowRight size={18} color="var(--pulse-accent)" />
-          </div>
-        </div>
 
         {/* Offline Downloads */}
         <div

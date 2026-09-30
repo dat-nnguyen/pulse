@@ -45,12 +45,20 @@ async function ensureBackendServer() {
 }
 
 async function createWindow() {
+  const iconPath = path.join(rootDir, 'public', 'icon-512.png');
+  if (process.platform === 'darwin' && app.dock) {
+    try {
+      app.dock.setIcon(iconPath);
+    } catch (e) {}
+  }
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 840,
     minWidth: 960,
     minHeight: 640,
     title: 'Pulse Music Player',
+    icon: iconPath,
     backgroundColor: '#0a0d14',
     titleBarStyle: 'hiddenInset', // Sleek macOS native traffic lights in dark header
     trafficLightPosition: { x: 16, y: 16 },

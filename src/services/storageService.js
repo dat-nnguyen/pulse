@@ -70,7 +70,14 @@ export async function saveTrack(track) {
         // If downloaded via local Mac backend, fetch the audio and upload to Supabase Storage
         // so iPhone and Web can stream it globally!
         try {
-          const res = await fetch(item.audioUrl);
+          let fetchTarget = item.audioUrl;
+          if (fetchTarget.startsWith('/audio/')) {
+            const host = (typeof window !== 'undefined' && window.location?.origin?.startsWith('http'))
+              ? window.location.origin
+              : 'http://127.0.0.1:3030';
+            fetchTarget = `${host}${fetchTarget}`;
+          }
+          const res = await fetch(fetchTarget);
           if (res.ok) {
             const blob = await res.blob();
             item.audioBlob = blob;

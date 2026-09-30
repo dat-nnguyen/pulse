@@ -105,13 +105,22 @@ export async function downloadTrackToLocal(track, onProgress = () => {}) {
   }
 }
 
-// Download from YouTube or direct URL via local backend or direct audio stream
+export function getBackendBaseUrl() {
+  const custom = localStorage.getItem('pulse_backend_url');
+  if (custom && custom.trim()) return custom.trim().replace(/\/+$/, '');
+  const envUrl = import.meta.env.VITE_BACKEND_URL;
+  if (envUrl && envUrl.trim()) return envUrl.trim().replace(/\/+$/, '');
+  return '';
+}
+
+// Download from YouTube or direct URL via backend or direct audio stream
 export async function downloadFromWebUrl(inputUrl, customMeta = {}) {
   const trimmedUrl = inputUrl.trim();
+  const baseUrl = getBackendBaseUrl();
 
-  // 1. Try local companion backend server first (runs native yt-dlp)
+  // 1. Try companion backend server (local Mac or cloud Render/Railway)
   try {
-    const res = await fetch('/api/download', {
+    const res = await fetch(`${baseUrl}/api/download`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: trimmedUrl, ...customMeta }),
@@ -121,7 +130,11 @@ export async function downloadFromWebUrl(inputUrl, customMeta = {}) {
     if (res.ok) {
       const data = await res.json();
       if (data && data.success && data.track) {
-        return saveTrack(data.track);
+        let track = data.track;
+        if (baseUrl && track.audioUrl && track.audioUrl.startsWith('/audio/')) {
+          track.audioUrl = `${baseUrl}${track.audioUrl}`;
+        }
+        return saveTrack(track);
       }
     } else {
       const errData = await res.json().catch(() => ({}));
@@ -134,7 +147,7 @@ export async function downloadFromWebUrl(inputUrl, customMeta = {}) {
     if (backendErr.message && !backendErr.message.includes('fetch') && !backendErr.message.includes('timeout')) {
       throw backendErr;
     }
-    // Otherwise backend server is not running or unreachable (e.g. on Vercel standalone), proceed to fallback
+    // Otherwise backend server is not running or unreachable, proceed to fallback
   }
 
   // 2. Direct Audio URL (.mp3, .m4a, .flac, .wav, .ogg, .aac)

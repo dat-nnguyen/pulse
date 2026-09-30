@@ -238,6 +238,36 @@ export default function DownloaderView({
               <span>{downloadStatus.message}</span>
             </div>
           )}
+
+          {/* Audio Source Guidance */}
+          <div
+            style={{
+              marginTop: 20,
+              padding: '14px 16px',
+              borderRadius: 12,
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid var(--border-subtle)',
+              fontSize: 12,
+              color: 'var(--text-secondary)',
+              lineHeight: 1.6,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
+              <Sparkles size={15} color="var(--pulse-accent)" />
+              <span>Audio Sources on Web & Mobile</span>
+            </div>
+            <ul style={{ paddingLeft: 18, margin: 0 }}>
+              <li>
+                <strong style={{ color: '#f8fafc' }}>Direct Audio Links (.mp3, .m4a, .flac):</strong> Downloads and caches directly in your browser or phone with 0 backend needed.
+              </li>
+              <li>
+                <strong style={{ color: '#f8fafc' }}>Local Files:</strong> Tap the &quot;Local Files&quot; tab to import your songs directly from phone storage or laptop.
+              </li>
+              <li>
+                <strong style={{ color: '#f8fafc' }}>YouTube Audio:</strong> YouTube requires a backend extractor. Run <code style={{ color: '#10b981' }}>npm run server</code> on your Mac, or deploy to free cloud hosting (Render / Railway) using the included Dockerfile.
+              </li>
+            </ul>
+          </div>
         </div>
       )}
 

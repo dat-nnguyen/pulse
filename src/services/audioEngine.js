@@ -72,6 +72,25 @@ class AudioEngine {
       const mediaErr = this.audio.error;
       console.warn('Audio playback error:', mediaErr ? `code ${mediaErr.code}: ${mediaErr.message}` : e);
 
+      // Automatic blob fallback: if blob URL failed, fallback to local/server URL
+      if (this.currentBlobUrl && (this.currentTrack?.localAudioUrl || this.currentTrack?.audioUrl)) {
+        console.warn('Blob audio failed, falling back to direct server URL...');
+        this.currentBlobUrl = null;
+        let fallbackSrc = this.currentTrack.localAudioUrl || this.currentTrack.audioUrl;
+        if (fallbackSrc.startsWith('/audio/')) {
+          const origin = (typeof window !== 'undefined' && window.location?.origin?.startsWith('http'))
+            ? window.location.origin
+            : 'http://127.0.0.1:3030';
+          fallbackSrc = `${origin}${fallbackSrc}`;
+        }
+        this.audio.src = fallbackSrc;
+        this.audio.load();
+        if (this.isPlaying) {
+          this.audio.play().catch((playErr) => console.warn('Fallback play error:', playErr));
+        }
+        return;
+      }
+
       // Automatic CORS fallback: if failed with crossOrigin, retry without crossOrigin
       if (this.audio.crossOrigin) {
         console.log('CORS playback issue detected. Retrying without crossOrigin attribute...');

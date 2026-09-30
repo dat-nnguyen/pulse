@@ -103,6 +103,7 @@ async function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: true,
+      backgroundThrottling: false, // Don't throttle audio playback when window is hidden
     },
   });
 
@@ -127,9 +128,13 @@ async function createWindow() {
     }
   }
 
-  mainWindow.on('close', () => {
-    // When clicking the 'X' traffic light button, completely quit the application
-    app.quit();
+  // Spotify-style macOS behavior: clicking 'X' hides window while audio keeps playing
+  mainWindow.on('close', (event) => {
+    if (process.platform === 'darwin' && !isQuitting) {
+      event.preventDefault();
+      mainWindow.hide();
+      return false;
+    }
   });
 
   mainWindow.on('closed', () => {
@@ -137,20 +142,48 @@ async function createWindow() {
   });
 }
 
+// Track when user explicitly requests to Quit (Dock menu -> Quit, or Cmd+Q)
+let isQuitting = false;
+
+app.on('before-quit', () => {
+  isQuitting = true;
+});
+
+// Single instance lock to focus window if opened again
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
 app.whenReady().then(async () => {
   await ensureBackendServer();
   await createWindow();
 
+  // Re-show window when clicking Dock icon
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    } else if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
     }
   });
 });
 
 app.on('window-all-closed', () => {
-  // Completely quit the app on all platforms including macOS when the window is closed
-  app.quit();
+  // On macOS, apps stay active in background until explicit Cmd+Q or Quit
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
 });
 
 app.on('will-quit', () => {

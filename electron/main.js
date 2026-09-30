@@ -127,6 +127,11 @@ async function createWindow() {
     }
   }
 
+  mainWindow.on('close', () => {
+    // When clicking the 'X' traffic light button, completely quit the application
+    app.quit();
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -144,9 +149,8 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  // Completely quit the app on all platforms including macOS when the window is closed
+  app.quit();
 });
 
 app.on('will-quit', () => {

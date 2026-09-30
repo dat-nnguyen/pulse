@@ -26,7 +26,15 @@ export default function HomeView({
   onTogglePlay,
   onPlaylistContextMenu,
 }) {
-  const offlineTracks = tracks.filter((t) => t.isDownloaded);
+  const offlineTracks = tracks.filter(
+    (t) =>
+      t.isDownloaded ||
+      Boolean(t.audioBlob) ||
+      (t.audioUrl &&
+        (t.audioUrl.startsWith('/audio/') ||
+          t.audioUrl.includes('localhost') ||
+          t.audioUrl.includes('127.0.0.1')))
+  );
 
   return (
     <div className="aura-scroll-area">

@@ -12,7 +12,9 @@ import {
   ListOrdered,
   Layers,
   FileAudio,
-  Check
+  Check,
+  FolderPlus,
+  ListMusic
 } from 'lucide-react';
 
 function YoutubeIcon({ size = 16 }) {
@@ -31,10 +33,18 @@ export default function DownloaderView({
   onTrackAdded,
   onPlayTrack,
   prefilledQuery = '',
+  playlists = [],
+  onOpenCreatePlaylist,
+  onAddTrackToPlaylist,
+  onAddMultipleTracksToPlaylist,
   toast,
 }) {
   const [activeTab, setActiveTab] = useState('youtube'); // 'youtube' | 'local'
   const [downloadMode, setDownloadMode] = useState('single'); // 'single' | 'batch'
+
+  // Playlist Destination state
+  const [selectedPlaylistId, setSelectedPlaylistId] = useState('');
+  const selectedPlaylist = (playlists || []).find((p) => p.id === selectedPlaylistId);
 
   // Single Web download state
   const [webUrl, setWebUrl] = useState('');
@@ -78,15 +88,29 @@ export default function DownloaderView({
         artist: customArtist.trim() || undefined,
       });
 
+      track.isDownloaded = true;
+      if (selectedPlaylistId && onAddTrackToPlaylist) {
+        onAddTrackToPlaylist(track.id, selectedPlaylistId);
+      }
+      onTrackAdded(track, selectedPlaylistId);
+
+      const destMessage = selectedPlaylist
+        ? `Saved to Offline Storage & "${selectedPlaylist.name}"`
+        : 'Saved to Offline Storage';
+
       setDownloadStatus({
         type: 'success',
-        message: `Downloaded "${track.title}" and synced to cloud`,
+        message: `Downloaded "${track.title}" • ${destMessage}`,
       });
-      if (toast) toast.success(`"${track.title}" added to library & synced`, { title: 'Download complete' });
+      if (toast) {
+        toast.success(
+          `"${track.title}" saved to ${selectedPlaylist ? `"${selectedPlaylist.name}" & Offline Storage` : 'Offline Storage'}`,
+          { title: 'Download complete' }
+        );
+      }
       setWebUrl('');
       setCustomTitle('');
       setCustomArtist('');
-      onTrackAdded(track);
     } catch (err) {
       setDownloadStatus({
         type: 'error',
@@ -115,6 +139,8 @@ export default function DownloaderView({
     setBatchItems(initialItems);
     setBatchProgress({ current: 0, total: parsedBatchUrls.length, percent: 0 });
 
+    const downloadedTrackIds = [];
+
     try {
       await downloadMultipleFromWebUrls(parsedBatchUrls, (progress) => {
         setBatchItems((prev) =>
@@ -132,7 +158,9 @@ export default function DownloaderView({
           })
         );
         if (progress.track) {
-          onTrackAdded(progress.track);
+          progress.track.isDownloaded = true;
+          downloadedTrackIds.push(progress.track.id);
+          onTrackAdded(progress.track, selectedPlaylistId);
         }
         setBatchProgress({
           current: progress.status === 'success' || progress.status === 'error' ? progress.index + 1 : progress.index,
@@ -141,7 +169,16 @@ export default function DownloaderView({
         });
       });
 
-      if (toast) toast.success(`Batch download completed for ${parsedBatchUrls.length} tracks`, { title: 'Batch complete' });
+      if (selectedPlaylistId && downloadedTrackIds.length > 0) {
+        if (onAddMultipleTracksToPlaylist) {
+          onAddMultipleTracksToPlaylist(downloadedTrackIds, selectedPlaylistId);
+        } else if (onAddTrackToPlaylist) {
+          downloadedTrackIds.forEach((id) => onAddTrackToPlaylist(id, selectedPlaylistId));
+        }
+      }
+
+      const destText = selectedPlaylist ? `saved to "${selectedPlaylist.name}" & Offline Storage` : 'saved to Offline Storage';
+      if (toast) toast.success(`Batch download completed for ${parsedBatchUrls.length} tracks • ${destText}`, { title: 'Batch complete' });
     } catch (err) {
       if (toast) toast.error('Batch download interrupted: ' + err.message, { title: 'Batch error' });
     } finally {
@@ -176,6 +213,8 @@ export default function DownloaderView({
     setUploadProgress({ current: 0, total: files.length, percent: 0 });
     setImportStatus({ type: 'loading', message: `Importing and cloud-syncing ${files.length} file(s)...` });
 
+    const uploadedTrackIds = [];
+
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
@@ -184,8 +223,11 @@ export default function DownloaderView({
         );
 
         const parsed = await parseAudioFile(file);
+        parsed.isDownloaded = true;
         const saved = await saveTrack(parsed);
-        onTrackAdded(saved);
+        saved.isDownloaded = true;
+        uploadedTrackIds.push(saved.id);
+        onTrackAdded(saved, selectedPlaylistId);
 
         setUploadItems((prev) =>
           prev.map((item, idx) =>
@@ -200,11 +242,20 @@ export default function DownloaderView({
         });
       }
 
+      if (selectedPlaylistId && uploadedTrackIds.length > 0) {
+        if (onAddMultipleTracksToPlaylist) {
+          onAddMultipleTracksToPlaylist(uploadedTrackIds, selectedPlaylistId);
+        } else if (onAddTrackToPlaylist) {
+          uploadedTrackIds.forEach((id) => onAddTrackToPlaylist(id, selectedPlaylistId));
+        }
+      }
+
+      const destText = selectedPlaylist ? `saved to "${selectedPlaylist.name}" & Offline Storage` : 'saved to Offline Storage';
       setImportStatus({
         type: 'success',
-        message: `Successfully added ${files.length} track(s) in original quality with cloud sync.`,
+        message: `Successfully added ${files.length} track(s) • ${destText}.`,
       });
-      if (toast) toast.success(`Added ${files.length} track(s) to library & cloud!`, { title: 'Import complete' });
+      if (toast) toast.success(`Added ${files.length} track(s) to library & ${selectedPlaylist ? `"${selectedPlaylist.name}"` : 'Offline Storage'}!`, { title: 'Import complete' });
     } catch (err) {
       setImportStatus({ type: 'error', message: 'Import error: ' + err.message });
       if (toast) toast.error('Import error: ' + err.message, { title: 'Import failed' });
@@ -230,6 +281,146 @@ export default function DownloaderView({
         <p style={{ color: 'var(--text-secondary)', fontSize: 13.5, margin: 0 }}>
           Download from YouTube/Web or upload local audio — multi-file batch (up to 10 files) with automatic cloud sync.
         </p>
+      </div>
+
+      {/* Target Playlist Selector Box */}
+      <div
+        className="pulse-playlist-banner"
+        style={{
+          background: selectedPlaylist
+            ? 'linear-gradient(135deg, rgba(0, 242, 254, 0.08) 0%, rgba(79, 172, 254, 0.03) 100%)'
+            : 'var(--pulse-surface)',
+          border: selectedPlaylist
+            ? '1.5px solid rgba(0, 242, 254, 0.4)'
+            : '1px solid var(--border-subtle)',
+          borderRadius: 14,
+          padding: '12px 18px',
+          marginBottom: 20,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 14,
+          boxShadow: selectedPlaylist
+            ? '0 6px 24px rgba(0, 242, 254, 0.08)'
+            : 'none',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: 10,
+              background: selectedPlaylist
+                ? 'linear-gradient(135deg, var(--pulse-accent), #00c6ff)'
+                : 'rgba(255, 255, 255, 0.06)',
+              color: selectedPlaylist ? '#000' : 'var(--text-secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: selectedPlaylist ? '0 2px 12px rgba(0, 242, 254, 0.3)' : 'none',
+            }}
+          >
+            <FolderPlus size={20} />
+          </div>
+
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--text-primary)' }}>
+                Save to Playlist:
+              </span>
+              {selectedPlaylist ? (
+                <span
+                  style={{
+                    fontSize: 12.5,
+                    fontWeight: 800,
+                    color: 'var(--pulse-accent)',
+                    background: 'rgba(0, 242, 254, 0.12)',
+                    border: '1px solid rgba(0, 242, 254, 0.3)',
+                    padding: '2px 10px',
+                    borderRadius: 6,
+                  }}
+                >
+                  🎵 {selectedPlaylist.name}
+                </span>
+              ) : (
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: 'var(--text-secondary)',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    padding: '2px 8px',
+                    borderRadius: 6,
+                  }}
+                >
+                  Offline Storage & Library (Default)
+                </span>
+              )}
+            </div>
+            <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
+              {selectedPlaylist
+                ? `Downloaded audio will lie in Offline Storage and be immediately saved to "${selectedPlaylist.name}".`
+                : 'Downloaded songs will lie in your Offline Storage immediately. Choose a playlist to also save there.'}
+            </p>
+          </div>
+        </div>
+
+        {/* Button to Choose Playlist */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ position: 'relative' }}>
+            <select
+              value={selectedPlaylistId}
+              onChange={(e) => {
+                if (e.target.value === '__new__') {
+                  if (onOpenCreatePlaylist) onOpenCreatePlaylist();
+                } else {
+                  setSelectedPlaylistId(e.target.value);
+                }
+              }}
+              className="pulse-input"
+              style={{
+                cursor: 'pointer',
+                fontSize: 12.5,
+                fontWeight: 700,
+                padding: '8px 14px',
+                background: 'var(--pulse-bg-raised)',
+                color: selectedPlaylistId ? 'var(--pulse-accent)' : 'var(--text-primary)',
+                border: selectedPlaylistId ? '1px solid var(--pulse-accent)' : '1px solid var(--border-subtle)',
+                borderRadius: 8,
+                minWidth: 200,
+              }}
+            >
+              <option value="">📂 Choose Playlist to save to...</option>
+              {(playlists || []).map((pl) => (
+                <option key={pl.id} value={pl.id}>
+                  🎵 {pl.name} ({pl.trackIds ? pl.trackIds.length : 0} tracks)
+                </option>
+              ))}
+              <option value="__new__">➕ Create New Playlist...</option>
+            </select>
+          </div>
+
+          {selectedPlaylistId && (
+            <button
+              type="button"
+              onClick={() => setSelectedPlaylistId('')}
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid var(--border-subtle)',
+                color: 'var(--text-muted)',
+                borderRadius: 8,
+                padding: '8px 12px',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Main Tabs */}
@@ -362,19 +553,19 @@ export default function DownloaderView({
                   {isDownloading ? (
                     <>
                       <Loader2 size={16} className="spin" />
-                      <span>Extracting & Syncing...</span>
+                      <span>Extracting & Saving...</span>
                     </>
                   ) : (
                     <>
                       <Download size={16} />
-                      <span>Download</span>
+                      <span>Download {selectedPlaylist ? `to "${selectedPlaylist.name}"` : 'to Offline Storage'}</span>
                     </>
                   )}
                 </button>
 
                 <div className="aura-badge-lossless">
                   <Sparkles size={10} />
-                  <span>Cloud Synced & Original quality</span>
+                  <span>Immediate Offline Storage & Original Quality</span>
                 </div>
               </div>
             </form>
@@ -427,7 +618,7 @@ export default function DownloaderView({
                   ) : (
                     <>
                       <Download size={16} />
-                      <span>Download All ({parsedBatchUrls.length} Tracks)</span>
+                      <span>Download All ({parsedBatchUrls.length} Tracks) {selectedPlaylist ? `to "${selectedPlaylist.name}"` : 'to Offline Storage'}</span>
                     </>
                   )}
                 </button>

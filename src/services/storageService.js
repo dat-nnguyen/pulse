@@ -43,12 +43,40 @@ export async function saveTrack(track) {
   let item = {
     ...track,
     addedAt: track.addedAt || Date.now(),
-    isDownloaded: Boolean(track.audioBlob || track.isDownloaded),
+    isDownloaded: Boolean(
+      track.audioBlob ||
+      track.isDownloaded ||
+      (track.audioUrl && (track.audioUrl.startsWith('/audio/') || track.audioUrl.includes('localhost') || track.audioUrl.includes('127.0.0.1')))
+    ),
   };
 
   // Preserve local URL for instant offline/desktop playback
   if (item.audioUrl && (item.audioUrl.startsWith('/audio/') || item.audioUrl.includes('localhost') || item.audioUrl.includes('127.0.0.1'))) {
     item.localAudioUrl = item.localAudioUrl || item.audioUrl;
+    item.isDownloaded = true;
+  }
+
+  // Eagerly fetch and store audioBlob in local IndexedDB so it lies in offline storage immediately!
+  if (!item.audioBlob && item.audioUrl) {
+    try {
+      let fetchTarget = item.localAudioUrl || item.audioUrl;
+      if (fetchTarget.startsWith('/audio/')) {
+        const host = (typeof window !== 'undefined' && window.location?.origin?.startsWith('http'))
+          ? window.location.origin
+          : 'http://127.0.0.1:3030';
+        fetchTarget = `${host}${fetchTarget}`;
+      }
+      const res = await fetch(fetchTarget);
+      if (res.ok) {
+        const blob = await res.blob();
+        item.audioBlob = blob;
+        item.isDownloaded = true;
+        item.fileSizeBytes = item.fileSizeBytes || blob.size;
+        item.downloadedAt = item.downloadedAt || Date.now();
+      }
+    } catch (cacheErr) {
+      console.warn('Immediate offline audio blob caching notice:', cacheErr.message);
+    }
   }
 
   // If Supabase is configured, upload audio file & metadata to cloud
@@ -154,7 +182,14 @@ export async function syncLibraryWithCloud(force = false) {
         ...ct,
         // Retain local audioBlob for instant zero-latency playback if cached
         audioBlob: local?.audioBlob || ct.audioBlob,
-        isDownloaded: Boolean(local?.audioBlob || ct.isDownloaded),
+        localAudioUrl: local?.localAudioUrl || (ct.audioUrl && (ct.audioUrl.startsWith('/audio/') || ct.audioUrl.includes('localhost') || ct.audioUrl.includes('127.0.0.1')) ? ct.audioUrl : null),
+        isDownloaded: Boolean(
+          local?.isDownloaded ||
+          local?.audioBlob ||
+          ct.audioBlob ||
+          ct.isDownloaded ||
+          (local?.audioUrl && (local.audioUrl.startsWith('/audio/') || local.audioUrl.includes('localhost') || local.audioUrl.includes('127.0.0.1')))
+        ),
         isCloudSynced: true,
       };
       await db.put('tracks', merged);

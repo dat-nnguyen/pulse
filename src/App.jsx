@@ -154,7 +154,14 @@ export default function App() {
           }
         }
 
-        dbTracks = cleanedTracks;
+        dbTracks = cleanedTracks.map((t) => ({
+          ...t,
+          isDownloaded: Boolean(
+            t.isDownloaded ||
+            t.audioBlob ||
+            (t.audioUrl && (t.audioUrl.startsWith('/audio/') || t.audioUrl.includes('localhost') || t.audioUrl.includes('127.0.0.1')))
+          ),
+        }));
         setTracks(dbTracks);
 
         let dbPlaylists = await getAllPlaylists();
@@ -479,6 +486,22 @@ export default function App() {
     toast.success('Added to playlist', { title: 'Done' });
   }, [toast]);
 
+  // Add multiple tracks to a playlist at once (e.g. batch download or multi-file upload)
+  const handleAddMultipleTracksToPlaylist = useCallback(async (trackIds, targetPlaylistId) => {
+    if (!targetPlaylistId || !Array.isArray(trackIds) || trackIds.length === 0) return;
+    setPlaylists((prev) =>
+      prev.map((pl) => {
+        if (pl.id !== targetPlaylistId) return pl;
+        const existingSet = new Set(pl.trackIds || []);
+        const newIds = trackIds.filter((id) => !existingSet.has(id));
+        if (newIds.length === 0) return pl;
+        const updated = { ...pl, trackIds: [...(pl.trackIds || []), ...newIds] };
+        savePlaylist(updated).catch(console.error);
+        return updated;
+      })
+    );
+  }, []);
+
   // Remove track from a specific playlist only (does NOT delete from library)
   const handleRemoveTrackFromPlaylist = useCallback(async (trackId, targetPlaylistId) => {
     setPlaylists((prev) =>
@@ -653,11 +676,18 @@ export default function App() {
           {currentView === 'downloader' && (
             <DownloaderView
               prefilledQuery={prefilledDownloaderQuery}
-              onTrackAdded={(newTrack) => {
+              playlists={playlists}
+              onOpenCreatePlaylist={() => setShowCreatePlaylistModal(true)}
+              onAddTrackToPlaylist={handleAddTrackToPlaylist}
+              onAddMultipleTracksToPlaylist={handleAddMultipleTracksToPlaylist}
+              onTrackAdded={(newTrack, targetPlaylistId) => {
                 setTracks((prev) => {
                   const filtered = prev.filter((t) => t.id !== newTrack.id);
                   return [newTrack, ...filtered];
                 });
+                if (targetPlaylistId) {
+                  handleAddTrackToPlaylist(newTrack.id, targetPlaylistId);
+                }
                 if (!currentTrackRef.current) {
                   handlePlayTrack(newTrack);
                 }

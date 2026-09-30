@@ -59,7 +59,15 @@ export default function LibraryView({
     title = 'Offline Storage';
     description = 'Saved locally to device storage • Lossless & 320kbps Original';
     bannerGradient = 'linear-gradient(180deg, #0c2b3d 0%, #0b0e14 100%)';
-    rawTracks = tracks.filter((t) => t.isDownloaded);
+    rawTracks = tracks.filter(
+      (t) =>
+        t.isDownloaded ||
+        Boolean(t.audioBlob) ||
+        (t.audioUrl &&
+          (t.audioUrl.startsWith('/audio/') ||
+            t.audioUrl.includes('localhost') ||
+            t.audioUrl.includes('127.0.0.1')))
+    );
   } else if (playlistId && playlistId !== 'all') {
     const pl = playlists.find((p) => p.id === playlistId);
     if (pl) {

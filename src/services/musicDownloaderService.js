@@ -78,6 +78,7 @@ export async function downloadFromWebUrl(inputUrl, customMeta = {}) {
       const data = await res.json();
       if (data && data.success && data.track) {
         let track = data.track;
+        track.isDownloaded = true;
         if (baseUrl && track.audioUrl && track.audioUrl.startsWith('/audio/')) {
           track.audioUrl = `${baseUrl}${track.audioUrl}`;
         }

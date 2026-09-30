@@ -225,6 +225,7 @@ class AudioEngine {
   }
 
   async play() {
+    if (!this.audio.src) return;
     this.initWebAudio();
     if (this.audioCtx && this.audioCtx.state === 'suspended') {
       await this.audioCtx.resume();
@@ -245,7 +246,8 @@ class AudioEngine {
     if (this.isPlaying) {
       this.pause();
     } else {
-      this.play();
+      if (!this.audio.src) return;
+      this.play().catch(() => {});
     }
   }
 

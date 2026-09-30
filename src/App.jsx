@@ -10,7 +10,6 @@ import {
   savePlaylist,
   deletePlaylist as removePlaylistFromDB,
 } from './services/storageService';
-import { SAMPLE_TRACKS } from './services/musicDownloaderService';
 
 // Components
 import Sidebar from './components/Sidebar';
@@ -84,30 +83,69 @@ export default function App() {
   const repeatModeRef = useRef(repeatMode);
   repeatModeRef.current = repeatMode;
 
-  // Initialize Library & Seed Sample Tracks if fresh install
+  // Initialize Library & Clean up any legacy mock tracks
   useEffect(() => {
     async function initDB() {
       try {
         let dbTracks = await getAllTracks();
-        if (!dbTracks || dbTracks.length === 0) {
-          // Seed with high quality sample tracks
-          for (const st of SAMPLE_TRACKS) {
-            await saveTrack(st);
+
+        // Purge any previously seeded mock/sample tracks
+        const mockTrackIds = new Set(['sample_1', 'sample_2', 'sample_3', 'sample_4']);
+        const cleanedTracks = [];
+        let hasDeletedMock = false;
+
+        for (const t of (dbTracks || [])) {
+          if (mockTrackIds.has(t.id) || (typeof t.id === 'string' && t.id.startsWith('sample_'))) {
+            await removeTrackFromDB(t.id);
+            hasDeletedMock = true;
+          } else {
+            cleanedTracks.push(t);
           }
-          dbTracks = await getAllTracks();
         }
+
+        dbTracks = cleanedTracks;
         setTracks(dbTracks);
 
-        const dbPlaylists = await getAllPlaylists();
+        let dbPlaylists = await getAllPlaylists();
+        // Also clean up any mock track IDs that were placed in playlists
+        if (hasDeletedMock && dbPlaylists && dbPlaylists.length > 0) {
+          const updatedPlaylists = [];
+          for (const pl of dbPlaylists) {
+            const hasMock = pl.trackIds?.some(
+              (id) => mockTrackIds.has(id) || (typeof id === 'string' && id.startsWith('sample_'))
+            );
+            if (hasMock) {
+              const cleanedPl = {
+                ...pl,
+                trackIds: (pl.trackIds || []).filter(
+                  (id) => !mockTrackIds.has(id) && !(typeof id === 'string' && id.startsWith('sample_'))
+                ),
+              };
+              await savePlaylist(cleanedPl);
+              updatedPlaylists.push(cleanedPl);
+            } else {
+              updatedPlaylists.push(pl);
+            }
+          }
+          dbPlaylists = updatedPlaylists;
+        }
         setPlaylists(dbPlaylists);
 
         const dbLiked = await getLikedIds();
+        mockTrackIds.forEach((id) => dbLiked.delete(id));
         setLikedIds(dbLiked);
 
-        // Preload first track if available
+        // Preload first track if available, or clear if previous current track was mock
         if (dbTracks.length > 0 && !currentTrackRef.current) {
           setCurrentTrack(dbTracks[0]);
           audioEngine.loadTrack(dbTracks[0]);
+        } else if (
+          currentTrackRef.current &&
+          (mockTrackIds.has(currentTrackRef.current.id) ||
+            (typeof currentTrackRef.current.id === 'string' && currentTrackRef.current.id.startsWith('sample_')))
+        ) {
+          audioEngine.pause();
+          setCurrentTrack(null);
         }
       } catch (err) {
         console.error('Database initialization error:', err);
@@ -234,6 +272,7 @@ export default function App() {
 
   // Toggle Play / Pause
   const handleTogglePlay = () => {
+    if (!currentTrackRef.current) return;
     audioEngine.togglePlay();
   };
 

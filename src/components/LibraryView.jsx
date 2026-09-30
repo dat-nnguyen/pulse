@@ -25,6 +25,10 @@ export default function LibraryView({
   likedIds = new Set(),
   currentTrack,
   isPlaying,
+  isShuffle,
+  onToggleShuffle,
+  onShufflePlaylist,
+  onAddToQueue,
   onPlayTrack,
   onTogglePlay,
   onToggleLike,
@@ -210,10 +214,19 @@ export default function LibraryView({
               if (isPlaylistActive && isPlaying) {
                 onTogglePlay();
               } else if (displayTracks.length > 0) {
-                onPlayTrack(displayTracks[0]);
+                if (isShuffle) {
+                  if (onShufflePlaylist) {
+                    onShufflePlaylist(displayTracks);
+                  } else {
+                    const randomIndex = Math.floor(Math.random() * displayTracks.length);
+                    onPlayTrack(displayTracks[randomIndex], displayTracks, { forceShuffle: true });
+                  }
+                } else {
+                  onPlayTrack(displayTracks[0], displayTracks);
+                }
               }
             }}
-            title="Play All"
+            title={isPlaylistActive && isPlaying ? "Pause" : (isShuffle ? "Shuffle Play All" : "Play All")}
           >
             {isPlaylistActive && isPlaying ? (
               <Pause size={22} fill="#080a10" color="#080a10" />
@@ -224,12 +237,18 @@ export default function LibraryView({
 
           {/* Shuffle Button */}
           <button
-            className="aura-circle-btn"
-            title="Shuffle playlist"
+            className={`aura-circle-btn ${isShuffle ? 'active' : ''}`}
+            title={isShuffle ? "Shuffle is ON - Click to re-shuffle playlist" : "Shuffle playlist"}
             onClick={() => {
               if (displayTracks.length > 0) {
-                const randomIndex = Math.floor(Math.random() * displayTracks.length);
-                onPlayTrack(displayTracks[randomIndex]);
+                if (onShufflePlaylist) {
+                  onShufflePlaylist(displayTracks);
+                } else {
+                  const randomIndex = Math.floor(Math.random() * displayTracks.length);
+                  onPlayTrack(displayTracks[randomIndex], displayTracks, { forceShuffle: true });
+                }
+              } else if (onToggleShuffle) {
+                onToggleShuffle();
               }
             }}
           >
@@ -360,7 +379,7 @@ export default function LibraryView({
                   <tr
                     key={track.id}
                     className={`track-table-row ${isCurrent ? 'active' : ''}`}
-                    onClick={() => onPlayTrack(track)}
+                    onClick={() => onPlayTrack(track, displayTracks)}
                     onContextMenu={(e) => handleContextMenu(e, track)}
                   >
                     <td className="track-table-index">
@@ -501,7 +520,8 @@ export default function LibraryView({
           playlistId={playlistId}
           isLiked={likedIds.has(contextMenu.track.id)}
           onClose={closeContextMenu}
-          onPlay={() => { onPlayTrack(contextMenu.track); closeContextMenu(); }}
+          onPlay={() => { onPlayTrack(contextMenu.track, displayTracks); closeContextMenu(); }}
+          onAddToQueue={(track) => { onAddToQueue?.(track); closeContextMenu(); }}
           onToggleLike={() => { onToggleLike(contextMenu.track.id); closeContextMenu(); }}
           onAddToPlaylist={(trackId, targetPlaylistId) => {
             closeContextMenu();

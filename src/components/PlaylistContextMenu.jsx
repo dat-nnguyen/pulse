@@ -4,6 +4,7 @@ import {
   Trash2,
   FolderOpen,
   Disc3,
+  Shuffle,
 } from 'lucide-react';
 
 /**
@@ -15,6 +16,7 @@ import {
  *   onClose    – close callback
  *   onOpen     – open playlist callback
  *   onPlay     – play all tracks callback
+ *   onShuffle  – shuffle play playlist callback
  *   onDelete   – delete playlist callback
  */
 export default function PlaylistContextMenu({
@@ -24,6 +26,7 @@ export default function PlaylistContextMenu({
   onClose,
   onOpen,
   onPlay,
+  onShuffle,
   onDelete,
 }) {
   const menuRef = useRef(null);
@@ -173,6 +176,9 @@ export default function PlaylistContextMenu({
 
       {/* Play all tracks */}
       {onPlay && trackCount > 0 && menuItem(<Play size={15} />, 'Play all', onPlay, 'success')}
+
+      {/* Shuffle play */}
+      {onShuffle && trackCount > 0 && menuItem(<Shuffle size={15} color="var(--pulse-accent)" />, 'Shuffle play', onShuffle)}
 
       {divider('d1')}
 

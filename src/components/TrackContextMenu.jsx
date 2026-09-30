@@ -36,6 +36,7 @@ export default function TrackContextMenu({
   isLiked,
   onClose,
   onPlay,
+  onAddToQueue,
   onToggleLike,
   onAddToPlaylist,
   onRemoveFromPlaylist,
@@ -169,6 +170,9 @@ export default function TrackContextMenu({
 
       {/* Play */}
       {menuItem(<Play size={15} />, 'Play now', onPlay, 'success')}
+
+      {/* Add to Queue */}
+      {onAddToQueue && menuItem(<ListPlus size={15} color="var(--pulse-accent)" />, 'Add to queue', () => onAddToQueue(track))}
 
       {/* Like / Unlike */}
       {menuItem(

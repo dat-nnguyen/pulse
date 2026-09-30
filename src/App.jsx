@@ -34,6 +34,18 @@ import { ConfirmDialog, useConfirm } from './components/ConfirmDialog';
 import { ToastContainer, useToast } from './components/ToastNotification';
 import { getCurrentUser, subscribeAuthChange } from './services/authService';
 
+/**
+ * Fisher-Yates shuffle algorithm for uniform randomization.
+ */
+function shuffleArray(array) {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 export default function App() {
   // User Authentication State
   const [user, setUser] = useState(null);
@@ -133,6 +145,11 @@ export default function App() {
   isShuffleRef.current = isShuffle;
   const repeatModeRef = useRef(repeatMode);
   repeatModeRef.current = repeatMode;
+
+  // Active playback context and shuffle memory
+  const activeContextTracksRef = useRef([]);
+  const unshuffledQueueRef = useRef([]);
+  const playbackHistoryRef = useRef([]);
 
   // Initialize Library & Clean up any legacy mock tracks
   useEffect(() => {
@@ -267,17 +284,62 @@ export default function App() {
   }, []);
 
   // Play a specific track
-  const handlePlayTrack = useCallback(async (track, newQueue = null) => {
+  const handlePlayTrack = useCallback(async (track, contextOrQueue = null, options = {}) => {
+    if (!track) return;
+    const { isQueueAdvance = false, forceShuffle = false, isHistoryBack = false } = options;
+
+    if (!isHistoryBack && currentTrackRef.current && currentTrackRef.current.id !== track.id) {
+      playbackHistoryRef.current.push(currentTrackRef.current);
+      if (playbackHistoryRef.current.length > 50) {
+        playbackHistoryRef.current.shift();
+      }
+    }
+
     setCurrentTrack(track);
     currentTrackRef.current = track;
 
-    if (newQueue) {
-      setQueue(newQueue.filter((t) => t.id !== track.id));
+    const shouldShuffle = forceShuffle || isShuffleRef.current;
+    if (forceShuffle) {
+      setIsShuffle(true);
+      isShuffleRef.current = true;
+    }
+
+    if (isQueueAdvance) {
+      // Advancing through existing queue: contextOrQueue is the remaining queue
+      if (Array.isArray(contextOrQueue)) {
+        setQueue(contextOrQueue.filter((t) => t.id !== track.id));
+      }
+    } else if (contextOrQueue && Array.isArray(contextOrQueue)) {
+      // Initiating playback from a specific playlist / tracks list
+      activeContextTracksRef.current = contextOrQueue;
+      const otherTracks = contextOrQueue.filter((t) => t.id !== track.id);
+
+      if (shouldShuffle) {
+        const shuffled = shuffleArray(otherTracks);
+        setQueue(shuffled);
+        const trackIdx = contextOrQueue.findIndex((t) => t.id === track.id);
+        unshuffledQueueRef.current = trackIdx !== -1 ? contextOrQueue.slice(trackIdx + 1) : otherTracks;
+      } else {
+        const trackIdx = contextOrQueue.findIndex((t) => t.id === track.id);
+        const seq = trackIdx !== -1 ? contextOrQueue.slice(trackIdx + 1) : otherTracks;
+        setQueue(seq);
+        unshuffledQueueRef.current = seq;
+      }
     } else {
-      // Build natural next queue from current tracks list
-      const idx = tracksRef.current.findIndex((t) => t.id === track.id);
-      if (idx !== -1) {
-        setQueue(tracksRef.current.slice(idx + 1));
+      // Standalone play: fallback to full library
+      const all = tracksRef.current;
+      activeContextTracksRef.current = all;
+      const otherTracks = all.filter((t) => t.id !== track.id);
+
+      if (shouldShuffle) {
+        const shuffled = shuffleArray(otherTracks);
+        setQueue(shuffled);
+        unshuffledQueueRef.current = otherTracks;
+      } else {
+        const trackIdx = all.findIndex((t) => t.id === track.id);
+        const seq = trackIdx !== -1 ? all.slice(trackIdx + 1) : otherTracks;
+        setQueue(seq);
+        unshuffledQueueRef.current = seq;
       }
     }
 
@@ -297,29 +359,35 @@ export default function App() {
       return;
     }
 
-    // Check if next song is in custom queue
+    // 1. Advance from queue if items exist
     if (queueRef.current.length > 0) {
       const nextSong = queueRef.current[0];
-      setQueue((prev) => prev.slice(1));
-      handlePlayTrack(nextSong);
+      const remainingQueue = queueRef.current.slice(1);
+      setQueue(remainingQueue);
+      handlePlayTrack(nextSong, remainingQueue, { isQueueAdvance: true });
       return;
     }
 
-    // Fallback: pick next in current tracks array
-    const all = tracksRef.current;
-    if (all.length === 0) return;
+    // 2. Queue is exhausted: check repeat / loop
+    const all = activeContextTracksRef.current?.length > 0
+      ? activeContextTracksRef.current
+      : tracksRef.current;
 
-    if (isShuffleRef.current) {
-      const randomIndex = Math.floor(Math.random() * all.length);
-      handlePlayTrack(all[randomIndex]);
-      return;
-    }
+    if (!all || all.length === 0) return;
 
-    const currentIndex = all.findIndex((t) => t.id === currentTrackRef.current?.id);
-    if (currentIndex !== -1 && currentIndex + 1 < all.length) {
-      handlePlayTrack(all[currentIndex + 1]);
-    } else if (repeatModeRef.current === 'all') {
-      handlePlayTrack(all[0]);
+    if (repeatModeRef.current === 'all') {
+      if (isShuffleRef.current) {
+        const shuffled = shuffleArray(all);
+        const first = shuffled[0];
+        const rest = shuffled.slice(1);
+        setQueue(rest);
+        handlePlayTrack(first, rest, { isQueueAdvance: true });
+      } else {
+        const first = all[0];
+        const rest = all.slice(1);
+        setQueue(rest);
+        handlePlayTrack(first, rest, { isQueueAdvance: true });
+      }
     }
   }, [handlePlayTrack]);
 
@@ -329,14 +397,29 @@ export default function App() {
       audioEngine.seek(0);
       return;
     }
-    const all = tracksRef.current;
-    if (all.length === 0) return;
+
+    // 1. Go back through playback history
+    if (playbackHistoryRef.current.length > 0) {
+      const prevTrack = playbackHistoryRef.current.pop();
+      if (currentTrackRef.current) {
+        setQueue((prev) => [currentTrackRef.current, ...prev]);
+      }
+      handlePlayTrack(prevTrack, null, { isHistoryBack: true, isQueueAdvance: true });
+      return;
+    }
+
+    // 2. Fallback to previous in context
+    const all = activeContextTracksRef.current?.length > 0
+      ? activeContextTracksRef.current
+      : tracksRef.current;
+
+    if (!all || all.length === 0) return;
 
     const currentIndex = all.findIndex((t) => t.id === currentTrackRef.current?.id);
     if (currentIndex > 0) {
-      handlePlayTrack(all[currentIndex - 1]);
+      handlePlayTrack(all[currentIndex - 1], all.slice(currentIndex));
     } else {
-      handlePlayTrack(all[all.length - 1]);
+      handlePlayTrack(all[all.length - 1], []);
     }
   }, [currentTime, handlePlayTrack]);
 
@@ -401,10 +484,76 @@ export default function App() {
     audioEngine.setVolume(newVol);
   };
 
-  // Shuffle toggle
-  const handleToggleShuffle = () => {
-    setIsShuffle((prev) => !prev);
-  };
+  // Shuffle toggle (shuffles current queue when enabled; restores sequence when disabled)
+  const handleToggleShuffle = useCallback(() => {
+    setIsShuffle((prev) => {
+      const next = !prev;
+      isShuffleRef.current = next;
+
+      if (next) {
+        // ENABLING SHUFFLE:
+        if (queueRef.current.length > 0) {
+          unshuffledQueueRef.current = [...queueRef.current];
+          const shuffled = shuffleArray(queueRef.current);
+          setQueue(shuffled);
+          toast.info('Shuffle enabled • Queue shuffled', { title: 'Shuffle' });
+        } else if (currentTrackRef.current) {
+          const all = activeContextTracksRef.current?.length > 0
+            ? activeContextTracksRef.current
+            : tracksRef.current;
+          const others = all.filter((t) => t.id !== currentTrackRef.current.id);
+          if (others.length > 0) {
+            unshuffledQueueRef.current = [...others];
+            setQueue(shuffleArray(others));
+            toast.info('Shuffle enabled • Queue populated', { title: 'Shuffle' });
+          } else {
+            toast.info('Shuffle enabled', { title: 'Shuffle' });
+          }
+        } else {
+          toast.info('Shuffle enabled', { title: 'Shuffle' });
+        }
+      } else {
+        // DISABLING SHUFFLE:
+        if (unshuffledQueueRef.current?.length > 0) {
+          const currentQueueIds = new Set(queueRef.current.map((t) => t.id));
+          const restored = unshuffledQueueRef.current.filter((t) => currentQueueIds.has(t.id));
+          const restoredIds = new Set(restored.map((t) => t.id));
+          const customAdded = queueRef.current.filter((t) => !restoredIds.has(t.id));
+          setQueue([...restored, ...customAdded]);
+          toast.info('Shuffle disabled • Queue un-shuffled', { title: 'Shuffle' });
+        } else {
+          toast.info('Shuffle disabled', { title: 'Shuffle' });
+        }
+      }
+
+      return next;
+    });
+  }, [toast]);
+
+  // Explicit queue shuffle button
+  const handleShuffleQueue = useCallback(() => {
+    if (queueRef.current.length > 1) {
+      const shuffled = shuffleArray(queueRef.current);
+      setQueue(shuffled);
+      toast.info('Queue shuffled', { title: 'Queue' });
+    }
+  }, [toast]);
+
+  // Playlist shuffle action (from Library / Playlist view or context menu)
+  const handleShufflePlaylist = useCallback((playlistTracks) => {
+    if (!playlistTracks || playlistTracks.length === 0) return;
+    const randomIndex = Math.floor(Math.random() * playlistTracks.length);
+    const startTrack = playlistTracks[randomIndex];
+    handlePlayTrack(startTrack, playlistTracks, { forceShuffle: true });
+    toast.info(`Shuffling ${playlistTracks.length} tracks`, { title: 'Shuffle' });
+  }, [handlePlayTrack, toast]);
+
+  // Add a track to the end of the current queue
+  const handleAddToQueue = useCallback((track) => {
+    if (!track) return;
+    setQueue((prev) => [...prev, track]);
+    toast.info(`Added "${track.title}" to queue`, { title: 'Queue' });
+  }, [toast]);
 
   // Repeat toggle ('off' -> 'all' -> 'one' -> 'off')
   const handleToggleRepeat = () => {
@@ -656,6 +805,10 @@ export default function App() {
               likedIds={likedIds}
               currentTrack={currentTrack}
               isPlaying={isPlaying}
+              isShuffle={isShuffle}
+              onToggleShuffle={handleToggleShuffle}
+              onShufflePlaylist={handleShufflePlaylist}
+              onAddToQueue={handleAddToQueue}
               onPlayTrack={handlePlayTrack}
               onTogglePlay={handleTogglePlay}
               onToggleLike={handleToggleLike}
@@ -776,6 +929,12 @@ export default function App() {
         onClose={() => setShowQueue(false)}
         currentTrack={currentTrack}
         queue={queue}
+        isShuffle={isShuffle}
+        onToggleShuffle={handleToggleShuffle}
+        onShuffleQueue={handleShuffleQueue}
+        onPlayFromQueue={(track, idx) =>
+          handlePlayTrack(track, queue.slice(idx + 1), { isQueueAdvance: true })
+        }
         onPlayTrack={handlePlayTrack}
         onRemoveFromQueue={(idx) => setQueue((prev) => prev.filter((_, i) => i !== idx))}
         onClearQueue={() => setQueue([])}
@@ -834,7 +993,21 @@ export default function App() {
             if (pl.trackIds && pl.trackIds.length > 0) {
               const plTracks = tracks.filter((t) => pl.trackIds.includes(t.id));
               if (plTracks.length > 0) {
-                handlePlayTrack(plTracks[0], plTracks);
+                if (isShuffleRef.current) {
+                  handleShufflePlaylist(plTracks);
+                } else {
+                  handlePlayTrack(plTracks[0], plTracks);
+                }
+              }
+            }
+            setPlaylistContextMenu(null);
+          }}
+          onShuffle={() => {
+            const pl = playlistContextMenu.playlist;
+            if (pl.trackIds && pl.trackIds.length > 0) {
+              const plTracks = tracks.filter((t) => pl.trackIds.includes(t.id));
+              if (plTracks.length > 0) {
+                handleShufflePlaylist(plTracks);
               }
             }
             setPlaylistContextMenu(null);

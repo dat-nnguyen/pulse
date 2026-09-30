@@ -1,11 +1,15 @@
 import React from 'react';
-import { X, ListMusic, Trash2 } from 'lucide-react';
+import { X, ListMusic, Trash2, Shuffle } from 'lucide-react';
 
 export default function QueueModal({
   isOpen,
   onClose,
   currentTrack,
   queue = [],
+  isShuffle = false,
+  onToggleShuffle,
+  onShuffleQueue,
+  onPlayFromQueue,
   onPlayTrack,
   onRemoveFromQueue,
   onClearQueue,
@@ -60,23 +64,69 @@ export default function QueueModal({
 
         {/* Next In Queue */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
-            Next Up ({queue.length})
-          </span>
-          {queue.length > 0 && (
-            <button
-              onClick={onClearQueue}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: 'var(--text-secondary)',
-                fontSize: 12,
-                cursor: 'pointer',
-              }}
-            >
-              Clear
-            </button>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+              Next Up ({queue.length})
+            </span>
+            {isShuffle && (
+              <span
+                style={{
+                  fontSize: 10.5,
+                  background: 'rgba(29, 185, 84, 0.12)',
+                  color: 'var(--pulse-accent)',
+                  border: '1px solid var(--pulse-accent-border)',
+                  padding: '1px 6px',
+                  borderRadius: 10,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  fontWeight: 600,
+                }}
+              >
+                <Shuffle size={10} />
+                Shuffled
+              </span>
+            )}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {queue.length > 1 && (
+              <button
+                onClick={onShuffleQueue}
+                style={{
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid var(--border-subtle)',
+                  color: isShuffle ? 'var(--pulse-accent)' : 'var(--text-secondary)',
+                  fontSize: 11.5,
+                  padding: '3px 8px',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  fontWeight: 600,
+                  transition: 'all 0.15s',
+                }}
+                title="Shuffle the upcoming queue"
+              >
+                <Shuffle size={12} />
+                <span>Shuffle Queue</span>
+              </button>
+            )}
+            {queue.length > 0 && (
+              <button
+                onClick={onClearQueue}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-secondary)',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}
+              >
+                Clear
+              </button>
+            )}
+          </div>
         </div>
 
         <div style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -100,7 +150,7 @@ export default function QueueModal({
               >
                 <div
                   style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', flex: 1, minWidth: 0 }}
-                  onClick={() => onPlayTrack(track)}
+                  onClick={() => (onPlayFromQueue ? onPlayFromQueue(track, idx) : onPlayTrack(track))}
                 >
                   <img
                     src={track.coverUrl}

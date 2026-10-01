@@ -18,6 +18,7 @@
     "ios:sync": "cap sync ios",
     "ios:open": "cap open ios",
     "lint": "oxlint",
+    "test": "vitest run",
     "preview": "vite preview"
   },
   "build": {
@@ -91,6 +92,7 @@
     "electron": "^44.5.0",
     "electron-builder": "^26.15.3",
     "oxlint": "^1.81.0",
-    "vite": "^8.3.0"
+    "vite": "^8.3.0",
+    "vitest": "^5.0.3"
   }
 }

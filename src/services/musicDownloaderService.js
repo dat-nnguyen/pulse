@@ -53,9 +53,11 @@ export async function downloadTrackToLocal(track, onProgress = () => {}) {
 }
 
 export function getBackendBaseUrl() {
-  const custom = localStorage.getItem('pulse_backend_url');
+  const custom = typeof localStorage !== 'undefined' && typeof localStorage.getItem === 'function'
+    ? localStorage.getItem('pulse_backend_url')
+    : null;
   if (custom && custom.trim()) return custom.trim().replace(/\/+$/, '');
-  const envUrl = import.meta.env.VITE_BACKEND_URL;
+  const envUrl = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_BACKEND_URL : null;
   if (envUrl && envUrl.trim()) return envUrl.trim().replace(/\/+$/, '');
 
   if (typeof window !== 'undefined') {

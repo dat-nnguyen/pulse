@@ -453,3 +453,15 @@ export async function setSetting(key, value) {
   const db = await getDB();
   await db.put('settings', value, key);
 }
+
+// Re-export duplicate detection and playlist deduplication utilities
+export {
+  normalizeTrackMeta,
+  areTracksDuplicate,
+  findDuplicateTrackInLibrary,
+  isTrackInPlaylist,
+  detectPlaylistDuplicates,
+  deduplicatePlaylist,
+  filterNewTracksForPlaylist,
+} from './duplicateDetectionService';
+

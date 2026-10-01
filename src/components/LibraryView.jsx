@@ -12,11 +12,12 @@ import {
   ChevronLeft,
   Music,
   Plus,
-  Download
+  Download,
+  CopyCheck,
 } from 'lucide-react';
 import { ConfirmDialog, useConfirm } from './ConfirmDialog';
 import TrackContextMenu from './TrackContextMenu';
-import { downloadTrackAudioFile } from '../services/storageService';
+import { downloadTrackAudioFile, detectPlaylistDuplicates } from '../services/storageService';
 
 export default function LibraryView({
   playlistId,
@@ -35,6 +36,7 @@ export default function LibraryView({
   onDeleteTrack,
   onAddTrackToPlaylist,
   onRemoveTrackFromPlaylist,
+  onDeduplicatePlaylist,
   onOpenCreatePlaylist,
   onBack,
   onOpenDownloader,
@@ -46,6 +48,12 @@ export default function LibraryView({
   const isCustomPlaylist = Boolean(currentPlaylist);
   const [playlistFilter, setPlaylistFilter] = useState('');
   const [contextMenu, setContextMenu] = useState(null); // { x, y, track }
+
+  // Detect duplicates in custom playlists
+  const dupReport = useMemo(() => {
+    if (!isCustomPlaylist || !currentPlaylist) return { hasDuplicates: false, duplicateCount: 0 };
+    return detectPlaylistDuplicates(currentPlaylist, tracks);
+  }, [isCustomPlaylist, currentPlaylist, tracks]);
 
   // Determine tracks to display based on selected playlist
   let title = 'Your Library';
@@ -238,22 +246,60 @@ export default function LibraryView({
           {/* Shuffle Button */}
           <button
             className={`aura-circle-btn ${isShuffle ? 'active' : ''}`}
-            title={isShuffle ? "Shuffle is ON - Click to re-shuffle playlist" : "Shuffle playlist"}
+            title={isShuffle ? "Shuffle is ON - Click to turn off shuffle" : "Shuffle playlist"}
             onClick={() => {
-              if (displayTracks.length > 0) {
-                if (onShufflePlaylist) {
-                  onShufflePlaylist(displayTracks);
-                } else {
-                  const randomIndex = Math.floor(Math.random() * displayTracks.length);
-                  onPlayTrack(displayTracks[randomIndex], displayTracks, { forceShuffle: true });
+              if (isShuffle) {
+                // If shuffle is ON: turn it OFF!
+                if (onToggleShuffle) onToggleShuffle();
+              } else {
+                // If shuffle is OFF:
+                if (isPlaylistActive && currentTrack) {
+                  // Already playing tracks from this view: toggle shuffle ON without interrupting playback!
+                  if (onToggleShuffle) onToggleShuffle();
+                } else if (displayTracks.length > 0) {
+                  // Start playing playlist shuffled
+                  if (onShufflePlaylist) {
+                    onShufflePlaylist(displayTracks);
+                  } else {
+                    const randomIndex = Math.floor(Math.random() * displayTracks.length);
+                    onPlayTrack(displayTracks[randomIndex], displayTracks, { forceShuffle: true });
+                  }
+                } else if (onToggleShuffle) {
+                  onToggleShuffle();
                 }
-              } else if (onToggleShuffle) {
-                onToggleShuffle();
               }
             }}
           >
             <Shuffle size={18} />
           </button>
+
+          {/* Clean Duplicates in Playlist */}
+          {isCustomPlaylist && dupReport.hasDuplicates && (
+            <button
+              className="aura-btn-secondary"
+              style={{
+                fontSize: 12,
+                padding: '6px 12px',
+                borderRadius: 20,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                color: '#f59e0b',
+                borderColor: 'rgba(245, 158, 11, 0.4)',
+                background: 'rgba(245, 158, 11, 0.08)',
+                cursor: 'pointer',
+              }}
+              title="Remove duplicate tracks from this playlist"
+              onClick={() => {
+                if (onDeduplicatePlaylist && currentPlaylist) {
+                  onDeduplicatePlaylist(currentPlaylist.id);
+                }
+              }}
+            >
+              <CopyCheck size={14} />
+              <span>Clean {dupReport.duplicateCount} Duplicate{dupReport.duplicateCount > 1 ? 's' : ''}</span>
+            </button>
+          )}
 
           {/* Download Audio Files to Device (up to 10) */}
           {displayTracks.length > 0 && (

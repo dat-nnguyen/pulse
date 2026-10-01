@@ -10,41 +10,13 @@ import {
   savePlaylist,
   deletePlaylist as removePlaylistFromDB,
   syncLibraryWithCloud,
+  isTrackInPlaylist,
+  detectPlaylistDuplicates,
+  deduplicatePlaylist,
+  filterNewTracksForPlaylist,
 } from './services/storageService';
 import { subscribeToCloudChanges } from './services/supabaseService';
-
-// Components
-import Sidebar from './components/Sidebar';
-import TopBar from './components/TopBar';
-import PlayerBar from './components/PlayerBar';
-import MobileBottomNav from './components/MobileBottomNav';
-import MobileMiniPlayer from './components/MobileMiniPlayer';
-import MobileFullPlayer from './components/MobileFullPlayer';
-import HomeView from './components/HomeView';
-import LibraryView from './components/LibraryView';
-import DownloaderView from './components/DownloaderView';
-import EqualizerModal from './components/EqualizerModal';
-import QueueModal from './components/QueueModal';
-import ShareModal from './components/ShareModal';
-import SupabaseModal from './components/SupabaseModal';
-import AuthModal from './components/AuthModal';
-import CreatePlaylistModal from './components/CreatePlaylistModal';
-import PlaylistContextMenu from './components/PlaylistContextMenu';
-import { ConfirmDialog, useConfirm } from './components/ConfirmDialog';
-import { ToastContainer, useToast } from './components/ToastNotification';
-import { getCurrentUser, subscribeAuthChange } from './services/authService';
-
-/**
- * Fisher-Yates shuffle algorithm for uniform randomization.
- */
-function shuffleArray(array) {
-  const arr = [...array];
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
+import { shuffleArray, computeToggledQueue } from './services/shuffleService';
 
 export default function App() {
   // User Authentication State
@@ -490,40 +462,25 @@ export default function App() {
       const next = !prev;
       isShuffleRef.current = next;
 
+      const contextTracks = activeContextTracksRef.current?.length > 0
+        ? activeContextTracksRef.current
+        : tracksRef.current;
+
+      const { nextQueue, nextUnshuffledQueue } = computeToggledQueue({
+        isEnabling: next,
+        currentTrack: currentTrackRef.current,
+        currentQueue: queueRef.current,
+        activeContextTracks: contextTracks,
+        unshuffledQueue: unshuffledQueueRef.current,
+      });
+
+      unshuffledQueueRef.current = nextUnshuffledQueue;
+      setQueue(nextQueue);
+
       if (next) {
-        // ENABLING SHUFFLE:
-        if (queueRef.current.length > 0) {
-          unshuffledQueueRef.current = [...queueRef.current];
-          const shuffled = shuffleArray(queueRef.current);
-          setQueue(shuffled);
-          toast.info('Shuffle enabled • Queue shuffled', { title: 'Shuffle' });
-        } else if (currentTrackRef.current) {
-          const all = activeContextTracksRef.current?.length > 0
-            ? activeContextTracksRef.current
-            : tracksRef.current;
-          const others = all.filter((t) => t.id !== currentTrackRef.current.id);
-          if (others.length > 0) {
-            unshuffledQueueRef.current = [...others];
-            setQueue(shuffleArray(others));
-            toast.info('Shuffle enabled • Queue populated', { title: 'Shuffle' });
-          } else {
-            toast.info('Shuffle enabled', { title: 'Shuffle' });
-          }
-        } else {
-          toast.info('Shuffle enabled', { title: 'Shuffle' });
-        }
+        toast.info('Shuffle enabled • Queue randomized', { title: 'Shuffle' });
       } else {
-        // DISABLING SHUFFLE:
-        if (unshuffledQueueRef.current?.length > 0) {
-          const currentQueueIds = new Set(queueRef.current.map((t) => t.id));
-          const restored = unshuffledQueueRef.current.filter((t) => currentQueueIds.has(t.id));
-          const restoredIds = new Set(restored.map((t) => t.id));
-          const customAdded = queueRef.current.filter((t) => !restoredIds.has(t.id));
-          setQueue([...restored, ...customAdded]);
-          toast.info('Shuffle disabled • Queue un-shuffled', { title: 'Shuffle' });
-        } else {
-          toast.info('Shuffle disabled', { title: 'Shuffle' });
-        }
+        toast.info('Shuffle disabled • Sequential playback restored', { title: 'Shuffle' });
       }
 
       return next;
@@ -615,14 +572,25 @@ export default function App() {
     navigateTo('playlist', newPlaylist.id);
   };
 
-  // Add track to a playlist (without navigating away)
+  // Add track to a playlist (without navigating away), with duplicate detection
   const handleAddTrackToPlaylist = useCallback(async (trackId, targetPlaylistId) => {
     if (targetPlaylistId === '__new__') {
-      // Open the create-playlist modal; track will be added after creation via a pending ref
       setPendingAddTrackId(trackId);
       setShowCreatePlaylistModal(true);
       return;
     }
+
+    const targetPlaylist = playlists.find((p) => p.id === targetPlaylistId);
+    const targetTrack = tracksRef.current.find((t) => t.id === trackId);
+
+    // Duplicate detection in playlist
+    if (targetPlaylist && isTrackInPlaylist(targetTrack || trackId, targetPlaylist, tracksRef.current)) {
+      toast.info(`"${targetTrack?.title || 'Track'}" is already in "${targetPlaylist.name}"`, {
+        title: 'Already in Playlist',
+      });
+      return;
+    }
+
     setPlaylists((prev) =>
       prev.map((pl) => {
         if (pl.id !== targetPlaylistId) return pl;
@@ -632,24 +600,71 @@ export default function App() {
         return updated;
       })
     );
-    toast.success('Added to playlist', { title: 'Done' });
-  }, [toast]);
+    toast.success(`Added to "${targetPlaylist?.name || 'playlist'}"`, { title: 'Done' });
+  }, [playlists, toast]);
 
-  // Add multiple tracks to a playlist at once (e.g. batch download or multi-file upload)
+  // Add multiple tracks to a playlist at once with duplicate detection (e.g. batch download or multi-file upload)
   const handleAddMultipleTracksToPlaylist = useCallback(async (trackIds, targetPlaylistId) => {
     if (!targetPlaylistId || !Array.isArray(trackIds) || trackIds.length === 0) return;
+    const targetPlaylist = playlists.find((p) => p.id === targetPlaylistId);
+
+    const { newTrackIds, skippedDuplicates } = filterNewTracksForPlaylist(
+      trackIds,
+      targetPlaylist,
+      tracksRef.current
+    );
+
+    if (newTrackIds.length === 0) {
+      if (skippedDuplicates.length > 0) {
+        toast.info(
+          `All ${skippedDuplicates.length} track(s) are already in "${targetPlaylist?.name || 'playlist'}"`,
+          { title: 'Duplicate tracks skipped' }
+        );
+      }
+      return;
+    }
+
     setPlaylists((prev) =>
       prev.map((pl) => {
         if (pl.id !== targetPlaylistId) return pl;
-        const existingSet = new Set(pl.trackIds || []);
-        const newIds = trackIds.filter((id) => !existingSet.has(id));
-        if (newIds.length === 0) return pl;
-        const updated = { ...pl, trackIds: [...(pl.trackIds || []), ...newIds] };
+        const updated = { ...pl, trackIds: [...(pl.trackIds || []), ...newTrackIds] };
         savePlaylist(updated).catch(console.error);
         return updated;
       })
     );
-  }, []);
+
+    if (skippedDuplicates.length > 0) {
+      toast.success(
+        `Added ${newTrackIds.length} track(s) to "${targetPlaylist?.name || 'playlist'}" (${skippedDuplicates.length} duplicate(s) skipped)`,
+        { title: 'Added with Duplicate Detection' }
+      );
+    } else {
+      toast.success(`Added ${newTrackIds.length} track(s) to "${targetPlaylist?.name || 'playlist'}"`, {
+        title: 'Done',
+      });
+    }
+  }, [playlists, toast]);
+
+  // Deduplicate tracks in a playlist
+  const handleDeduplicatePlaylist = useCallback(async (playlistId) => {
+    const target = playlists.find((p) => p.id === playlistId);
+    if (!target) return;
+
+    const dupReport = detectPlaylistDuplicates(target, tracksRef.current);
+    if (!dupReport.hasDuplicates) {
+      toast.info('No duplicate tracks found in this playlist', { title: 'Playlist is Clean' });
+      return;
+    }
+
+    const deduplicated = deduplicatePlaylist(target, tracksRef.current);
+    setPlaylists((prev) =>
+      prev.map((pl) => (pl.id === playlistId ? deduplicated : pl))
+    );
+    await savePlaylist(deduplicated).catch(console.error);
+    toast.success(`Removed ${dupReport.duplicateCount} duplicate track(s) from "${target.name}"`, {
+      title: 'Playlist Deduplicated',
+    });
+  }, [playlists, toast]);
 
   // Remove track from a specific playlist only (does NOT delete from library)
   const handleRemoveTrackFromPlaylist = useCallback(async (trackId, targetPlaylistId) => {
@@ -815,6 +830,7 @@ export default function App() {
               onDeleteTrack={handleDeleteTrack}
               onAddTrackToPlaylist={handleAddTrackToPlaylist}
               onRemoveTrackFromPlaylist={handleRemoveTrackFromPlaylist}
+              onDeduplicatePlaylist={handleDeduplicatePlaylist}
               onBack={() => {
                 handleGoBack();
               }}
@@ -830,6 +846,7 @@ export default function App() {
             <DownloaderView
               prefilledQuery={prefilledDownloaderQuery}
               playlists={playlists}
+              tracks={tracks}
               onOpenCreatePlaylist={() => setShowCreatePlaylistModal(true)}
               onAddTrackToPlaylist={handleAddTrackToPlaylist}
               onAddMultipleTracksToPlaylist={handleAddMultipleTracksToPlaylist}
@@ -838,9 +855,6 @@ export default function App() {
                   const filtered = prev.filter((t) => t.id !== newTrack.id);
                   return [newTrack, ...filtered];
                 });
-                if (targetPlaylistId) {
-                  handleAddTrackToPlaylist(newTrack.id, targetPlaylistId);
-                }
                 if (!currentTrackRef.current) {
                   handlePlayTrack(newTrack);
                 }

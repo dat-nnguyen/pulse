@@ -27,13 +27,14 @@ function YoutubeIcon({ size = 16 }) {
 
 import { downloadFromWebUrl, downloadMultipleFromWebUrls } from '../services/musicDownloaderService';
 import { parseAudioFile } from '../services/localFileParser';
-import { saveTrack } from '../services/storageService';
+import { saveTrack, isTrackInPlaylist } from '../services/storageService';
 
 export default function DownloaderView({
   onTrackAdded,
   onPlayTrack,
   prefilledQuery = '',
   playlists = [],
+  tracks = [],
   onOpenCreatePlaylist,
   onAddTrackToPlaylist,
   onAddMultipleTracksToPlaylist,
@@ -89,13 +90,21 @@ export default function DownloaderView({
       });
 
       track.isDownloaded = true;
-      if (selectedPlaylistId && onAddTrackToPlaylist) {
-        onAddTrackToPlaylist(track.id, selectedPlaylistId);
-      }
       onTrackAdded(track, selectedPlaylistId);
 
+      let isDuplicate = false;
+      if (selectedPlaylist && selectedPlaylistId) {
+        if (isTrackInPlaylist(track, selectedPlaylist, tracks)) {
+          isDuplicate = true;
+        } else if (onAddTrackToPlaylist) {
+          onAddTrackToPlaylist(track.id, selectedPlaylistId);
+        }
+      }
+
       const destMessage = selectedPlaylist
-        ? `Saved to Offline Storage & "${selectedPlaylist.name}"`
+        ? (isDuplicate
+            ? `Saved to Offline Storage (already in "${selectedPlaylist.name}", skipped duplicate)`
+            : `Saved to Offline Storage & "${selectedPlaylist.name}"`)
         : 'Saved to Offline Storage';
 
       setDownloadStatus({
@@ -103,10 +112,17 @@ export default function DownloaderView({
         message: `Downloaded "${track.title}" • ${destMessage}`,
       });
       if (toast) {
-        toast.success(
-          `"${track.title}" saved to ${selectedPlaylist ? `"${selectedPlaylist.name}" & Offline Storage` : 'Offline Storage'}`,
-          { title: 'Download complete' }
-        );
+        if (isDuplicate) {
+          toast.info(
+            `"${track.title}" saved to Offline Storage (already in "${selectedPlaylist.name}", skipped duplicate)`,
+            { title: 'Duplicate skipped in playlist' }
+          );
+        } else {
+          toast.success(
+            `"${track.title}" saved to ${selectedPlaylist ? `"${selectedPlaylist.name}" & Offline Storage` : 'Offline Storage'}`,
+            { title: 'Download complete' }
+          );
+        }
       }
       setWebUrl('');
       setCustomTitle('');

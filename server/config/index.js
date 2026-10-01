@@ -31,6 +31,56 @@ if (!fs.existsSync(CACHE_DIR)) {
   } catch (e) {}
 }
 
+export function resolveYtDlpBinary() {
+  if (process.env.YT_DLP_PATH && fs.existsSync(process.env.YT_DLP_PATH)) {
+    return process.env.YT_DLP_PATH;
+  }
+
+  const candidatePaths = [
+    // 1. Packaged electron Resources/bin/yt-dlp
+    process.resourcesPath ? path.join(process.resourcesPath, 'bin', 'yt-dlp') : null,
+    // 2. Persistent user Application Support bin
+    path.join(homeDir, 'Library', 'Application Support', 'pulse-music-player', 'bin', 'yt-dlp'),
+    // 3. Project root / parent bin
+    path.join(rootDir, 'bin', 'yt-dlp'),
+    path.join(rootDir, '..', 'bin', 'yt-dlp'),
+    // 4. Standard Mac system/brew paths
+    '/usr/local/bin/yt-dlp',
+    '/opt/homebrew/bin/yt-dlp',
+    path.join(homeDir, '.local', 'bin', 'yt-dlp'),
+    // 5. Development repo venv / bin
+    path.join(rootDir, '.venv', 'bin', 'yt-dlp'),
+    '/Users/datnguyen/Documents/project/real-free-music-player/bin/yt-dlp',
+    '/Users/datnguyen/Documents/project/real-free-music-player/.venv/bin/yt-dlp',
+  ].filter(Boolean);
+
+  for (const candidate of candidatePaths) {
+    try {
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    } catch (e) {}
+  }
+
+  return 'yt-dlp';
+}
+
+// Augment PATH so any spawned process can find yt-dlp or system tools
+const extraPaths = [
+  '/usr/local/bin',
+  '/opt/homebrew/bin',
+  '/opt/homebrew/sbin',
+  path.join(homeDir, '.local', 'bin'),
+  path.join(homeDir, 'Library', 'Application Support', 'pulse-music-player', 'bin'),
+  path.join(rootDir, 'bin'),
+  process.resourcesPath ? path.join(process.resourcesPath, 'bin') : null,
+].filter(Boolean);
+
+const existingPaths = (process.env.PATH || '').split(':');
+process.env.PATH = Array.from(new Set([...extraPaths, ...existingPaths])).filter(Boolean).join(':');
+
+const resolvedYtDlp = resolveYtDlpBinary();
+
 export const config = {
   port: process.env.PORT || 3030,
   host: process.env.HOST || '0.0.0.0',
@@ -38,7 +88,8 @@ export const config = {
   rootDirCache,
   userDataCache,
   distDir: process.env.DIST_DIR || path.join(rootDir, 'dist'),
-  venvYtDlp: process.env.YT_DLP_PATH || path.join(rootDir, '.venv', 'bin', 'yt-dlp'),
+  venvYtDlp: resolvedYtDlp,
+  resolveYtDlp: resolveYtDlpBinary,
   corsOrigins: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : '*',
 };
 

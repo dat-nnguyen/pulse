@@ -17,19 +17,52 @@ let embeddedServer = null;
 const userDataDir = app.getPath('userData');
 const cacheDir = path.join(userDataDir, 'audio_cache');
 if (!fs.existsSync(cacheDir)) {
-  fs.mkdirSync(cacheDir, { recursive: true });
+  try {
+    fs.mkdirSync(cacheDir, { recursive: true });
+  } catch (e) {}
 }
 process.env.CACHE_DIR = cacheDir;
 
-// On macOS, add homebrew & venv paths so CLI tools like yt-dlp or ffmpeg are accessible
-if (process.platform === 'darwin') {
-  const extraPaths = [
-    '/opt/homebrew/bin',
-    '/usr/local/bin',
-    path.join(rootDir, '.venv', 'bin')
-  ];
-  process.env.PATH = `${extraPaths.join(':')}:${process.env.PATH || ''}`;
+// Ensure user bin directory exists
+const userBinDir = path.join(userDataDir, 'bin');
+if (!fs.existsSync(userBinDir)) {
+  try {
+    fs.mkdirSync(userBinDir, { recursive: true });
+  } catch (e) {}
 }
+
+// Locate yt-dlp binary across potential paths and make sure it has executable permissions
+const candidateBinDirs = [
+  userBinDir,
+  process.resourcesPath ? path.join(process.resourcesPath, 'bin') : null,
+  path.join(rootDir, 'bin'),
+  path.join(rootDir, '..', 'bin'),
+  '/usr/local/bin',
+  '/opt/homebrew/bin',
+  '/opt/homebrew/sbin',
+  path.join(process.env.HOME || '', '.local', 'bin'),
+  path.join(process.env.HOME || '', 'bin'),
+  path.join(rootDir, '.venv', 'bin'),
+  '/Users/datnguyen/Documents/project/real-free-music-player/bin',
+  '/Users/datnguyen/Documents/project/real-free-music-player/.venv/bin',
+].filter(Boolean);
+
+for (const dir of candidateBinDirs) {
+  const ytDlpCandidate = path.join(dir, 'yt-dlp');
+  if (fs.existsSync(ytDlpCandidate)) {
+    try {
+      fs.chmodSync(ytDlpCandidate, 0o755);
+    } catch (e) {}
+    if (!process.env.YT_DLP_PATH) {
+      process.env.YT_DLP_PATH = ytDlpCandidate;
+    }
+  }
+}
+
+// Augment PATH with all candidate binary folders so child processes locate tools easily
+const existingPaths = (process.env.PATH || '').split(':');
+const mergedPaths = Array.from(new Set([...candidateBinDirs, ...existingPaths])).filter(Boolean);
+process.env.PATH = mergedPaths.join(':');
 
 // Check if backend server is already running on port 3030
 function isServerRunning(port = 3030) {

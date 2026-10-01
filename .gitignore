@@ -42,4 +42,5 @@ skills-lock.json
 # Electron & desktop packaging
 release/
 build/icon.iconset/
+bin/
 

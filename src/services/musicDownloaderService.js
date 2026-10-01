@@ -57,6 +57,12 @@ export function getBackendBaseUrl() {
   if (custom && custom.trim()) return custom.trim().replace(/\/+$/, '');
   const envUrl = import.meta.env.VITE_BACKEND_URL;
   if (envUrl && envUrl.trim()) return envUrl.trim().replace(/\/+$/, '');
+
+  if (typeof window !== 'undefined') {
+    if (window.location.protocol === 'file:' || !window.location.host) {
+      return 'http://127.0.0.1:3030';
+    }
+  }
   return '';
 }
 
@@ -71,7 +77,7 @@ export async function downloadFromWebUrl(inputUrl, customMeta = {}) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: trimmedUrl, ...customMeta }),
-      signal: AbortSignal.timeout(60000), // Allow 60s for high-quality audio extraction
+      signal: AbortSignal.timeout(90000), // Allow 90s for high-quality audio extraction
     });
 
     if (res.ok) {
@@ -79,8 +85,9 @@ export async function downloadFromWebUrl(inputUrl, customMeta = {}) {
       if (data && data.success && data.track) {
         let track = data.track;
         track.isDownloaded = true;
-        if (baseUrl && track.audioUrl && track.audioUrl.startsWith('/audio/')) {
-          track.audioUrl = `${baseUrl}${track.audioUrl}`;
+        const effectiveHost = baseUrl || (typeof window !== 'undefined' && window.location.protocol === 'file:' ? 'http://127.0.0.1:3030' : '');
+        if (effectiveHost && track.audioUrl && track.audioUrl.startsWith('/audio/')) {
+          track.audioUrl = `${effectiveHost}${track.audioUrl}`;
         }
         return saveTrack(track);
       }

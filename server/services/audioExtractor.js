@@ -86,15 +86,41 @@ export function parseTitleAndArtist(info, customMeta = {}) {
 }
 
 export async function extractAudioFromUrl(url, customMeta = {}) {
-  const ytDlpCmd = fs.existsSync(config.venvYtDlp) ? config.venvYtDlp : 'yt-dlp';
+  const ytDlpCmd = (typeof config.resolveYtDlp === 'function' ? config.resolveYtDlp() : null)
+    || (config.venvYtDlp && fs.existsSync(config.venvYtDlp) ? config.venvYtDlp : 'yt-dlp');
+
   const outputId = `track_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
   const outputPath = path.join(config.cacheDir, `${outputId}.%(ext)s`);
+
+  // Ensure PATH contains all standard macOS and Homebrew tool locations
+  const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+  const extraPaths = [
+    '/usr/local/bin',
+    '/opt/homebrew/bin',
+    '/opt/homebrew/sbin',
+    '/usr/bin',
+    '/bin',
+    '/usr/sbin',
+    '/sbin',
+    path.join(homeDir, '.local', 'bin'),
+    path.join(homeDir, 'bin'),
+    path.join(homeDir, 'Library', 'Application Support', 'pulse-music-player', 'bin'),
+    process.resourcesPath ? path.join(process.resourcesPath, 'bin') : null,
+  ].filter(Boolean);
+
+  const existingPaths = (process.env.PATH || '').split(':');
+  const enhancedPath = Array.from(new Set([...extraPaths, ...existingPaths])).filter(Boolean).join(':');
+
+  const execEnv = {
+    ...process.env,
+    PATH: enhancedPath,
+  };
 
   return new Promise((resolve, reject) => {
     // Download best available audio stream (prefers m4a/aac, falls back to webm/opus) without needing ffmpeg
     const cmd = `"${ytDlpCmd}" -f "ba[ext=m4a]/ba/b" --no-playlist -o "${outputPath}" --print-json "${url}"`;
 
-    exec(cmd, { timeout: 60000 }, (error, stdout, stderr) => {
+    exec(cmd, { timeout: 90000, maxBuffer: 15 * 1024 * 1024, env: execEnv }, (error, stdout, stderr) => {
       let info = null;
       if (stdout) {
         try {
@@ -112,10 +138,23 @@ export async function extractAudioFromUrl(url, customMeta = {}) {
       }
 
       // Check if file was downloaded to cache
-      const files = fs.readdirSync(config.cacheDir);
+      const files = fs.existsSync(config.cacheDir) ? fs.readdirSync(config.cacheDir) : [];
       const downloadedFile = files.find((f) => f.startsWith(outputId));
 
       if (downloadedFile) {
+        // If secondary rootDir cache exists and differs from primary, mirror file for local dev access
+        if (config.rootDirCache && config.rootDirCache !== config.cacheDir && fs.existsSync(config.rootDirCache)) {
+          try {
+            const src = path.join(config.cacheDir, downloadedFile);
+            const dst = path.join(config.rootDirCache, downloadedFile);
+            if (!fs.existsSync(dst)) {
+              fs.copyFileSync(src, dst);
+            }
+          } catch (copyErr) {
+            console.warn('Cache mirror notice:', copyErr.message);
+          }
+        }
+
         const ext = path.extname(downloadedFile).replace('.', '').toUpperCase() || 'M4A';
         const { title: trackTitle, artist: trackArtist } = parseTitleAndArtist(info, customMeta);
         const trackDuration = Math.round((info && info.duration) || 180);
@@ -140,8 +179,19 @@ export async function extractAudioFromUrl(url, customMeta = {}) {
       }
 
       if (error) {
-        console.error('yt-dlp execution error:', error.message, stderr);
-        return reject(new Error('Failed to extract audio from link. Please verify the URL.'));
+        console.error('yt-dlp execution error:', {
+          cmd,
+          message: error.message,
+          stderr: stderr ? stderr.slice(0, 1000) : '',
+        });
+
+        let userMsg = 'Failed to extract audio from link. Please verify the URL.';
+        if (stderr) {
+          if (stderr.includes('Private video')) userMsg = 'This video is private or requires sign-in.';
+          else if (stderr.includes('Video unavailable')) userMsg = 'This video is unavailable or has been removed.';
+          else if (stderr.includes('Sign in to confirm you’re not a bot')) userMsg = 'YouTube requires verification for this link. Try another video.';
+        }
+        return reject(new Error(userMsg));
       }
 
       reject(new Error('Audio file was not generated.'));

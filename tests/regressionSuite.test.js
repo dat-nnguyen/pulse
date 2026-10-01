@@ -4,6 +4,18 @@ import * as duplicateDetectionService from '../src/services/duplicateDetectionSe
 import * as shuffleService from '../src/services/shuffleService.js';
 import { getBackendBaseUrl } from '../src/services/musicDownloaderService.js';
 
+// Polyfill Audio for headless Node test environment
+if (typeof globalThis.Audio === 'undefined') {
+  globalThis.Audio = class MockAudio {
+    constructor() {
+      this.preload = 'auto';
+      this.volume = 1;
+      this.addEventListener = () => {};
+      this.removeEventListener = () => {};
+    }
+  };
+}
+
 describe('Regression & Contract Test Suite', () => {
   describe('Duplicate Detection & Storage Service Integration', () => {
     it('storageService exports all necessary duplicate detection functions', () => {
@@ -72,6 +84,20 @@ describe('Regression & Contract Test Suite', () => {
     it('safely resolves backend URL without crashing when window is undefined or in node', () => {
       const baseUrl = getBackendBaseUrl();
       expect(typeof baseUrl).toBe('string');
+    });
+  });
+
+  describe('Component Import & Reference Integrity', () => {
+    it('App and core views export valid React component functions without reference errors', async () => {
+      const App = (await import('../src/App.jsx')).default;
+      const LibraryView = (await import('../src/components/LibraryView.jsx')).default;
+      const DownloaderView = (await import('../src/components/DownloaderView.jsx')).default;
+      const PlayerBar = (await import('../src/components/PlayerBar.jsx')).default;
+
+      expect(typeof App).toBe('function');
+      expect(typeof LibraryView).toBe('function');
+      expect(typeof DownloaderView).toBe('function');
+      expect(typeof PlayerBar).toBe('function');
     });
   });
 });

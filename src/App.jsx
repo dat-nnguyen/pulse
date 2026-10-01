@@ -18,6 +18,27 @@ import {
 import { subscribeToCloudChanges } from './services/supabaseService';
 import { shuffleArray, computeToggledQueue } from './services/shuffleService';
 
+// Components
+import Sidebar from './components/Sidebar';
+import TopBar from './components/TopBar';
+import PlayerBar from './components/PlayerBar';
+import MobileBottomNav from './components/MobileBottomNav';
+import MobileMiniPlayer from './components/MobileMiniPlayer';
+import MobileFullPlayer from './components/MobileFullPlayer';
+import HomeView from './components/HomeView';
+import LibraryView from './components/LibraryView';
+import DownloaderView from './components/DownloaderView';
+import EqualizerModal from './components/EqualizerModal';
+import QueueModal from './components/QueueModal';
+import ShareModal from './components/ShareModal';
+import SupabaseModal from './components/SupabaseModal';
+import AuthModal from './components/AuthModal';
+import CreatePlaylistModal from './components/CreatePlaylistModal';
+import PlaylistContextMenu from './components/PlaylistContextMenu';
+import { ConfirmDialog, useConfirm } from './components/ConfirmDialog';
+import { ToastContainer, useToast } from './components/ToastNotification';
+import { getCurrentUser, subscribeAuthChange } from './services/authService';
+
 export default function App() {
   // User Authentication State
   const [user, setUser] = useState(null);

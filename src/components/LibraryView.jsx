@@ -246,29 +246,8 @@ export default function LibraryView({
           {/* Shuffle Button */}
           <button
             className={`aura-circle-btn ${isShuffle ? 'active' : ''}`}
-            title={isShuffle ? "Shuffle is ON - Click to turn off shuffle" : "Shuffle playlist"}
-            onClick={() => {
-              if (isShuffle) {
-                // If shuffle is ON: turn it OFF!
-                if (onToggleShuffle) onToggleShuffle();
-              } else {
-                // If shuffle is OFF:
-                if (isPlaylistActive && currentTrack) {
-                  // Already playing tracks from this view: toggle shuffle ON without interrupting playback!
-                  if (onToggleShuffle) onToggleShuffle();
-                } else if (displayTracks.length > 0) {
-                  // Start playing playlist shuffled
-                  if (onShufflePlaylist) {
-                    onShufflePlaylist(displayTracks);
-                  } else {
-                    const randomIndex = Math.floor(Math.random() * displayTracks.length);
-                    onPlayTrack(displayTracks[randomIndex], displayTracks, { forceShuffle: true });
-                  }
-                } else if (onToggleShuffle) {
-                  onToggleShuffle();
-                }
-              }
-            }}
+            title={isShuffle ? "Shuffle is ON - Click to turn off shuffle" : "Turn on shuffle"}
+            onClick={onToggleShuffle}
           >
             <Shuffle size={18} />
           </button>

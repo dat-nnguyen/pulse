@@ -1301,24 +1301,38 @@ button, input, optgroup, select, textarea {
     flex: 1;
   }
 
-  /* Mobile Top Bar: fits 100% within mobile viewport without overflow */
+  /* Mobile Top Bar: respect notch/Dynamic Island safe area and never overlap */
   .aura-top-bar {
-    padding: 8px 14px !important;
-    gap: 8px !important;
+    padding-top: max(10px, env(safe-area-inset-top, 10px)) !important;
+    padding-bottom: 8px !important;
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+    gap: 10px !important;
     flex-wrap: nowrap !important;
-    min-height: 52px !important;
-    height: 52px !important;
+    min-height: calc(50px + env(safe-area-inset-top, 0px)) !important;
+    height: auto !important;
     justify-content: space-between !important;
-    overflow: hidden !important;
-    background: var(--pulse-surface) !important;
+    align-items: center !important;
+    overflow: visible !important;
+    background: rgba(14, 18, 28, 0.96) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border-bottom: 1px solid var(--border-subtle) !important;
+    z-index: 40 !important;
+  }
+
+  .aura-topbar-drag-spacer {
+    display: none !important;
   }
 
   .aura-topbar-left {
     gap: 8px !important;
+    flex-shrink: 0 !important;
   }
 
   .aura-topbar-right {
-    gap: 6px !important;
+    gap: 8px !important;
+    flex-shrink: 0 !important;
   }
 
   /* Fixed Mobile Bottom Navigation Bar */

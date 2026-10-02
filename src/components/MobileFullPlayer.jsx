@@ -193,20 +193,29 @@ export default function MobileFullPlayer({
 
         <button
           style={{
-            width: 60,
-            height: 60,
+            width: 64,
+            height: 64,
             borderRadius: '50%',
-            background: 'var(--text-primary)',
+            background: '#ffffff',
             border: 'none',
-            color: 'var(--aura-bg)',
+            color: '#07090e',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.6)',
+            flexShrink: 0,
+            transition: 'transform 0.15s ease',
           }}
           onClick={onTogglePlay}
+          title={isPlaying ? 'Pause' : 'Play'}
+          aria-label={isPlaying ? 'Pause' : 'Play'}
         >
-          {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" style={{ marginLeft: 3 }} />}
+          {isPlaying ? (
+            <Pause size={28} fill="#07090e" color="#07090e" />
+          ) : (
+            <Play size={28} fill="#07090e" color="#07090e" style={{ marginLeft: 3 }} />
+          )}
         </button>
 
         <button className="aura-control-btn" onClick={onNext}>

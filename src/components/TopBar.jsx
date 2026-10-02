@@ -35,22 +35,22 @@ export default function TopBar({
     <header className="aura-top-bar">
       {/* Left: Navigation history & Home */}
       <div className="aura-topbar-left">
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <button
-            className="aura-circle-btn"
-            disabled={!canGoBack}
-            onClick={onGoBack}
-            title="Go back (⌘[ or Alt+←)"
-            style={{
-              width: 34,
-              height: 34,
-              opacity: canGoBack ? 1 : 0.35,
-              cursor: canGoBack ? 'pointer' : 'not-allowed',
-            }}
-            aria-label="Back"
-          >
-            <ChevronLeft size={18} />
-          </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {canGoBack && (
+            <button
+              className="aura-circle-btn"
+              onClick={onGoBack}
+              title="Go back (⌘[ or Alt+←)"
+              style={{
+                width: 34,
+                height: 34,
+                cursor: 'pointer',
+              }}
+              aria-label="Back"
+            >
+              <ChevronLeft size={18} />
+            </button>
+          )}
           <button
             className="aura-circle-btn hide-on-mobile"
             disabled={!canGoForward}
@@ -67,7 +67,7 @@ export default function TopBar({
             <ChevronRight size={18} />
           </button>
           <button
-            className={`aura-circle-btn ${currentView === 'home' && !selectedPlaylistId ? 'active' : ''}`}
+            className={`aura-circle-btn hide-on-mobile ${currentView === 'home' && !selectedPlaylistId ? 'active' : ''}`}
             onClick={onGoHome}
             title="Go to Home / Playlists"
             style={{ width: 34, height: 34 }}
@@ -85,10 +85,11 @@ export default function TopBar({
               alignItems: 'center',
               gap: 7,
               cursor: 'pointer',
-              padding: '3px 8px 3px 4px',
-              borderRadius: 16,
+              padding: '4px 10px 4px 6px',
+              borderRadius: 18,
               background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(0, 242, 254, 0.2)',
+              border: '1px solid rgba(0, 242, 254, 0.25)',
+              flexShrink: 0,
             }}
             title="Pulse High-Fidelity Audio"
           >
@@ -102,11 +103,12 @@ export default function TopBar({
                 alignItems: 'center',
                 justifyContent: 'center',
                 boxShadow: '0 2px 8px rgba(0, 242, 254, 0.35)',
+                flexShrink: 0,
               }}
             >
               <Activity size={14} color="#07090e" strokeWidth={2.8} />
             </div>
-            <span style={{ fontWeight: 800, fontSize: 13.5, letterSpacing: '0.06em', color: '#ffffff' }}>
+            <span style={{ fontWeight: 800, fontSize: 13.5, letterSpacing: '0.06em', color: '#ffffff', whiteSpace: 'nowrap' }}>
               PULSE
             </span>
           </div>
@@ -118,11 +120,11 @@ export default function TopBar({
 
       {/* Right Actions & Account Status */}
       <div className="aura-topbar-right">
-        {/* User Account / Device Sync Button */}
+        {/* User Account / Device Sync Button (Desktop only - mobile has bottom nav Account tab) */}
         {user ? (
           <button
             onClick={onOpenAuth}
-            className="aura-account-pill"
+            className="aura-account-pill hide-on-mobile"
             title={`Logged in as ${user.email} • Click to manage account`}
             style={{
               display: 'flex',
@@ -154,7 +156,7 @@ export default function TopBar({
             >
               {(user.email || 'U')[0].toUpperCase()}
             </div>
-            <span className="hide-on-mobile" style={{ maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <span style={{ maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {user.email?.split('@')[0]}
             </span>
             <span
@@ -179,10 +181,9 @@ export default function TopBar({
           </button>
         )}
 
-
-        {/* Download Audio Button */}
+        {/* Download Audio Button (Desktop only - mobile has bottom nav Download tab) */}
         <button
-          className="aura-btn-primary"
+          className="aura-btn-primary hide-on-mobile"
           onClick={onOpenDownloader}
           title="Download & Import Music (YouTube / Local Files)"
           style={{ padding: '7px 14px', fontSize: 12.5 }}
@@ -191,14 +192,15 @@ export default function TopBar({
           <span>Download</span>
         </button>
 
-        {/* Equalizer (hidden on mobile, accessible in full player) */}
+        {/* Equalizer (Available on both desktop & mobile) */}
         <button
-          className="aura-circle-btn hide-on-mobile"
+          className="aura-circle-btn"
           onClick={onOpenEqualizer}
           title="Audio Equalizer & Visualizer"
           style={{ width: 34, height: 34 }}
+          aria-label="Audio Equalizer"
         >
-          <Sliders size={15} />
+          <Sliders size={15} color="var(--pulse-accent)" />
         </button>
 
         {/* Supabase Cloud Status */}
@@ -226,9 +228,9 @@ export default function TopBar({
           )}
         </button>
 
-        {/* Install App on Phone & Desktop / Share */}
+        {/* Install App / Share (Desktop only - mobile has bottom nav Sync & Wi-Fi tab) */}
         <button
-          className="aura-circle-btn"
+          className="aura-circle-btn hide-on-mobile"
           onClick={onOpenShare}
           title="Install App on Phone (iOS/Android) & Share"
           style={{ width: 34, height: 34 }}

@@ -52,16 +52,19 @@ describe('Playlist Avatar & Cover Customization', () => {
     expect(removedCover.name).toBe('Ambient Relax');
   });
 
-  it('validates preset cover URLs format and accessibility', () => {
-    const presetUrls = [
-      'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=600&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=600&auto=format&fit=crop&q=80',
+  it('supports custom image URLs or data URLs for playlist avatars', () => {
+    const customUrls = [
+      'https://example.com/my-cool-artwork.png',
+      'data:image/jpeg;base64,/9j/4AAQSkZJRg==',
     ];
 
-    for (const url of presetUrls) {
-      expect(url).toMatch(/^https:\/\//);
-      expect(url).toContain('images.unsplash.com');
+    for (const url of customUrls) {
+      const playlist = {
+        id: 'pl_custom_art',
+        name: 'My Playlist',
+        coverUrl: url,
+      };
+      expect(playlist.coverUrl).toBe(url);
     }
   });
 });

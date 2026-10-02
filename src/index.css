@@ -1109,6 +1109,92 @@ button, input, optgroup, select, textarea {
   flex-shrink: 0;
 }
 
+.pulse-hero-art-interactive {
+  position: relative;
+  width: 170px;
+  height: 170px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+
+.pulse-hero-art-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.65), 0 0 0 1.5px rgba(0, 242, 254, 0.3);
+}
+
+.pulse-hero-art-interactive .pulse-hero-art-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pulse-hero-art-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(2px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #ffffff;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.pulse-hero-art-interactive:hover .pulse-hero-art-overlay {
+  opacity: 1;
+}
+
+.pulse-hero-art-overlay span {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.pulse-edit-playlist-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.pulse-edit-playlist-btn:hover {
+  background: var(--pulse-surface-hover);
+  color: var(--pulse-accent);
+  border-color: rgba(0, 242, 254, 0.3);
+}
+
+@media (max-width: 600px) {
+  .pulse-edit-details-grid {
+    grid-template-columns: 1fr !important;
+    justify-items: center;
+  }
+}
+
+.aura-playlist-card:hover .pulse-card-edit-btn {
+  opacity: 1 !important;
+  transform: scale(1.05);
+}
+
+
+
 .pulse-playlist-actions {
   display: flex;
   align-items: center;

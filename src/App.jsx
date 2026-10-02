@@ -34,6 +34,7 @@ import ShareModal from './components/ShareModal';
 import SupabaseModal from './components/SupabaseModal';
 import AuthModal from './components/AuthModal';
 import CreatePlaylistModal from './components/CreatePlaylistModal';
+import EditPlaylistModal from './components/EditPlaylistModal';
 import PlaylistContextMenu from './components/PlaylistContextMenu';
 import { ConfirmDialog, useConfirm } from './components/ConfirmDialog';
 import { ToastContainer, useToast } from './components/ToastNotification';
@@ -110,6 +111,7 @@ export default function App() {
   const [showSupabaseModal, setShowSupabaseModal] = useState(false);
   const [showFullMobilePlayer, setShowFullMobilePlayer] = useState(false);
   const [showCreatePlaylistModal, setShowCreatePlaylistModal] = useState(false);
+  const [editingPlaylist, setEditingPlaylist] = useState(null);
   const [pendingAddTrackId, setPendingAddTrackId] = useState(null);
 
   // Library & Audio Data
@@ -715,6 +717,23 @@ export default function App() {
     }
   }, [selectedPlaylistId, toast, navigateTo]);
 
+  // Update Playlist Details & Avatar Cover
+  const handleUpdatePlaylist = useCallback(async (updatedPlaylist) => {
+    try {
+      await savePlaylist(updatedPlaylist);
+      setPlaylists((prev) =>
+        prev.map((p) => (p.id === updatedPlaylist.id ? updatedPlaylist : p))
+      );
+      toast.success(`Updated "${updatedPlaylist.name}" cover & details!`, {
+        title: 'Playlist updated',
+      });
+      setEditingPlaylist(null);
+    } catch (err) {
+      console.error('Failed to update playlist details:', err);
+      toast.error('Failed to save playlist changes');
+    }
+  }, [toast]);
+
   // Open right-click context menu for playlists
   const handlePlaylistContextMenu = useCallback((e, playlist) => {
     e.preventDefault();
@@ -830,6 +849,7 @@ export default function App() {
               isPlaying={isPlaying}
               onTogglePlay={handleTogglePlay}
               onPlaylistContextMenu={handlePlaylistContextMenu}
+              onEditPlaylist={(pl) => setEditingPlaylist(pl)}
             />
           )}
 
@@ -859,6 +879,7 @@ export default function App() {
               onOpenCreatePlaylist={() => setShowCreatePlaylistModal(true)}
               onDeletePlaylist={handleDeletePlaylist}
               onPlaylistContextMenu={handlePlaylistContextMenu}
+              onEditPlaylist={(pl) => setEditingPlaylist(pl)}
               toast={toast}
             />
           )}
@@ -1012,6 +1033,17 @@ export default function App() {
         toast={toast}
       />
 
+      {/* Edit Playlist Details & Avatar Modal (like Spotify) */}
+      {editingPlaylist && (
+        <EditPlaylistModal
+          isOpen={Boolean(editingPlaylist)}
+          playlist={editingPlaylist}
+          onClose={() => setEditingPlaylist(null)}
+          onSave={handleUpdatePlaylist}
+          toast={toast}
+        />
+      )}
+
       {/* Playlist Context Menu */}
       {playlistContextMenu && (
         <PlaylistContextMenu
@@ -1046,6 +1078,11 @@ export default function App() {
               }
             }
             setPlaylistContextMenu(null);
+          }}
+          onEdit={() => {
+            const pl = playlistContextMenu.playlist;
+            setPlaylistContextMenu(null);
+            setEditingPlaylist(pl);
           }}
           onDelete={() => handleRequestDeletePlaylist(playlistContextMenu.playlist)}
         />

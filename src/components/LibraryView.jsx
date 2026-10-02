@@ -14,6 +14,8 @@ import {
   Plus,
   Download,
   CopyCheck,
+  Camera,
+  Pencil,
 } from 'lucide-react';
 import { ConfirmDialog, useConfirm } from './ConfirmDialog';
 import TrackContextMenu from './TrackContextMenu';
@@ -43,6 +45,7 @@ export default function LibraryView({
   toast,
   onDeletePlaylist,
   onPlaylistContextMenu,
+  onEditPlaylist,
 }) {
   const currentPlaylist = playlists.find((p) => p.id === playlistId);
   const isCustomPlaylist = Boolean(currentPlaylist);
@@ -145,7 +148,46 @@ export default function LibraryView({
         }}
       >
 
-        {coverArt ? (
+        {isCustomPlaylist ? (
+          <div
+            className="pulse-hero-art-interactive"
+            onClick={() => onEditPlaylist && onEditPlaylist(currentPlaylist)}
+            title="Click to change playlist avatar (like Spotify)"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onEditPlaylist && onEditPlaylist(currentPlaylist);
+              }
+            }}
+          >
+            {coverArt ? (
+              <img
+                src={coverArt}
+                alt={title}
+                className="pulse-hero-art-img"
+              />
+            ) : (
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'linear-gradient(135deg, #1e293b, #0f172a)',
+                }}
+              >
+                <Disc3 size={54} color="#64748b" />
+              </div>
+            )}
+            <div className="pulse-hero-art-overlay">
+              <Camera size={34} />
+              <span>Choose photo</span>
+            </div>
+          </div>
+        ) : coverArt ? (
           <img
             src={coverArt}
             alt={title}
@@ -180,9 +222,22 @@ export default function LibraryView({
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 0 }}>
-          <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5, color: 'var(--pulse-accent)' }}>
-            Playlist
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5, color: 'var(--pulse-accent)' }}>
+              Playlist
+            </span>
+            {isCustomPlaylist && onEditPlaylist && (
+              <button
+                type="button"
+                className="pulse-edit-playlist-btn"
+                onClick={() => onEditPlaylist(currentPlaylist)}
+                title="Edit playlist name & cover photo"
+              >
+                <Pencil size={12} />
+                <span>Edit details</span>
+              </button>
+            )}
+          </div>
           <h1
             style={{
               fontSize: 'clamp(26px, 4.5vw, 46px)',

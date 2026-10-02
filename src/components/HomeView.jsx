@@ -10,7 +10,8 @@ import {
   Sparkles,
   ArrowRight,
   CloudDownload,
-  Download
+  Download,
+  Camera,
 } from 'lucide-react';
 
 export default function HomeView({
@@ -25,6 +26,7 @@ export default function HomeView({
   isPlaying,
   onTogglePlay,
   onPlaylistContextMenu,
+  onEditPlaylist,
 }) {
   const offlineTracks = tracks.filter(
     (t) =>
@@ -277,6 +279,39 @@ export default function HomeView({
                   >
                     <Disc3 size={42} color="#64748b" />
                   </div>
+                )}
+
+                {onEditPlaylist && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEditPlaylist(pl);
+                    }}
+                    style={{
+                      position: 'absolute',
+                      top: 8,
+                      right: 8,
+                      width: 32,
+                      height: 32,
+                      borderRadius: '50%',
+                      background: 'rgba(0, 0, 0, 0.68)',
+                      backdropFilter: 'blur(4px)',
+                      border: '1px solid rgba(255, 255, 255, 0.25)',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      opacity: 0,
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+                    }}
+                    className="pulse-card-edit-btn"
+                    title="Change playlist cover (like Spotify)"
+                  >
+                    <Camera size={15} />
+                  </button>
                 )}
               </div>
 

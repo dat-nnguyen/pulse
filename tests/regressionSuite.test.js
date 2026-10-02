@@ -93,11 +93,13 @@ describe('Regression & Contract Test Suite', () => {
       const LibraryView = (await import('../src/components/LibraryView.jsx')).default;
       const DownloaderView = (await import('../src/components/DownloaderView.jsx')).default;
       const PlayerBar = (await import('../src/components/PlayerBar.jsx')).default;
+      const EditPlaylistModal = (await import('../src/components/EditPlaylistModal.jsx')).default;
 
       expect(typeof App).toBe('function');
       expect(typeof LibraryView).toBe('function');
       expect(typeof DownloaderView).toBe('function');
       expect(typeof PlayerBar).toBe('function');
+      expect(typeof EditPlaylistModal).toBe('function');
     });
   });
 });

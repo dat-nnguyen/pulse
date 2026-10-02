@@ -5,6 +5,7 @@ import {
   FolderOpen,
   Disc3,
   Shuffle,
+  Camera,
 } from 'lucide-react';
 
 /**
@@ -18,6 +19,7 @@ import {
  *   onPlay     – play all tracks callback
  *   onShuffle  – shuffle play playlist callback
  *   onDelete   – delete playlist callback
+ *   onEdit     – edit playlist details and change photo callback
  */
 export default function PlaylistContextMenu({
   x,
@@ -28,6 +30,7 @@ export default function PlaylistContextMenu({
   onPlay,
   onShuffle,
   onDelete,
+  onEdit,
 }) {
   const menuRef = useRef(null);
 
@@ -179,6 +182,9 @@ export default function PlaylistContextMenu({
 
       {/* Shuffle play */}
       {onShuffle && trackCount > 0 && menuItem(<Shuffle size={15} color="var(--pulse-accent)" />, 'Shuffle play', onShuffle)}
+
+      {/* Edit details / Change photo (like Spotify) */}
+      {onEdit && menuItem(<Camera size={15} color="var(--pulse-accent)" />, 'Edit details & cover', onEdit)}
 
       {divider('d1')}
 

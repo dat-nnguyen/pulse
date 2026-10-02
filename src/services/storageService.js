@@ -12,6 +12,7 @@ import {
   deleteTrackFromSupabase,
   deletePlaylistFromSupabase,
 } from './supabaseService';
+import { getBackendBaseUrl } from './musicDownloaderService.js';
 
 const DB_NAME = 'PulseAudioDB';
 const DB_VERSION = 2;
@@ -56,16 +57,27 @@ export async function saveTrack(track) {
     item.isDownloaded = true;
   }
 
+function resolveDeviceFetchTarget(url) {
+  if (!url) return '';
+  const isCapacitorOrMobile = typeof window !== 'undefined' && (
+    window.location.protocol === 'capacitor:' ||
+    !!window.Capacitor ||
+    /iPad|iPhone|iPod|Android/.test(navigator.userAgent)
+  );
+  const backendBase = getBackendBaseUrl() || (isCapacitorOrMobile ? 'http://192.168.1.102:3030' : 'http://127.0.0.1:3030');
+  if (url.startsWith('/audio/')) {
+    return `${backendBase}${url}`;
+  }
+  if (isCapacitorOrMobile && (url.includes('127.0.0.1:3030') || url.includes('localhost:3030'))) {
+    return url.replace(/http:\/\/(127\.0\.0\.1|localhost):3030/, backendBase);
+  }
+  return url;
+}
+
   // Eagerly fetch and store audioBlob in local IndexedDB so it lies in offline storage immediately!
   if (!item.audioBlob && item.audioUrl) {
     try {
-      let fetchTarget = item.localAudioUrl || item.audioUrl;
-      if (fetchTarget.startsWith('/audio/')) {
-        const host = (typeof window !== 'undefined' && window.location?.origin?.startsWith('http'))
-          ? window.location.origin
-          : 'http://127.0.0.1:3030';
-        fetchTarget = `${host}${fetchTarget}`;
-      }
+      const fetchTarget = resolveDeviceFetchTarget(item.localAudioUrl || item.audioUrl);
       const res = await fetch(fetchTarget);
       if (res.ok) {
         const blob = await res.blob();
@@ -108,13 +120,7 @@ export async function saveTrack(track) {
         // If downloaded via local Mac backend, fetch the audio and upload to Supabase Storage
         // so iPhone and Web can stream it globally!
         try {
-          let fetchTarget = item.localAudioUrl || item.audioUrl;
-          if (fetchTarget.startsWith('/audio/')) {
-            const host = (typeof window !== 'undefined' && window.location?.origin?.startsWith('http'))
-              ? window.location.origin
-              : 'http://127.0.0.1:3030';
-            fetchTarget = `${host}${fetchTarget}`;
-          }
+          const fetchTarget = resolveDeviceFetchTarget(item.localAudioUrl || item.audioUrl);
           const res = await fetch(fetchTarget);
           if (res.ok) {
             const blob = await res.blob();

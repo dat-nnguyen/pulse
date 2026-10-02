@@ -85,21 +85,33 @@ describe('Regression & Contract Test Suite', () => {
       const baseUrl = getBackendBaseUrl();
       expect(typeof baseUrl).toBe('string');
     });
+
+    it('sets and retrieves custom backend URL via setBackendBaseUrl', async () => {
+      const { setBackendBaseUrl, getBackendBaseUrl } = await import('../src/services/musicDownloaderService.js');
+      expect(typeof setBackendBaseUrl).toBe('function');
+      expect(typeof getBackendBaseUrl).toBe('function');
+    });
   });
 
   describe('Component Import & Reference Integrity', () => {
     it('App and core views export valid React component functions without reference errors', async () => {
       const App = (await import('../src/App.jsx')).default;
+      const HomeView = (await import('../src/components/HomeView.jsx')).default;
       const LibraryView = (await import('../src/components/LibraryView.jsx')).default;
       const DownloaderView = (await import('../src/components/DownloaderView.jsx')).default;
       const PlayerBar = (await import('../src/components/PlayerBar.jsx')).default;
       const EditPlaylistModal = (await import('../src/components/EditPlaylistModal.jsx')).default;
+      const MobileBottomNav = (await import('../src/components/MobileBottomNav.jsx')).default;
+      const ShareModal = (await import('../src/components/ShareModal.jsx')).default;
 
       expect(typeof App).toBe('function');
+      expect(typeof HomeView).toBe('function');
       expect(typeof LibraryView).toBe('function');
       expect(typeof DownloaderView).toBe('function');
       expect(typeof PlayerBar).toBe('function');
       expect(typeof EditPlaylistModal).toBe('function');
+      expect(typeof MobileBottomNav).toBe('function');
+      expect(typeof ShareModal).toBe('function');
     });
   });
 });

@@ -8,7 +8,8 @@ import {
   Sliders,
   Cloud,
   User,
-  LogIn
+  LogIn,
+  Activity,
 } from 'lucide-react';
 import { isSupabaseConfigured } from '../services/supabaseClient';
 
@@ -74,6 +75,41 @@ export default function TopBar({
           >
             <Home size={17} />
           </button>
+
+          {/* Pulse Brand Logo on Mobile */}
+          <div
+            className="pulse-mobile-brand"
+            onClick={onGoHome}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 7,
+              cursor: 'pointer',
+              padding: '3px 8px 3px 4px',
+              borderRadius: 16,
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(0, 242, 254, 0.2)',
+            }}
+            title="Pulse High-Fidelity Audio"
+          >
+            <div
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 6,
+                background: 'linear-gradient(135deg, #00f2fe, #4facfe)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 2px 8px rgba(0, 242, 254, 0.35)',
+              }}
+            >
+              <Activity size={14} color="#07090e" strokeWidth={2.8} />
+            </div>
+            <span style={{ fontWeight: 800, fontSize: 13.5, letterSpacing: '0.06em', color: '#ffffff' }}>
+              PULSE
+            </span>
+          </div>
         </div>
       </div>
 

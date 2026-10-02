@@ -151,14 +151,37 @@ export default function LibraryView({
         {isCustomPlaylist ? (
           <div
             className="pulse-hero-art-interactive"
-            onClick={() => onEditPlaylist && onEditPlaylist(currentPlaylist)}
-            title="Click to change playlist avatar (like Spotify)"
+            onClick={() => {
+              if (window.innerWidth <= 820) {
+                // On mobile, tap artwork to toggle play/pause of the playlist
+                if (displayTracks.length > 0) {
+                  if (isPlaylistActive && isPlaying) {
+                    onTogglePlay();
+                  } else {
+                    onPlayTrack(displayTracks[0], displayTracks);
+                  }
+                }
+              } else if (onEditPlaylist) {
+                onEditPlaylist(currentPlaylist);
+              }
+            }}
+            title={typeof window !== 'undefined' && window.innerWidth <= 820 ? "Tap to play playlist" : "Click to change playlist avatar (like Spotify)"}
             role="button"
             tabIndex={0}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                onEditPlaylist && onEditPlaylist(currentPlaylist);
+                if (window.innerWidth <= 820) {
+                  if (displayTracks.length > 0) {
+                    if (isPlaylistActive && isPlaying) {
+                      onTogglePlay();
+                    } else {
+                      onPlayTrack(displayTracks[0], displayTracks);
+                    }
+                  }
+                } else if (onEditPlaylist) {
+                  onEditPlaylist(currentPlaylist);
+                }
               }
             }}
           >
@@ -470,7 +493,12 @@ export default function LibraryView({
                           <div className="eq-bar" />
                         </div>
                       ) : (
-                        <span className="index-number">{index + 1}</span>
+                        <div className="track-play-cell">
+                          <span className="index-number">{index + 1}</span>
+                          <span className="track-hover-play-icon" title="Play track">
+                            <Play size={14} fill="currentColor" />
+                          </span>
+                        </div>
                       )}
                     </td>
 

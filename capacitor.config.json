@@ -1,5 +1,5 @@
 {
-  "appId": "com.pulse.musicplayer",
+  "appId": "com.datnguyen.pulse",
   "appName": "Pulse",
   "webDir": "dist",
   "bundledWebRuntime": false,

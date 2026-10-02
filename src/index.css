@@ -741,8 +741,28 @@ button, input, optgroup, select, textarea {
   font-weight: 700;
 }
 
-.track-table-row:hover .index-number {
-  color: #ffffff;
+.track-play-cell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.track-hover-play-icon {
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.track-table-row:hover .track-play-cell .index-number {
+  display: none;
+}
+
+.track-table-row:hover .track-play-cell .track-hover-play-icon {
+  display: flex;
+  color: var(--pulse-accent);
 }
 
 /* Inline track info cell */
@@ -1234,12 +1254,17 @@ button, input, optgroup, select, textarea {
 
 .aura-mobile-miniplayer { display: none; }
 .aura-mobile-nav { display: none; }
+.pulse-mobile-brand { display: none !important; }
 
 /* ==========================================================================
    MOBILE & TABLET RESPONSIVE RULES (max-width: 820px)
    ========================================================================== */
 
 @media (max-width: 820px) {
+  .pulse-mobile-brand {
+    display: flex !important;
+  }
+
   .hide-on-mobile {
     display: none !important;
   }
@@ -1421,14 +1446,27 @@ button, input, optgroup, select, textarea {
     box-sizing: border-box !important;
   }
 
-  /* Responsive Track Table */
+  /* Responsive Track Table: keep index/play and actions visible, hide album & duration */
   .track-table th:nth-child(3),
   .track-table td:nth-child(3),
   .track-table th:nth-child(4),
-  .track-table td:nth-child(4),
-  .track-table th:nth-child(5),
-  .track-table td:nth-child(5) {
+  .track-table td:nth-child(4) {
     display: none !important;
+  }
+
+  .pulse-hero-art-overlay {
+    display: none !important;
+  }
+
+  .track-play-cell .index-number {
+    display: none !important;
+  }
+
+  .track-play-cell .track-hover-play-icon {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    color: var(--pulse-accent) !important;
   }
 
   .track-table th {

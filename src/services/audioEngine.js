@@ -1,9 +1,15 @@
 // Audio Engine with Web Audio API Equalizer, Visualizer, and MediaSession lock-screen controls
+import { getBackendBaseUrl } from './musicDownloaderService.js';
 
 class AudioEngine {
   constructor() {
     this.audio = new Audio();
     this.audio.preload = 'auto';
+    this.audio.playsInline = true;
+    if (typeof this.audio.setAttribute === 'function') {
+      this.audio.setAttribute('playsinline', 'true');
+      this.audio.setAttribute('webkit-playsinline', 'true');
+    }
 
     this.audioCtx = null;
     this.sourceNode = null;
@@ -77,11 +83,16 @@ class AudioEngine {
         console.warn('Blob audio failed, falling back to direct server URL...');
         this.currentBlobUrl = null;
         let fallbackSrc = this.currentTrack.localAudioUrl || this.currentTrack.audioUrl;
+        const isCapacitorOrMobile = typeof window !== 'undefined' && (
+          window.location.protocol === 'capacitor:' ||
+          !!window.Capacitor ||
+          /iPad|iPhone|iPod|Android/.test(navigator.userAgent)
+        );
+        const backendBase = getBackendBaseUrl() || (isCapacitorOrMobile ? 'http://192.168.1.102:3030' : 'http://127.0.0.1:3030');
         if (fallbackSrc.startsWith('/audio/')) {
-          const origin = (typeof window !== 'undefined' && window.location?.origin?.startsWith('http'))
-            ? window.location.origin
-            : 'http://127.0.0.1:3030';
-          fallbackSrc = `${origin}${fallbackSrc}`;
+          fallbackSrc = `${backendBase}${fallbackSrc}`;
+        } else if (isCapacitorOrMobile && (fallbackSrc.includes('127.0.0.1:3030') || fallbackSrc.includes('localhost:3030'))) {
+          fallbackSrc = fallbackSrc.replace(/http:\/\/(127\.0\.0\.1|localhost):3030/, backendBase);
         }
         this.audio.src = fallbackSrc;
         this.audio.load();
@@ -109,8 +120,16 @@ class AudioEngine {
     });
   }
 
-  initWebAudio() {
+  initWebAudio(force = false) {
     if (this.isWebAudioInitialized) return;
+    const isIOS = typeof navigator !== 'undefined' && (
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    );
+    // On iOS WebKit, avoid createMediaElementSource unless explicitly forced (e.g. Equalizer)
+    // because WebKit mutes cross-origin streams and disables AVAudioSession background lock-screen playback
+    if (isIOS && !force) return;
+
     try {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextClass) return;
@@ -212,13 +231,25 @@ class AudioEngine {
 
     const artwork = [];
     if (track.coverUrl) {
+      let resolvedCover = track.coverUrl;
+      const isCapacitorOrMobile = typeof window !== 'undefined' && (
+        window.location.protocol === 'capacitor:' ||
+        !!window.Capacitor ||
+        /iPad|iPhone|iPod|Android/.test(navigator.userAgent)
+      );
+      const backendBase = getBackendBaseUrl() || (isCapacitorOrMobile ? 'http://192.168.1.102:3030' : 'http://127.0.0.1:3030');
+      if (resolvedCover.startsWith('/audio/')) {
+        resolvedCover = `${backendBase}${resolvedCover}`;
+      } else if (isCapacitorOrMobile && (resolvedCover.includes('127.0.0.1:3030') || resolvedCover.includes('localhost:3030'))) {
+        resolvedCover = resolvedCover.replace(/http:\/\/(127\.0\.0\.1|localhost):3030/, backendBase);
+      }
       artwork.push(
-        { src: track.coverUrl, sizes: '96x96', type: 'image/png' },
-        { src: track.coverUrl, sizes: '128x128', type: 'image/png' },
-        { src: track.coverUrl, sizes: '192x192', type: 'image/png' },
-        { src: track.coverUrl, sizes: '256x256', type: 'image/png' },
-        { src: track.coverUrl, sizes: '384x384', type: 'image/png' },
-        { src: track.coverUrl, sizes: '512x512', type: 'image/png' }
+        { src: resolvedCover, sizes: '96x96', type: 'image/png' },
+        { src: resolvedCover, sizes: '128x128', type: 'image/png' },
+        { src: resolvedCover, sizes: '192x192', type: 'image/png' },
+        { src: resolvedCover, sizes: '256x256', type: 'image/png' },
+        { src: resolvedCover, sizes: '384x384', type: 'image/png' },
+        { src: resolvedCover, sizes: '512x512', type: 'image/png' }
       );
     }
 
@@ -273,16 +304,31 @@ class AudioEngine {
       src = track.localAudioUrl || track.audioUrl || '';
     }
 
+    const isIOS = typeof navigator !== 'undefined' && (
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    );
+    const isCapacitorOrMobile = typeof window !== 'undefined' && (
+      window.location.protocol === 'capacitor:' ||
+      !!window.Capacitor ||
+      isIOS ||
+      /Android/.test(navigator.userAgent)
+    );
+
+    const backendBase = getBackendBaseUrl() || (isCapacitorOrMobile ? 'http://192.168.1.102:3030' : 'http://127.0.0.1:3030');
+
     // If relative audio path, resolve to local backend server
     if (src && src.startsWith('/audio/')) {
-      const origin = (typeof window !== 'undefined' && window.location?.origin?.startsWith('http'))
-        ? window.location.origin
-        : 'http://127.0.0.1:3030';
-      src = `${origin}${src}`;
+      src = `${backendBase}${src}`;
+    } else if (src && isCapacitorOrMobile && (src.includes('127.0.0.1:3030') || src.includes('localhost:3030'))) {
+      src = src.replace(/http:\/\/(127\.0\.0\.1|localhost):3030/, backendBase);
     }
 
     // Blob and data URLs must NEVER have crossOrigin set in WebKit/Chromium
     if (isLocalBlob || src.startsWith('blob:') || src.startsWith('data:') || src.startsWith('file:')) {
+      this.audio.removeAttribute('crossOrigin');
+    } else if (isIOS) {
+      // On iOS WebKit, omitting crossOrigin ensures native AVPlayer streams without CORS preflight restrictions
       this.audio.removeAttribute('crossOrigin');
     } else if (src.startsWith('http://') || src.startsWith('https://')) {
       this.audio.crossOrigin = 'anonymous';

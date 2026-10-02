@@ -108,6 +108,11 @@ export default function App() {
   const [showQueue, setShowQueue] = useState(false);
   const [showEqualizer, setShowEqualizer] = useState(false);
   const [showShare, setShowShare] = useState(false);
+
+  const handleOpenEqualizer = useCallback(() => {
+    audioEngine.initWebAudio(true);
+    setShowEqualizer(true);
+  }, []);
   const [showSupabaseModal, setShowSupabaseModal] = useState(false);
   const [showFullMobilePlayer, setShowFullMobilePlayer] = useState(false);
   const [showCreatePlaylistModal, setShowCreatePlaylistModal] = useState(false);
@@ -804,7 +809,7 @@ export default function App() {
           user={user}
           onOpenAuth={() => setShowAuthModal(true)}
           onCreatePlaylist={handleCreatePlaylist}
-          onOpenEqualizer={() => setShowEqualizer(true)}
+          onOpenEqualizer={handleOpenEqualizer}
           onOpenShare={() => setShowShare(true)}
           onOpenSupabase={() => setShowSupabaseModal(true)}
           activeFilter={sidebarFilter}
@@ -822,7 +827,7 @@ export default function App() {
             user={user}
             onOpenAuth={() => setShowAuthModal(true)}
             onOpenShare={() => setShowShare(true)}
-            onOpenEqualizer={() => setShowEqualizer(true)}
+            onOpenEqualizer={handleOpenEqualizer}
             onOpenSupabase={() => setShowSupabaseModal(true)}
             currentTrack={currentTrack}
             onOpenDownloader={() => navigateTo('downloader', null)}
@@ -928,7 +933,7 @@ export default function App() {
         onToggleRepeat={handleToggleRepeat}
         onToggleLike={() => handleToggleLike()}
         onToggleQueue={() => setShowQueue(!showQueue)}
-        onOpenEqualizer={() => setShowEqualizer(true)}
+        onOpenEqualizer={handleOpenEqualizer}
         onOpenFullscreen={() => setShowFullMobilePlayer(true)}
       />
 
@@ -972,7 +977,7 @@ export default function App() {
         onToggleShuffle={handleToggleShuffle}
         onToggleRepeat={handleToggleRepeat}
         onToggleLike={() => handleToggleLike()}
-        onOpenEqualizer={() => setShowEqualizer(true)}
+        onOpenEqualizer={handleOpenEqualizer}
         onOpenShare={() => setShowShare(true)}
         onOpenSupabase={() => setShowSupabaseModal(true)}
       />

@@ -25,7 +25,7 @@ export default function MobileBottomNav({ currentView, setCurrentView, user, onO
         onClick={onOpenShare}
       >
         <Smartphone size={22} color="var(--pulse-accent)" />
-        <span>Install App</span>
+        <span>Sync & Wi-Fi</span>
       </button>
 
       <button

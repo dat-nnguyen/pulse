@@ -61,11 +61,30 @@ export function getBackendBaseUrl() {
   if (envUrl && envUrl.trim()) return envUrl.trim().replace(/\/+$/, '');
 
   if (typeof window !== 'undefined') {
+    const isCapacitor = window.location.protocol === 'capacitor:' || !!window.Capacitor;
+    const isMobileDevice = /iPad|iPhone|iPod|Android/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    // If running inside Capacitor on iOS/Android or on a mobile device without local host
+    if (isCapacitor || (isMobileDevice && (window.location.protocol === 'file:' || !window.location.host || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))) {
+      return 'http://192.168.1.102:3030';
+    }
+
     if (window.location.protocol === 'file:' || !window.location.host) {
       return 'http://127.0.0.1:3030';
     }
   }
   return '';
+}
+
+export function setBackendBaseUrl(url) {
+  if (typeof localStorage !== 'undefined' && typeof localStorage.setItem === 'function') {
+    if (url && url.trim()) {
+      localStorage.setItem('pulse_backend_url', url.trim().replace(/\/+$/, ''));
+    } else {
+      localStorage.removeItem('pulse_backend_url');
+    }
+  }
 }
 
 // Download from YouTube or direct URL via backend or direct audio stream

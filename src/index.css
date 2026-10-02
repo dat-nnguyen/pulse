@@ -1219,10 +1219,17 @@ button, input, optgroup, select, textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 32px;
+  padding: 16px 32px;
   gap: 16px;
   flex-wrap: wrap;
   border-bottom: 1px solid var(--border-subtle);
+}
+
+.pulse-actions-buttons {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
 }
 
 .pulse-playlist-search {
@@ -1231,11 +1238,68 @@ button, input, optgroup, select, textarea {
   gap: 8px;
   background: var(--pulse-bg-raised);
   border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  padding: 6px 12px;
-  min-width: 240px;
+  border-radius: var(--radius-pill);
+  padding: 0 14px;
+  height: 38px;
+  min-width: 220px;
   max-width: 320px;
-  flex: 1 1 240px;
+  box-sizing: border-box;
+  transition: all var(--transition);
+}
+
+.pulse-playlist-search:focus-within {
+  border-color: var(--pulse-accent);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 2px rgba(0, 242, 254, 0.15);
+}
+
+.pulse-search-icon {
+  color: #94a3b8;
+  flex-shrink: 0;
+  transition: color var(--transition);
+}
+
+.pulse-playlist-search:focus-within .pulse-search-icon {
+  color: var(--pulse-accent);
+}
+
+.pulse-playlist-search-input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #f8fafc;
+  font-size: 13px;
+  width: 100%;
+  min-width: 0;
+}
+
+.pulse-playlist-search-input::placeholder {
+  color: #64748b;
+}
+
+.pulse-search-clear-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  border-radius: 50%;
+  color: #94a3b8;
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+  transition: all var(--transition);
+}
+
+.pulse-search-clear-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+.pulse-tracks-container {
+  padding: 8px 32px 40px 32px;
 }
 
 .aura-topbar-left {
@@ -1443,21 +1507,60 @@ button, input, optgroup, select, textarea {
   }
 
   .pulse-playlist-actions {
-    padding: 12px 14px !important;
+    padding: 10px 14px !important;
     gap: 10px !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    flex-wrap: nowrap !important;
   }
 
-  .pulse-playlist-actions > div:first-child {
-    justify-content: center !important;
+  .pulse-playlist-actions > div:first-child,
+  .pulse-actions-buttons {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    flex-shrink: 0 !important;
+    justify-content: flex-start !important;
+  }
+
+  .pulse-actions-buttons .pulse-main-play-btn,
+  .pulse-playlist-actions .pulse-main-play-btn {
+    width: 42px !important;
+    height: 42px !important;
+  }
+
+  .pulse-actions-buttons .aura-circle-btn,
+  .pulse-playlist-actions .aura-circle-btn {
+    width: 34px !important;
+    height: 34px !important;
   }
 
   .pulse-playlist-search {
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 100% !important;
+    flex: 1 1 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 220px !important;
+    height: 34px !important;
+    padding: 0 10px !important;
+    border-radius: 17px !important;
+    background: rgba(255, 255, 255, 0.06) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    gap: 6px !important;
     box-sizing: border-box !important;
+  }
+
+  .pulse-playlist-search-input {
+    font-size: 12px !important;
+  }
+
+  .pulse-playlist-search-input::placeholder {
+    font-size: 12px !important;
+    color: rgba(255, 255, 255, 0.45) !important;
+  }
+
+  .pulse-tracks-container {
+    padding: 6px 12px calc(var(--mobile-nav-height, 60px) + var(--mobile-mini-height, 60px) + 20px) 12px !important;
   }
 
   /* Responsive Track Table: keep index/play and actions visible, hide album & duration */

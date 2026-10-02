@@ -16,6 +16,7 @@ import {
   CopyCheck,
   Camera,
   Pencil,
+  X,
 } from 'lucide-react';
 import { ConfirmDialog, useConfirm } from './ConfirmDialog';
 import TrackContextMenu from './TrackContextMenu';
@@ -283,10 +284,10 @@ export default function LibraryView({
 
       {/* Action Row & In-Playlist Search */}
       <div className="pulse-playlist-actions">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div className="pulse-actions-buttons">
           {/* Main Play/Pause Button */}
           <button
-            className="aura-btn-primary"
+            className="aura-btn-primary pulse-main-play-btn"
             style={{
               width: 48,
               height: 48,
@@ -409,41 +410,30 @@ export default function LibraryView({
 
         {/* IN-PLAYLIST SEARCH BAR (Fast Filter) */}
         <div className="pulse-playlist-search">
-          <Search size={15} color="#94a3b8" />
+          <Search size={14} className="pulse-search-icon" />
           <input
             type="text"
-            placeholder="Search within playlist..."
+            placeholder="Find in playlist..."
             value={playlistFilter}
             onChange={(e) => setPlaylistFilter(e.target.value)}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              outline: 'none',
-              color: '#f8fafc',
-              fontSize: 13,
-              width: '100%',
-            }}
+            className="pulse-playlist-search-input"
           />
           {playlistFilter && (
             <button
+              type="button"
+              className="pulse-search-clear-btn"
               onClick={() => setPlaylistFilter('')}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#94a3b8',
-                cursor: 'pointer',
-                fontSize: 12,
-                padding: 0,
-              }}
+              title="Clear search"
+              aria-label="Clear search"
             >
-              Clear
+              <X size={12} />
             </button>
           )}
         </div>
       </div>
 
       {/* Tracks Table */}
-      <div style={{ padding: '8px 32px 40px 32px' }}>
+      <div className="pulse-tracks-container">
         {displayTracks.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94a3b8' }}>
             <p style={{ fontSize: 16, marginBottom: 8, color: '#f8fafc' }}>

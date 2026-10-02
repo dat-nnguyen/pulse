@@ -1813,3 +1813,119 @@ input[type="range"].eq-vertical-slider {
   color: var(--text-secondary);
   margin-bottom: 12px;
 }
+
+/* ==========================================================================
+   BUILT-IN YOUTUBE SEARCH & DISCOVERY
+   ========================================================================== */
+
+.youtube-search-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.youtube-search-bar {
+  display: flex;
+  align-items: center;
+  background: var(--pulse-bg-raised);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-pill);
+  padding: 4px 6px 4px 16px;
+  gap: 10px;
+  transition: all var(--transition);
+}
+
+.youtube-search-bar:focus-within {
+  border-color: var(--pulse-accent);
+  box-shadow: 0 0 0 3px rgba(0, 242, 254, 0.15);
+  background: var(--pulse-surface-active);
+}
+
+.youtube-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+}
+
+.youtube-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.youtube-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--pulse-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+
+.youtube-chip:hover {
+  background: var(--pulse-surface-hover);
+  color: var(--pulse-accent);
+  border-color: rgba(0, 242, 254, 0.3);
+}
+
+.youtube-result-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  background: var(--pulse-bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  transition: all var(--transition);
+}
+
+.youtube-result-card:hover {
+  background: var(--pulse-surface-hover);
+  border-color: var(--border-medium);
+  transform: translateY(-1px);
+}
+
+.youtube-thumb-wrapper {
+  position: relative;
+  width: 120px;
+  height: 68px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--pulse-bg);
+}
+
+.youtube-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.25s ease;
+}
+
+.youtube-result-card:hover .youtube-thumb-img {
+  transform: scale(1.05);
+}
+
+.youtube-duration-badge {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: rgba(0, 0, 0, 0.82);
+  color: #ffffff;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.3px;
+}

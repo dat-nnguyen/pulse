@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { handleDownload } from '../controllers/downloadController.js';
 import { handlePodcastFeed } from '../controllers/podcastController.js';
+import { handleSearch } from '../controllers/searchController.js';
 
 const router = Router();
 
@@ -15,6 +16,7 @@ router.get('/status', (req, res) => {
 });
 
 // Audio & Media Endpoints
+router.get('/search', handleSearch);
 router.post('/download', handleDownload);
 router.get('/podcast/feed', handlePodcastFeed);
 

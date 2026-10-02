@@ -14,7 +14,14 @@ import {
   FileAudio,
   Check,
   FolderPlus,
-  ListMusic
+  ListMusic,
+  Search,
+  ExternalLink,
+  Plus,
+  Flame,
+  ArrowRight,
+  X,
+  Link2,
 } from 'lucide-react';
 
 function YoutubeIcon({ size = 16 }) {
@@ -27,7 +34,23 @@ function YoutubeIcon({ size = 16 }) {
 
 import { downloadFromWebUrl, downloadMultipleFromWebUrls } from '../services/musicDownloaderService';
 import { parseAudioFile } from '../services/localFileParser';
-import { saveTrack, isTrackInPlaylist } from '../services/storageService';
+import {
+  saveTrack,
+  isTrackInPlaylist,
+  findDuplicateTrackInLibrary,
+} from '../services/storageService';
+import { searchYouTube } from '../services/youtubeSearchService';
+
+const DISCOVERY_CHIPS = [
+  { label: 'Top Hits', query: 'popular hits music 2026' },
+  { label: 'Daft Punk', query: 'Daft Punk' },
+  { label: 'The Weeknd', query: 'The Weeknd' },
+  { label: 'Lo-Fi Chill', query: 'lofi hip hop radio beats to relax study to' },
+  { label: 'Synthwave', query: 'synthwave chillwave retro' },
+  { label: 'Workout EDM', query: 'workout motivation edm gym music' },
+  { label: 'Deep Ambient', query: 'ambient sleep meditation chill' },
+  { label: 'Indie Vibes', query: 'indie alternative rock essentials' },
+];
 
 export default function DownloaderView({
   onTrackAdded,
@@ -40,16 +63,26 @@ export default function DownloaderView({
   onAddMultipleTracksToPlaylist,
   toast,
 }) {
-  const [activeTab, setActiveTab] = useState('youtube'); // 'youtube' | 'local'
+  const isInputUrl = (prefilledQuery || '').trim().startsWith('http');
+  const [activeTab, setActiveTab] = useState(isInputUrl ? 'youtube' : 'search'); // 'search' | 'youtube' | 'local'
   const [downloadMode, setDownloadMode] = useState('single'); // 'single' | 'batch'
+
+  // YouTube Search state
+  const [searchQuery, setSearchQuery] = useState(isInputUrl ? '' : prefilledQuery);
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState(null);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [downloadingSearchIds, setDownloadingSearchIds] = useState(new Set());
+  const [downloadedSearchIds, setDownloadedSearchIds] = useState(new Set());
 
   // Playlist Destination state
   const [selectedPlaylistId, setSelectedPlaylistId] = useState('');
   const selectedPlaylist = (playlists || []).find((p) => p.id === selectedPlaylistId);
 
   // Single Web download state
-  const [webUrl, setWebUrl] = useState('');
-  const [customTitle, setCustomTitle] = useState(prefilledQuery);
+  const [webUrl, setWebUrl] = useState(isInputUrl ? prefilledQuery : '');
+  const [customTitle, setCustomTitle] = useState('');
   const [customArtist, setCustomArtist] = useState('');
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(null);
@@ -74,7 +107,155 @@ export default function DownloaderView({
     .filter((u) => u.length > 0)
     .slice(0, 10);
 
-  // 1. Handle Single Web / YouTube Download
+  // 1. YouTube Search Handler
+  const executeSearch = async (queryText) => {
+    const q = (queryText ?? searchQuery).trim();
+    if (!q) return;
+
+    setIsSearching(true);
+    setSearchError(null);
+    setHasSearched(true);
+
+    try {
+      const items = await searchYouTube(q, 16);
+      setSearchResults(items);
+      if (items.length === 0) {
+        setSearchError(`No tracks found for "${q}". Try another artist or song title.`);
+      }
+    } catch (err) {
+      setSearchError(err.message || 'Unable to load search results. Please check your network or companion server.');
+      if (toast) {
+        toast.error(err.message || 'YouTube search failed', { title: 'Search Error' });
+      }
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    executeSearch();
+  };
+
+  const handleChipClick = (query) => {
+    setSearchQuery(query);
+    executeSearch(query);
+  };
+
+  // Helper to check if search result item is already in library or playlist
+  const checkItemInLibrary = (item) => {
+    const candidate = {
+      id: `yt_${item.id}`,
+      title: item.cleanTitle || item.title,
+      artist: item.cleanArtist || item.channel,
+      sourceUrl: item.url,
+    };
+    return findDuplicateTrackInLibrary(candidate, tracks);
+  };
+
+  const checkItemInPlaylist = (item) => {
+    if (!selectedPlaylist) return false;
+    const candidate = {
+      id: `yt_${item.id}`,
+      title: item.cleanTitle || item.title,
+      artist: item.cleanArtist || item.channel,
+      sourceUrl: item.url,
+    };
+    return isTrackInPlaylist(candidate, selectedPlaylist, tracks);
+  };
+
+  // 2. Action: Paste link and metadata into Single Downloader Tab
+  const handleUseInDownloader = (item) => {
+    setWebUrl(item.url);
+    setCustomTitle(item.cleanTitle || item.title);
+    setCustomArtist(item.cleanArtist || item.channel);
+    setActiveTab('youtube');
+    setDownloadMode('single');
+    if (toast) {
+      toast.success(`Pasted "${item.cleanTitle || item.title}" into Link Downloader!`, {
+        title: 'Link & Info Ready',
+      });
+    }
+  };
+
+  // 3. Action: 1-Click Fast Download directly from Search Card
+  const handleDirectDownloadFromSearch = async (item) => {
+    if (downloadingSearchIds.has(item.id)) return;
+
+    setDownloadingSearchIds((prev) => new Set([...prev, item.id]));
+    try {
+      const track = await downloadFromWebUrl(item.url, {
+        title: item.cleanTitle || item.title,
+        artist: item.cleanArtist || item.channel,
+      });
+
+      track.isDownloaded = true;
+      onTrackAdded(track, selectedPlaylistId);
+
+      let isDuplicate = false;
+      if (selectedPlaylist && selectedPlaylistId) {
+        if (isTrackInPlaylist(track, selectedPlaylist, tracks)) {
+          isDuplicate = true;
+        } else if (onAddTrackToPlaylist) {
+          onAddTrackToPlaylist(track.id, selectedPlaylistId);
+        }
+      }
+
+      setDownloadedSearchIds((prev) => new Set([...prev, item.id]));
+
+      if (toast) {
+        if (isDuplicate) {
+          toast.info(
+            `"${track.title}" saved to Offline Storage (already in "${selectedPlaylist.name}", skipped duplicate)`,
+            { title: 'Duplicate skipped in playlist' }
+          );
+        } else {
+          toast.success(
+            `"${track.title}" downloaded to ${selectedPlaylist ? `"${selectedPlaylist.name}" & Offline Storage` : 'Offline Storage'}!`,
+            { title: 'Download Complete' }
+          );
+        }
+      }
+    } catch (err) {
+      if (toast) {
+        toast.error(err.message || 'Download failed. Please try again.', { title: 'Download Error' });
+      }
+    } finally {
+      setDownloadingSearchIds((prev) => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
+    }
+  };
+
+  // 4. Action: Add to Batch Downloader List
+  const handleAddToBatch = (item) => {
+    const currentUrls = batchUrlsText
+      .split(/[\n,]/)
+      .map((u) => u.trim())
+      .filter((u) => u.length > 0);
+
+    if (currentUrls.includes(item.url)) {
+      if (toast) toast.info('This video link is already in your batch queue.', { title: 'Already In Batch' });
+      return;
+    }
+
+    if (currentUrls.length >= 10) {
+      if (toast) toast.warning('Batch downloader accepts a maximum of 10 tracks.', { title: 'Batch Full (10/10)' });
+      return;
+    }
+
+    const updated = batchUrlsText ? `${batchUrlsText.trim()}\n${item.url}` : item.url;
+    setBatchUrlsText(updated);
+    if (toast) {
+      toast.success(`Queued to Batch Downloader (${currentUrls.length + 1}/10)`, {
+        title: 'Added to Batch',
+      });
+    }
+  };
+
+  // 5. Handle Single Web / YouTube Download form submit
   const handleWebDownload = async (e) => {
     e.preventDefault();
     if (!webUrl.trim()) return;
@@ -139,7 +320,7 @@ export default function DownloaderView({
     }
   };
 
-  // 2. Handle Batch Web Download (Max 10)
+  // 6. Handle Batch Web Download (Max 10)
   const handleBatchDownload = async (e) => {
     e.preventDefault();
     if (parsedBatchUrls.length === 0) return;
@@ -202,7 +383,7 @@ export default function DownloaderView({
     }
   };
 
-  // 3. Local file upload (Max 10)
+  // 7. Local file upload (Max 10)
   const handleFiles = async (fileList) => {
     const rawFiles = Array.from(fileList).filter((f) =>
       /\.(mp3|wav|flac|m4a|ogg|aac)$/i.test(f.name)
@@ -212,7 +393,6 @@ export default function DownloaderView({
       return;
     }
 
-    // Enforce 10 files max
     const files = rawFiles.slice(0, 10);
     if (rawFiles.length > 10 && toast) {
       toast.info('Maximum 10 audio files per batch. Processing first 10 files.', { title: 'Batch Limit (10 files)' });
@@ -292,10 +472,10 @@ export default function DownloaderView({
             margin: '0 0 6px',
           }}
         >
-          Download & Upload Audio
+          Download & Search Audio
         </h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: 13.5, margin: 0 }}>
-          Download from YouTube/Web or upload local audio — multi-file batch (up to 10 files) with automatic cloud sync.
+          Find YouTube tracks with built-in search, paste links into the downloader, or upload local audio files.
         </p>
       </div>
 
@@ -442,11 +622,19 @@ export default function DownloaderView({
       {/* Main Tabs */}
       <div className="pulse-tab-bar" style={{ marginBottom: 18 }}>
         <button
+          className={`pulse-tab ${activeTab === 'search' ? 'active' : ''}`}
+          onClick={() => setActiveTab('search')}
+        >
+          <Search size={14} />
+          <span>YouTube Search</span>
+        </button>
+
+        <button
           className={`pulse-tab ${activeTab === 'youtube' ? 'active' : ''}`}
           onClick={() => setActiveTab('youtube')}
         >
           <YoutubeIcon size={14} />
-          <span>Web & YouTube</span>
+          <span>Link Downloader</span>
         </button>
 
         <button
@@ -458,9 +646,399 @@ export default function DownloaderView({
         </button>
       </div>
 
-      {/* TAB 1: YOUTUBE & WEB AUDIO */}
+      {/* TAB 1: BUILT-IN YOUTUBE SEARCH */}
+      {activeTab === 'search' && (
+        <div className="youtube-search-container" style={{ maxWidth: 780 }}>
+          {/* Search Bar */}
+          <form onSubmit={handleSearchSubmit} className="youtube-search-bar">
+            <Search size={18} color="var(--pulse-accent)" style={{ flexShrink: 0 }} />
+            <input
+              type="text"
+              placeholder="Search songs, artists, albums, or paste YouTube link..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="youtube-search-input"
+              autoFocus
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: 4,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+                title="Clear input"
+              >
+                <X size={15} />
+              </button>
+            )}
+            <button
+              type="submit"
+              disabled={isSearching || !searchQuery.trim()}
+              className="aura-btn-primary"
+              style={{
+                padding: '7px 18px',
+                fontSize: 12.5,
+                borderRadius: 'var(--radius-pill)',
+                flexShrink: 0,
+              }}
+            >
+              {isSearching ? (
+                <>
+                  <Loader2 size={14} className="spin" />
+                  <span>Searching...</span>
+                </>
+              ) : (
+                <span>Search</span>
+              )}
+            </button>
+          </form>
+
+          {/* Quick Discovery Chips */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              flexWrap: 'wrap',
+              margin: '2px 0 6px',
+            }}
+          >
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Flame size={12} color="var(--pulse-accent)" />
+              <span>Trending:</span>
+            </span>
+            {DISCOVERY_CHIPS.map((chip) => (
+              <button
+                key={chip.label}
+                type="button"
+                className="youtube-chip"
+                onClick={() => handleChipClick(chip.query)}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Loading Indicator */}
+          {isSearching && (
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '40px 20px',
+                gap: 12,
+                color: 'var(--text-secondary)',
+              }}
+            >
+              <Loader2 size={32} className="spin" color="var(--pulse-accent)" />
+              <span style={{ fontSize: 13.5, fontWeight: 600 }}>Searching YouTube tracks in real-time...</span>
+            </div>
+          )}
+
+          {/* Error Message */}
+          {searchError && !isSearching && (
+            <div className="pulse-status-banner error" style={{ margin: '8px 0' }}>
+              <AlertCircle size={18} />
+              <span>{searchError}</span>
+            </div>
+          )}
+
+          {/* Search Results List */}
+          {!isSearching && searchResults.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '0 4px',
+                }}
+              >
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-secondary)' }}>
+                  Found {searchResults.length} YouTube Tracks
+                </span>
+                <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                  Click "Paste Link" or "Download" directly
+                </span>
+              </div>
+
+              {searchResults.map((item) => {
+                const inLibrary = checkItemInLibrary(item);
+                const inPlaylist = checkItemInPlaylist(item);
+                const isItemDownloading = downloadingSearchIds.has(item.id);
+                const isItemDownloaded = downloadedSearchIds.has(item.id) || Boolean(inLibrary);
+
+                return (
+                  <div key={item.id} className="youtube-result-card">
+                    {/* Thumbnail */}
+                    <div className="youtube-thumb-wrapper">
+                      {item.thumbnail ? (
+                        <img
+                          src={item.thumbnail}
+                          alt={item.title}
+                          className="youtube-thumb-img"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            background: 'var(--pulse-surface)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <Music size={22} color="var(--text-muted)" />
+                        </div>
+                      )}
+                      {item.duration && (
+                        <span className="youtube-duration-badge">{item.duration}</span>
+                      )}
+                    </div>
+
+                    {/* Meta info */}
+                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span
+                          style={{
+                            color: '#ffffff',
+                            fontWeight: 700,
+                            fontSize: 13.5,
+                            lineHeight: 1.35,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            maxWidth: '100%',
+                          }}
+                          title={item.title}
+                        >
+                          {item.cleanTitle || item.title}
+                        </span>
+
+                        {/* Duplicate Badges */}
+                        {isItemDownloaded && (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 800,
+                              color: '#10b981',
+                              background: 'rgba(16, 185, 129, 0.14)',
+                              border: '1px solid rgba(16, 185, 129, 0.3)',
+                              padding: '1px 6px',
+                              borderRadius: 4,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 3,
+                            }}
+                          >
+                            <Check size={10} />
+                            <span>In Library</span>
+                          </span>
+                        )}
+
+                        {selectedPlaylist && inPlaylist && (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 800,
+                              color: 'var(--pulse-accent)',
+                              background: 'rgba(0, 242, 254, 0.12)',
+                              border: '1px solid rgba(0, 242, 254, 0.3)',
+                              padding: '1px 6px',
+                              borderRadius: 4,
+                            }}
+                          >
+                            ✓ In {selectedPlaylist.name}
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--pulse-accent-subtle, #a0aec0)' }}>
+                          {item.cleanArtist || item.channel}
+                        </span>
+                        {item.views && (
+                          <>
+                            <span style={{ color: 'var(--text-muted)' }}>•</span>
+                            <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{item.views}</span>
+                          </>
+                        )}
+                        {item.publishedTime && (
+                          <>
+                            <span style={{ color: 'var(--text-muted)' }}>•</span>
+                            <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{item.publishedTime}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Actions Column */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                      {/* Button 1: Paste Link into Downloader */}
+                      <button
+                        type="button"
+                        onClick={() => handleUseInDownloader(item)}
+                        className="aura-btn-secondary"
+                        style={{
+                          padding: '6px 12px',
+                          fontSize: 11.5,
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 5,
+                        }}
+                        title="Paste link and metadata directly into the Downloader tab"
+                      >
+                        <Link2 size={13} color="var(--pulse-accent)" />
+                        <span>Paste Link</span>
+                      </button>
+
+                      {/* Button 2: 1-Click Fast Download */}
+                      <button
+                        type="button"
+                        onClick={() => handleDirectDownloadFromSearch(item)}
+                        disabled={isItemDownloading}
+                        className="aura-btn-primary"
+                        style={{
+                          padding: '6px 14px',
+                          fontSize: 11.5,
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 5,
+                        }}
+                        title={selectedPlaylist ? `Download to "${selectedPlaylist.name}" & Offline Storage` : 'Download to Offline Storage'}
+                      >
+                        {isItemDownloading ? (
+                          <>
+                            <Loader2 size={13} className="spin" />
+                            <span>Extracting...</span>
+                          </>
+                        ) : isItemDownloaded ? (
+                          <>
+                            <CheckCircle size={13} color="#10b981" />
+                            <span>Saved</span>
+                          </>
+                        ) : (
+                          <>
+                            <Download size={13} />
+                            <span>Download</span>
+                          </>
+                        )}
+                      </button>
+
+                      {/* Button 3: Add to batch */}
+                      <button
+                        type="button"
+                        onClick={() => handleAddToBatch(item)}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid var(--border-subtle)',
+                          borderRadius: 'var(--radius-sm)',
+                          color: 'var(--text-secondary)',
+                          cursor: 'pointer',
+                          padding: '6px 8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          fontSize: 11,
+                          fontWeight: 600,
+                        }}
+                        title="Add link to batch downloader list"
+                      >
+                        <Plus size={13} />
+                        <span>Batch</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Initial Search Helper State */}
+          {!hasSearched && !isSearching && (
+            <div
+              style={{
+                background: 'var(--pulse-surface)',
+                border: '1px dashed var(--border-medium)',
+                borderRadius: 12,
+                padding: '36px 24px',
+                textAlign: 'center',
+                color: 'var(--text-secondary)',
+                marginTop: 8,
+              }}
+            >
+              <Search size={36} color="var(--pulse-accent)" style={{ margin: '0 auto 12px', display: 'block', opacity: 0.8 }} />
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 6px' }}>
+                Search YouTube Without Leaving Pulse
+              </h3>
+              <p style={{ fontSize: 13, maxWidth: 460, margin: '0 auto 18px', color: 'var(--text-muted)' }}>
+                Type any track name or artist above, or click one of the trending tags.
+                You can 1-click download tracks or paste links directly into the downloader.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 2: YOUTUBE & WEB LINK DOWNLOADER */}
       {activeTab === 'youtube' && (
         <div style={{ maxWidth: 640 }}>
+          {/* Shortcut Banner to YouTube Search */}
+          <div
+            style={{
+              background: 'linear-gradient(135deg, rgba(0, 242, 254, 0.08) 0%, rgba(79, 172, 254, 0.02) 100%)',
+              border: '1px solid rgba(0, 242, 254, 0.25)',
+              borderRadius: 10,
+              padding: '10px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 16,
+              gap: 12,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Search size={16} color="var(--pulse-accent)" />
+              <span style={{ fontSize: 12.5, color: 'var(--text-primary)', fontWeight: 600 }}>
+                Looking for a track? Find it in our built-in YouTube search without opening a browser.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('search')}
+              style={{
+                background: 'var(--pulse-accent)',
+                color: '#000000',
+                border: 'none',
+                borderRadius: 6,
+                padding: '5px 12px',
+                fontSize: 11.5,
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                flexShrink: 0,
+              }}
+            >
+              <span>Search YouTube</span>
+              <ArrowRight size={12} />
+            </button>
+          </div>
+
           {/* Sub-mode selector: Single vs Batch (Max 10) */}
           <div
             style={{
@@ -719,7 +1297,7 @@ export default function DownloaderView({
         </div>
       )}
 
-      {/* TAB 2: LOCAL FILE IMPORT (UP TO 10 FILES) */}
+      {/* TAB 3: LOCAL FILE IMPORT (UP TO 10 FILES) */}
       {activeTab === 'local' && (
         <div style={{ maxWidth: 640 }}>
           <div

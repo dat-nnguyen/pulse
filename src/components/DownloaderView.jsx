@@ -187,6 +187,10 @@ export default function DownloaderView({
       const track = await downloadFromWebUrl(item.url, {
         title: item.cleanTitle || item.title,
         artist: item.cleanArtist || item.channel,
+        coverUrl: item.thumbnail,
+        audioUrl: item.audioUrl || item.previewUrl,
+        previewUrl: item.previewUrl,
+        duration: item.durationSec || 180,
       });
 
       track.isDownloaded = true;

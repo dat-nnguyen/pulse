@@ -59,17 +59,18 @@ export async function saveTrack(track) {
 
 function resolveDeviceFetchTarget(url) {
   if (!url) return '';
-  const isCapacitorOrMobile = typeof window !== 'undefined' && (
-    window.location.protocol === 'capacitor:' ||
-    !!window.Capacitor ||
-    /iPad|iPhone|iPod|Android/.test(navigator.userAgent)
-  );
-  const backendBase = getBackendBaseUrl() || (isCapacitorOrMobile ? 'http://192.168.1.102:3030' : 'http://127.0.0.1:3030');
+  const backendBase = getBackendBaseUrl();
   if (url.startsWith('/audio/')) {
-    return `${backendBase}${url}`;
+    if (backendBase) {
+      return `${backendBase}${url}`;
+    }
+    if (typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {
+      return `${window.location.origin}${url}`;
+    }
+    return `http://127.0.0.1:3030${url}`;
   }
-  if (isCapacitorOrMobile && (url.includes('127.0.0.1:3030') || url.includes('localhost:3030'))) {
-    return url.replace(/http:\/\/(127\.0\.0\.1|localhost):3030/, backendBase);
+  if (backendBase && (url.includes('127.0.0.1:3030') || url.includes('localhost:3030') || url.includes('192.168.'))) {
+    return url.replace(/http:\/\/[^/]+(:3030)?/, backendBase);
   }
   return url;
 }

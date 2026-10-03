@@ -52,81 +52,126 @@ export async function downloadTrackToLocal(track, onProgress = () => {}) {
   }
 }
 
+let memoryBackendUrl = null;
+
 export function getBackendBaseUrl() {
-  const custom = typeof localStorage !== 'undefined' && typeof localStorage.getItem === 'function'
-    ? localStorage.getItem('pulse_backend_url')
-    : null;
-  if (custom && custom.trim()) return custom.trim().replace(/\/+$/, '');
+  if (memoryBackendUrl && memoryBackendUrl.trim()) {
+    return memoryBackendUrl.trim().replace(/\/+$/, '');
+  }
+
+  try {
+    const custom = typeof localStorage !== 'undefined' && typeof localStorage.getItem === 'function'
+      ? localStorage.getItem('pulse_backend_url')
+      : null;
+    if (custom && custom.trim()) return custom.trim().replace(/\/+$/, '');
+  } catch (e) {
+    // localStorage not accessible (e.g. Node or restricted iframe)
+  }
+
   const envUrl = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_BACKEND_URL : null;
   if (envUrl && envUrl.trim()) return envUrl.trim().replace(/\/+$/, '');
 
   if (typeof window !== 'undefined') {
     const isCapacitor = window.location.protocol === 'capacitor:' || !!window.Capacitor;
-    const isMobileDevice = /iPad|iPhone|iPod|Android/.test(navigator.userAgent) ||
-      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
-    // If running inside Capacitor on iOS/Android or on a mobile device without local host
-    if (isCapacitor || (isMobileDevice && (window.location.protocol === 'file:' || !window.location.host || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))) {
-      return 'http://192.168.1.102:3030';
+    // Running inside iOS/Android native app via Capacitor
+    if (isCapacitor) {
+      return 'http://10.11.217.214:3030';
     }
 
+    // Running inside Electron desktop packaged app (file://)
     if (window.location.protocol === 'file:' || !window.location.host) {
       return 'http://127.0.0.1:3030';
+    }
+
+    // Running in standard web browser on localhost or 127.0.0.1
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      // Relative URL "" routes through Vite dev proxy or same-origin server with zero CORS restrictions
+      return '';
+    }
+
+    // Running in web browser connected via LAN IP (e.g. http://10.11.217.214:5173 on phone)
+    if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(window.location.hostname)) {
+      return `http://${window.location.hostname}:3030`;
     }
   }
   return '';
 }
 
 export function setBackendBaseUrl(url) {
-  if (typeof localStorage !== 'undefined' && typeof localStorage.setItem === 'function') {
-    if (url && url.trim()) {
-      localStorage.setItem('pulse_backend_url', url.trim().replace(/\/+$/, ''));
-    } else {
-      localStorage.removeItem('pulse_backend_url');
+  memoryBackendUrl = url && url.trim() ? url.trim().replace(/\/+$/, '') : null;
+  try {
+    if (typeof localStorage !== 'undefined' && typeof localStorage.setItem === 'function') {
+      if (url && url.trim()) {
+        localStorage.setItem('pulse_backend_url', url.trim().replace(/\/+$/, ''));
+      } else {
+        localStorage.removeItem('pulse_backend_url');
+      }
     }
+  } catch (e) {
+    // Ignore localStorage access restrictions
   }
 }
 
 // Download from YouTube or direct URL via backend or direct audio stream
 export async function downloadFromWebUrl(inputUrl, customMeta = {}) {
-  const trimmedUrl = inputUrl.trim();
+  const trimmedUrl = (inputUrl || '').trim();
   const baseUrl = getBackendBaseUrl();
 
-  // 1. Try companion backend server (local Mac or cloud Render/Railway)
-  try {
-    const res = await fetch(`${baseUrl}/api/download`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: trimmedUrl, ...customMeta }),
-      signal: AbortSignal.timeout(90000), // Allow 90s for high-quality audio extraction
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.success && data.track) {
-        let track = data.track;
-        track.isDownloaded = true;
-        const effectiveHost = baseUrl || (typeof window !== 'undefined' && window.location.protocol === 'file:' ? 'http://127.0.0.1:3030' : '');
-        if (effectiveHost && track.audioUrl && track.audioUrl.startsWith('/audio/')) {
-          track.audioUrl = `${effectiveHost}${track.audioUrl}`;
-        }
-        return saveTrack(track);
-      }
-    } else {
-      const errData = await res.json().catch(() => ({}));
-      if (errData.error) {
-        throw new Error(errData.error);
-      }
-    }
-  } catch (backendErr) {
-    // If backend threw an explicit error from server
-    if (backendErr.message && !backendErr.message.includes('fetch') && !backendErr.message.includes('timeout')) {
-      throw backendErr;
-    }
-    // Otherwise backend server is not running or unreachable, proceed to fallback
+  // 1. Direct audio stream provided in customMeta (e.g. from 1-Click Search on web)
+  if (customMeta.audioUrl || customMeta.previewUrl) {
+    const directAudio = customMeta.audioUrl || customMeta.previewUrl;
+    const track = {
+      id: `track_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      title: customMeta.title || 'Web Audio Track',
+      artist: customMeta.artist || 'Web Artist',
+      album: customMeta.album || 'Web Audio Downloads',
+      audioUrl: directAudio,
+      coverUrl: customMeta.coverUrl || '',
+      duration: customMeta.duration || 180,
+      bitrate: '256 kbps High-Fidelity',
+      format: 'M4A',
+      type: 'music',
+      isDownloaded: true,
+    };
+    return downloadTrackToLocal(track);
   }
 
-  // 2. Direct Audio URL (.mp3, .m4a, .flac, .wav, .ogg, .aac)
+  // 2. Try companion backend server (local Mac or cloud Render/Railway)
+  if (baseUrl || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))) {
+    try {
+      const res = await fetch(`${baseUrl}/api/download`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: trimmedUrl, ...customMeta }),
+        signal: AbortSignal.timeout(90000), // Allow 90s for high-quality audio extraction
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.success && data.track) {
+          let track = data.track;
+          track.isDownloaded = true;
+          const effectiveHost = baseUrl || (typeof window !== 'undefined' && window.location.protocol === 'file:' ? 'http://127.0.0.1:3030' : '');
+          if (effectiveHost && track.audioUrl && track.audioUrl.startsWith('/audio/')) {
+            track.audioUrl = `${effectiveHost}${track.audioUrl}`;
+          }
+          return saveTrack(track);
+        }
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        if (errData.error) {
+          throw new Error(errData.error);
+        }
+      }
+    } catch (backendErr) {
+      if (backendErr.message && !backendErr.message.includes('fetch') && !backendErr.message.includes('timeout')) {
+        throw backendErr;
+      }
+    }
+  }
+
+  // 3. Direct Audio URL (.mp3, .m4a, .flac, .wav, .ogg, .aac)
   const isDirectAudio = /\.(mp3|m4a|wav|flac|ogg|aac)(\?.*)?$/i.test(trimmedUrl);
   if (isDirectAudio) {
     const rawFilename = trimmedUrl.split('/').pop().split('?')[0];
@@ -155,15 +200,47 @@ export async function downloadFromWebUrl(inputUrl, customMeta = {}) {
     return downloadTrackToLocal(track);
   }
 
-  // 3. YouTube link on standalone web / Vercel without local backend server
+  // 4. Standalone Web Fallback for YouTube or title queries
+  if (customMeta.title || customMeta.artist) {
+    try {
+      const searchRes = await fetch(
+        `https://itunes.apple.com/search?term=${encodeURIComponent(`${customMeta.artist || ''} ${customMeta.title || ''}`.trim())}&entity=song&limit=1`,
+        { signal: AbortSignal.timeout(6000) }
+      );
+      if (searchRes.ok) {
+        const searchData = await searchRes.json();
+        const topSong = searchData.results?.[0];
+        if (topSong && topSong.previewUrl) {
+          const track = {
+            id: `web_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            title: topSong.trackName || customMeta.title,
+            artist: topSong.artistName || customMeta.artist,
+            album: topSong.collectionName || 'Web Audio Downloads',
+            audioUrl: topSong.previewUrl,
+            coverUrl: topSong.artworkUrl100 ? topSong.artworkUrl100.replace('100x100bb', '600x600bb') : '',
+            duration: Math.round((topSong.trackTimeMillis || 180000) / 1000),
+            bitrate: '256 kbps High-Fidelity',
+            format: 'M4A',
+            type: 'music',
+            isDownloaded: true,
+          };
+          return downloadTrackToLocal(track);
+        }
+      }
+    } catch (e) {
+      // Continue to final error
+    }
+  }
+
+  // 5. Friendly guidance if offline without companion backend
   const isYouTube = /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/i.test(trimmedUrl);
   if (isYouTube) {
     throw new Error(
-      'YouTube audio extraction requires the Pulse local server running on your Mac (run "npm run server" in terminal). Alternatively, you can paste any direct .mp3 / .m4a link or import local files directly!'
+      'To extract full YouTube audio, please connect the Pulse Companion Server in Sync & Wi-Fi settings, or use the Search tab for instant 1-click web music downloads!'
     );
   }
 
-  throw new Error('Please enter a valid YouTube link or direct audio URL (.mp3, .m4a, .flac).');
+  throw new Error('Please enter a valid music title, YouTube link, or direct audio URL (.mp3, .m4a, .flac).');
 }
 
 // Download up to 10 tracks from a list of URLs

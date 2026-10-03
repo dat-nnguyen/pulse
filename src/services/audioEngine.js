@@ -78,22 +78,28 @@ class AudioEngine {
       const mediaErr = this.audio.error;
       console.warn('Audio playback error:', mediaErr ? `code ${mediaErr.code}: ${mediaErr.message}` : e);
 
-      // Automatic blob fallback: if blob URL failed, fallback to local/server URL
+      // Multi-step fallback 1: If current src was local /audio/ or failed, try cloudAudioUrl if available
+      if (this.currentTrack?.cloudAudioUrl && this.audio.src !== this.currentTrack.cloudAudioUrl) {
+        console.log('Local stream failed, falling back to Supabase Cloud Audio URL...');
+        this.audio.removeAttribute('crossOrigin');
+        this.audio.src = this.currentTrack.cloudAudioUrl;
+        this.audio.load();
+        if (this.isPlaying) {
+          this.audio.play().catch((playErr) => console.warn('Cloud audio fallback play error:', playErr));
+        }
+        return;
+      }
+
+      // Multi-step fallback 2: Automatic blob fallback: if blob URL failed, fallback to local/server URL
       if (this.currentBlobUrl && (this.currentTrack?.localAudioUrl || this.currentTrack?.audioUrl)) {
         console.warn('Blob audio failed, falling back to direct server URL...');
         this.currentBlobUrl = null;
         let fallbackSrc = this.currentTrack.localAudioUrl || this.currentTrack.audioUrl;
-        const isCapacitorOrMobile = typeof window !== 'undefined' && (
-          window.location.protocol === 'capacitor:' ||
-          !!window.Capacitor ||
-          /iPad|iPhone|iPod|Android/.test(navigator.userAgent)
-        );
-        const backendBase = getBackendBaseUrl() || (isCapacitorOrMobile ? 'http://192.168.1.102:3030' : 'http://127.0.0.1:3030');
-        if (fallbackSrc.startsWith('/audio/')) {
+        const backendBase = getBackendBaseUrl();
+        if (fallbackSrc.startsWith('/audio/') && backendBase) {
           fallbackSrc = `${backendBase}${fallbackSrc}`;
-        } else if (isCapacitorOrMobile && (fallbackSrc.includes('127.0.0.1:3030') || fallbackSrc.includes('localhost:3030'))) {
-          fallbackSrc = fallbackSrc.replace(/http:\/\/(127\.0\.0\.1|localhost):3030/, backendBase);
         }
+        this.audio.removeAttribute('crossOrigin');
         this.audio.src = fallbackSrc;
         this.audio.load();
         if (this.isPlaying) {
@@ -102,7 +108,7 @@ class AudioEngine {
         return;
       }
 
-      // Automatic CORS fallback: if failed with crossOrigin, retry without crossOrigin
+      // Multi-step fallback 3: Automatic CORS fallback: if failed with crossOrigin, retry without crossOrigin
       if (this.audio.crossOrigin) {
         console.log('CORS playback issue detected. Retrying without crossOrigin attribute...');
         this.audio.removeAttribute('crossOrigin');
@@ -232,16 +238,11 @@ class AudioEngine {
     const artwork = [];
     if (track.coverUrl) {
       let resolvedCover = track.coverUrl;
-      const isCapacitorOrMobile = typeof window !== 'undefined' && (
-        window.location.protocol === 'capacitor:' ||
-        !!window.Capacitor ||
-        /iPad|iPhone|iPod|Android/.test(navigator.userAgent)
-      );
-      const backendBase = getBackendBaseUrl() || (isCapacitorOrMobile ? 'http://192.168.1.102:3030' : 'http://127.0.0.1:3030');
+      const backendBase = getBackendBaseUrl();
       if (resolvedCover.startsWith('/audio/')) {
-        resolvedCover = `${backendBase}${resolvedCover}`;
-      } else if (isCapacitorOrMobile && (resolvedCover.includes('127.0.0.1:3030') || resolvedCover.includes('localhost:3030'))) {
-        resolvedCover = resolvedCover.replace(/http:\/\/(127\.0\.0\.1|localhost):3030/, backendBase);
+        resolvedCover = backendBase ? `${backendBase}${resolvedCover}` : (typeof window !== 'undefined' ? `${window.location.origin}${resolvedCover}` : resolvedCover);
+      } else if (backendBase && (resolvedCover.includes('127.0.0.1:3030') || resolvedCover.includes('localhost:3030') || resolvedCover.includes('192.168.'))) {
+        resolvedCover = resolvedCover.replace(/http:\/\/[^/]+(:3030)?/, backendBase);
       }
       artwork.push(
         { src: resolvedCover, sizes: '96x96', type: 'image/png' },
@@ -300,6 +301,8 @@ class AudioEngine {
       this.currentBlobUrl = URL.createObjectURL(track.audioBlob);
       src = this.currentBlobUrl;
       isLocalBlob = true;
+    } else if (track.cloudAudioUrl && track.cloudAudioUrl.startsWith('http')) {
+      src = track.cloudAudioUrl;
     } else {
       src = track.localAudioUrl || track.audioUrl || '';
     }
@@ -308,20 +311,27 @@ class AudioEngine {
       /iPad|iPhone|iPod/.test(navigator.userAgent) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
     );
-    const isCapacitorOrMobile = typeof window !== 'undefined' && (
-      window.location.protocol === 'capacitor:' ||
-      !!window.Capacitor ||
-      isIOS ||
-      /Android/.test(navigator.userAgent)
-    );
 
-    const backendBase = getBackendBaseUrl() || (isCapacitorOrMobile ? 'http://192.168.1.102:3030' : 'http://127.0.0.1:3030');
+    const backendBase = getBackendBaseUrl();
 
-    // If relative audio path, resolve to local backend server
+    // If relative audio path, resolve to local backend server or same-origin
     if (src && src.startsWith('/audio/')) {
-      src = `${backendBase}${src}`;
-    } else if (src && isCapacitorOrMobile && (src.includes('127.0.0.1:3030') || src.includes('localhost:3030'))) {
-      src = src.replace(/http:\/\/(127\.0\.0\.1|localhost):3030/, backendBase);
+      if (backendBase) {
+        src = `${backendBase}${src}`;
+      } else if (typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {
+        src = `${window.location.origin}${src}`;
+      } else {
+        src = `http://127.0.0.1:3030${src}`;
+      }
+    } else if (src && backendBase && (src.includes('127.0.0.1:3030') || src.includes('localhost:3030') || src.includes('192.168.'))) {
+      src = src.replace(/http:\/\/[^/]+(:3030)?/, backendBase);
+    }
+
+    // Avoid Mixed Content error if page is loaded on HTTPS:
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && src.startsWith('http://')) {
+      if (track.cloudAudioUrl && track.cloudAudioUrl.startsWith('https://')) {
+        src = track.cloudAudioUrl;
+      }
     }
 
     // Blob and data URLs must NEVER have crossOrigin set in WebKit/Chromium

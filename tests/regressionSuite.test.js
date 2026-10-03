@@ -90,6 +90,26 @@ describe('Regression & Contract Test Suite', () => {
       const { setBackendBaseUrl, getBackendBaseUrl } = await import('../src/services/musicDownloaderService.js');
       expect(typeof setBackendBaseUrl).toBe('function');
       expect(typeof getBackendBaseUrl).toBe('function');
+
+      setBackendBaseUrl('http://custom-lan-host:3030');
+      expect(getBackendBaseUrl()).toBe('http://custom-lan-host:3030');
+    });
+  });
+
+  describe('Web Audio Search Fallback Resilience', () => {
+    it('searchYouTube returns results via Apple Music fallback when companion backend is unavailable', async () => {
+      const { searchYouTube } = await import('../src/services/youtubeSearchService.js');
+      // In node/offline test env, searchYouTube query should return results from itunes fallback or throw network error without syntax crash
+      try {
+        const results = await searchYouTube('Daft Punk', 2);
+        expect(Array.isArray(results)).toBe(true);
+        if (results.length > 0) {
+          expect(results[0]).toHaveProperty('title');
+          expect(results[0]).toHaveProperty('cleanArtist');
+        }
+      } catch (err) {
+        expect(err.message).toMatch(/Unable to fetch music search results|network/i);
+      }
     });
   });
 

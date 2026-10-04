@@ -24,7 +24,7 @@ export default function ShareModal({ isOpen, onClose, tracks = [], playlists = [
     if (typeof window !== 'undefined' && window.location.hostname && window.location.hostname !== 'localhost') {
       return `http://${window.location.hostname}:3030`;
     }
-    return 'http://10.11.217.214:3030';
+    return 'http://192.168.1.102:3030';
   });
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState(null);
@@ -183,7 +183,7 @@ export default function ShareModal({ isOpen, onClose, tracks = [], playlists = [
               type="text"
               value={backendUrl}
               onChange={(e) => setBackendUrlState(e.target.value)}
-              placeholder="http://10.11.217.214:3030"
+              placeholder="http://192.168.1.102:3030"
               className="pulse-input"
               style={{ flex: 1, padding: '10px 14px', fontSize: 13 }}
             />

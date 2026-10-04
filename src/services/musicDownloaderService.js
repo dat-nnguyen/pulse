@@ -76,7 +76,7 @@ export function getBackendBaseUrl() {
 
     // Running inside iOS/Android native app via Capacitor
     if (isCapacitor) {
-      return 'http://10.11.217.214:3030';
+      return 'http://192.168.1.102:3030';
     }
 
     // Running inside Electron desktop packaged app (file://)
@@ -90,7 +90,7 @@ export function getBackendBaseUrl() {
       return '';
     }
 
-    // Running in web browser connected via LAN IP (e.g. http://10.11.217.214:5173 on phone)
+    // Running in web browser connected via LAN IP (e.g. http://192.168.1.102:5173 on phone)
     if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(window.location.hostname)) {
       return `http://${window.location.hostname}:3030`;
     }

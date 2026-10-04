@@ -1,6 +1,23 @@
 // Audio Engine with Web Audio API Equalizer, Visualizer, and MediaSession lock-screen controls
 import { getBackendBaseUrl } from './musicDownloaderService.js';
 
+const SUPABASE_STORAGE_AUDIO = 'https://wtrlpbumpwtauvxqwrrg.supabase.co/storage/v1/object/public/audio-files/audio';
+
+export function getCloudFallbackUrl(track) {
+  if (track?.cloudAudioUrl && track.cloudAudioUrl.startsWith('http')) {
+    return track.cloudAudioUrl;
+  }
+  const raw = track?.audioUrl || track?.localAudioUrl || '';
+  if (raw.startsWith('https://') || (raw.startsWith('http://') && !raw.includes('127.0.0.1') && !raw.includes('localhost') && !raw.includes('192.168.') && !raw.includes('10.11.'))) {
+    return raw;
+  }
+  if (raw.includes('/audio/')) {
+    const filename = raw.split('/audio/').pop();
+    if (filename) return `${SUPABASE_STORAGE_AUDIO}/${filename}`;
+  }
+  return null;
+}
+
 class AudioEngine {
   constructor() {
     this.audio = new Audio();
@@ -35,8 +52,35 @@ class AudioEngine {
       eqChange: [],
     };
 
+    this.hasUnlockedAudio = false;
     this.setupAudioListeners();
     this.setupMediaSession();
+    this.unlockAudioForIOS();
+  }
+
+  unlockAudioForIOS() {
+    if (this.hasUnlockedAudio || typeof window === 'undefined') return;
+    const unlock = () => {
+      if (this.hasUnlockedAudio) return;
+      this.hasUnlockedAudio = true;
+      if (this.audioCtx && this.audioCtx.state === 'suspended') {
+        this.audioCtx.resume().catch(() => {});
+      }
+      if (!this.audio.src) {
+        // Silent 1-sample WAV to prime WebKit media playback pipeline on first touch
+        this.audio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+        this.audio.play().then(() => {
+          this.audio.pause();
+          this.audio.src = '';
+        }).catch(() => {});
+      }
+      window.removeEventListener('touchstart', unlock, true);
+      window.removeEventListener('touchend', unlock, true);
+      window.removeEventListener('click', unlock, true);
+    };
+    window.addEventListener('touchstart', unlock, { capture: true, passive: true });
+    window.addEventListener('touchend', unlock, { capture: true, passive: true });
+    window.addEventListener('click', unlock, { capture: true, passive: true });
   }
 
   setupAudioListeners() {
@@ -79,10 +123,11 @@ class AudioEngine {
       console.warn('Audio playback error:', mediaErr ? `code ${mediaErr.code}: ${mediaErr.message}` : e);
 
       // Multi-step fallback 1: If current src was local /audio/ or failed, try cloudAudioUrl if available
-      if (this.currentTrack?.cloudAudioUrl && this.audio.src !== this.currentTrack.cloudAudioUrl) {
-        console.log('Local stream failed, falling back to Supabase Cloud Audio URL...');
+      const cloudFallback = getCloudFallbackUrl(this.currentTrack);
+      if (cloudFallback && this.audio.src !== cloudFallback) {
+        console.log('Playback stream failed, falling back to Supabase Cloud Audio CDN URL...');
         this.audio.removeAttribute('crossOrigin');
-        this.audio.src = this.currentTrack.cloudAudioUrl;
+        this.audio.src = cloudFallback;
         this.audio.load();
         if (this.isPlaying) {
           this.audio.play().catch((playErr) => console.warn('Cloud audio fallback play error:', playErr));
@@ -283,10 +328,16 @@ class AudioEngine {
     this.initWebAudio();
 
     if (this.audioCtx && this.audioCtx.state === 'suspended') {
-      try {
-        await this.audioCtx.resume();
-      } catch (e) {}
+      this.audioCtx.resume().catch(() => {});
     }
+
+    const isIOS = typeof navigator !== 'undefined' && (
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    );
+    const isCapacitor = typeof window !== 'undefined' && (
+      window.location.protocol === 'capacitor:' || !!window.Capacitor
+    );
 
     // Determine audio URL (blob url or streaming url)
     let src = '';
@@ -307,30 +358,35 @@ class AudioEngine {
       src = track.localAudioUrl || track.audioUrl || '';
     }
 
-    const isIOS = typeof navigator !== 'undefined' && (
-      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-    );
-
     const backendBase = getBackendBaseUrl();
+    const cloudUrl = getCloudFallbackUrl(track);
 
-    // If relative audio path, resolve to local backend server or same-origin
-    if (src && src.startsWith('/audio/')) {
+    // On iPhone (iOS or Capacitor native app), prioritize high-speed Supabase CDN stream
+    // so playback starts instantly without waiting for or timing out on local Mac LAN IP
+    if ((isIOS || isCapacitor) && !isLocalBlob) {
+      if (cloudUrl) {
+        src = cloudUrl;
+      } else if (src.startsWith('/audio/')) {
+        src = backendBase ? `${backendBase}${src}` : `${SUPABASE_STORAGE_AUDIO}/${src.split('/audio/').pop()}`;
+      }
+    } else if (src && src.startsWith('/audio/')) {
       if (backendBase) {
         src = `${backendBase}${src}`;
-      } else if (typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {
+      } else if (cloudUrl) {
+        src = cloudUrl;
+      } else if (typeof window !== 'undefined' && window.location.protocol.startsWith('http') && !isCapacitor) {
         src = `${window.location.origin}${src}`;
       } else {
         src = `http://127.0.0.1:3030${src}`;
       }
-    } else if (src && backendBase && (src.includes('127.0.0.1:3030') || src.includes('localhost:3030') || src.includes('192.168.'))) {
+    } else if (src && backendBase && (src.includes('127.0.0.1:3030') || src.includes('localhost:3030') || src.includes('192.168.') || src.includes('10.11.'))) {
       src = src.replace(/http:\/\/[^/]+(:3030)?/, backendBase);
     }
 
     // Avoid Mixed Content error if page is loaded on HTTPS:
     if (typeof window !== 'undefined' && window.location.protocol === 'https:' && src.startsWith('http://')) {
-      if (track.cloudAudioUrl && track.cloudAudioUrl.startsWith('https://')) {
-        src = track.cloudAudioUrl;
+      if (cloudUrl && cloudUrl.startsWith('https://')) {
+        src = cloudUrl;
       }
     }
 

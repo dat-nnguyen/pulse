@@ -95,21 +95,38 @@ export async function fetchTracksFromSupabase() {
     return [];
   }
 
-  return (data || []).map((row) => ({
-    id: row.id,
-    title: row.title,
-    artist: row.artist,
-    album: row.album,
-    duration: row.duration,
-    coverUrl: row.cover_url,
-    audioUrl: row.audio_url,
-    bitrate: row.bitrate,
-    format: row.format,
-    type: row.type,
-    lyrics: row.lyrics,
-    addedAt: new Date(row.created_at).getTime(),
-    isCloudSynced: true,
-  }));
+  const clientCreds = getSupabaseCredentials();
+  const storageBase = clientCreds.url ? `${clientCreds.url}/storage/v1/object/public/audio-files/audio` : '';
+
+  return (data || []).map((row) => {
+    let cloudAudioUrl = null;
+    let audioUrl = row.audio_url || '';
+
+    if (audioUrl.startsWith('http://') || audioUrl.startsWith('https://')) {
+      cloudAudioUrl = audioUrl;
+    } else if (audioUrl.includes('/audio/') && storageBase) {
+      const filename = audioUrl.split('/audio/').pop();
+      cloudAudioUrl = `${storageBase}/${filename}`;
+    }
+
+    return {
+      id: row.id,
+      title: row.title,
+      artist: row.artist,
+      album: row.album,
+      duration: row.duration,
+      coverUrl: row.cover_url,
+      audioUrl: cloudAudioUrl || audioUrl,
+      cloudAudioUrl: cloudAudioUrl,
+      localAudioUrl: audioUrl.startsWith('/audio/') ? audioUrl : null,
+      bitrate: row.bitrate,
+      format: row.format,
+      type: row.type,
+      lyrics: row.lyrics,
+      addedAt: new Date(row.created_at).getTime(),
+      isCloudSynced: true,
+    };
+  });
 }
 
 // Fetch all playlists from Supabase

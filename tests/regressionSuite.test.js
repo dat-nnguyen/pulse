@@ -110,6 +110,29 @@ describe('Regression & Contract Test Suite', () => {
       } catch (err) {
         expect(err.message).toMatch(/Unable to fetch music search results|network/i);
       }
+    }, 15000);
+  });
+
+  describe('Cloud Audio CDN Fallback for Mobile and Web', () => {
+    it('correctly maps relative /audio/ paths to public Supabase CDN URLs', async () => {
+      const { getCloudFallbackUrl } = await import('../src/services/audioEngine.js');
+      expect(typeof getCloudFallbackUrl).toBe('function');
+
+      const track = {
+        id: 'track_123',
+        audioUrl: '/audio/track_123.m4a',
+      };
+      const cloudUrl = getCloudFallbackUrl(track);
+      expect(cloudUrl).toBe('https://wtrlpbumpwtauvxqwrrg.supabase.co/storage/v1/object/public/audio-files/audio/track_123.m4a');
+    });
+
+    it('preserves existing https cloud URLs without mangling', async () => {
+      const { getCloudFallbackUrl } = await import('../src/services/audioEngine.js');
+      const track = {
+        id: 'track_456',
+        cloudAudioUrl: 'https://cdn.example.com/audio.mp3',
+      };
+      expect(getCloudFallbackUrl(track)).toBe('https://cdn.example.com/audio.mp3');
     });
   });
 

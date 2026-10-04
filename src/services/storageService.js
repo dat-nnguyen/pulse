@@ -64,12 +64,13 @@ function resolveDeviceFetchTarget(url) {
     if (backendBase) {
       return `${backendBase}${url}`;
     }
-    if (typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {
+    if (typeof window !== 'undefined' && window.location.protocol.startsWith('http') && !window.location.protocol.startsWith('capacitor')) {
       return `${window.location.origin}${url}`;
     }
-    return `http://127.0.0.1:3030${url}`;
+    const filename = url.split('/audio/').pop();
+    return `https://wtrlpbumpwtauvxqwrrg.supabase.co/storage/v1/object/public/audio-files/audio/${filename}`;
   }
-  if (backendBase && (url.includes('127.0.0.1:3030') || url.includes('localhost:3030') || url.includes('192.168.'))) {
+  if (backendBase && (url.includes('127.0.0.1:3030') || url.includes('localhost:3030') || url.includes('192.168.') || url.includes('10.11.'))) {
     return url.replace(/http:\/\/[^/]+(:3030)?/, backendBase);
   }
   return url;
@@ -185,11 +186,14 @@ export async function syncLibraryWithCloud(force = false) {
     // Put / update all cloud tracks into local IndexedDB
     for (const ct of cloudTracks) {
       const local = localTrackMap.get(ct.id);
+      const resolvedCloudUrl = ct.cloudAudioUrl || local?.cloudAudioUrl;
       const merged = {
         ...ct,
         // Retain local audioBlob for instant zero-latency playback if cached
         audioBlob: local?.audioBlob || ct.audioBlob,
         localAudioUrl: local?.localAudioUrl || (ct.audioUrl && (ct.audioUrl.startsWith('/audio/') || ct.audioUrl.includes('localhost') || ct.audioUrl.includes('127.0.0.1')) ? ct.audioUrl : null),
+        cloudAudioUrl: resolvedCloudUrl,
+        audioUrl: resolvedCloudUrl || ct.audioUrl,
         isDownloaded: Boolean(
           local?.isDownloaded ||
           local?.audioBlob ||

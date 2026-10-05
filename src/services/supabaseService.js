@@ -1,5 +1,5 @@
-import { getSupabaseClient, isSupabaseConfigured } from './supabaseClient';
-export { isSupabaseConfigured };
+import { getSupabaseClient, isSupabaseConfigured, getSupabaseCredentials } from './supabaseClient';
+export { isSupabaseConfigured, getSupabaseCredentials };
 
 // Upload audio blob/file to Supabase Storage Bucket ('audio-files')
 export async function uploadAudioToSupabaseStorage(trackId, fileBlob, filename = 'track.mp3') {

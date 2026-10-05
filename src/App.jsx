@@ -452,7 +452,7 @@ export default function App() {
 
     const unsubError = audioEngine.on('error', (err) => {
       console.warn('Audio playback error handled in App:', err);
-      toast('Playback error. Please check audio file or network connection.', 'error');
+      toast?.error?.('Playback error. Please check audio file or network connection.');
     });
 
     return () => {

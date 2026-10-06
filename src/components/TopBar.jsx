@@ -10,6 +10,7 @@ import {
   User,
   LogIn,
   Activity,
+  Loader2,
 } from 'lucide-react';
 import { isSupabaseConfigured } from '../services/supabaseClient';
 
@@ -28,6 +29,7 @@ export default function TopBar({
   onGoBack,
   onGoForward,
   onGoHome,
+  activeDownloads = { isDownloading: false, count: 0 },
 }) {
   const isCloudConnected = isSupabaseConfigured();
 
@@ -178,6 +180,20 @@ export default function TopBar({
           >
             <LogIn size={14} />
             <span>Sign In to Sync</span>
+          </button>
+        )}
+
+        {/* Active Background Downloads Pill */}
+        {activeDownloads && activeDownloads.isDownloading && (
+          <button
+            onClick={onOpenDownloader}
+            className="pulse-downloading-pill"
+            title="Download running in background. Click to view progress."
+          >
+            <Loader2 size={13} className="spin" color="#00f2fe" />
+            <span>
+              Downloading ({activeDownloads.count || 1} active)...
+            </span>
           </button>
         )}
 

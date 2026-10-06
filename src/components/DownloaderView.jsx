@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Download,
   UploadCloud,
@@ -8,6 +8,10 @@ import {
   Sparkles,
   Music,
   Play,
+  Pause,
+  Volume2,
+  VolumeX,
+  Headphones,
   HardDriveDownload,
   ListOrdered,
   Layers,
@@ -40,6 +44,13 @@ import {
   findDuplicateTrackInLibrary,
 } from '../services/storageService';
 import { searchYouTube } from '../services/youtubeSearchService';
+import { resolvePreviewSource } from '../services/previewAudioService';
+import { audioEngine } from '../services/audioEngine';
+import {
+  getSearchSession,
+  saveSearchSession,
+  clearSearchSession,
+} from '../services/searchSessionService';
 
 const DISCOVERY_CHIPS = [
   { label: 'Top Hits', query: 'popular hits music 2026' },
@@ -62,19 +73,260 @@ export default function DownloaderView({
   onAddTrackToPlaylist,
   onAddMultipleTracksToPlaylist,
   toast,
+  onDownloadStatusChange,
 }) {
+  const savedSession = getSearchSession();
   const isInputUrl = (prefilledQuery || '').trim().startsWith('http');
-  const [activeTab, setActiveTab] = useState(isInputUrl ? 'youtube' : 'search'); // 'search' | 'youtube' | 'local'
+  const [activeTab, setActiveTab] = useState(
+    isInputUrl ? 'youtube' : (savedSession?.activeTab || 'search')
+  );
   const [downloadMode, setDownloadMode] = useState('single'); // 'single' | 'batch'
 
-  // YouTube Search state
-  const [searchQuery, setSearchQuery] = useState(isInputUrl ? '' : prefilledQuery);
-  const [searchResults, setSearchResults] = useState([]);
+  // YouTube Search state (persisted across tab changes and reloads)
+  const [searchQuery, setSearchQuery] = useState(
+    isInputUrl ? '' : (prefilledQuery || savedSession?.query || '')
+  );
+  const [searchResults, setSearchResults] = useState(savedSession?.results || []);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState(null);
-  const [hasSearched, setHasSearched] = useState(false);
+  const [hasSearched, setHasSearched] = useState(
+    Boolean(savedSession?.hasSearched || (savedSession?.results && savedSession.results.length > 0))
+  );
   const [downloadingSearchIds, setDownloadingSearchIds] = useState(new Set());
-  const [downloadedSearchIds, setDownloadedSearchIds] = useState(new Set());
+  const [downloadedSearchIds, setDownloadedSearchIds] = useState(
+    new Set(savedSession?.downloadedIds || [])
+  );
+
+  // Sound Testing / Audio Preview state
+  const [previewState, setPreviewState] = useState({
+    activeId: null,
+    isPlaying: false,
+    isLoading: false,
+    currentTime: 0,
+    duration: 30,
+    volume: 0.85,
+    isMuted: false,
+    error: null,
+    sourceType: 'audio', // 'audio' | 'youtube_embed'
+    embedUrl: null,
+  });
+
+  const previewAudioRef = useRef(null);
+
+  // Audio Preview Event Listeners & Lifecycle
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const audio = new Audio();
+    audio.preload = 'auto';
+    previewAudioRef.current = audio;
+
+    const onTimeUpdate = () => {
+      setPreviewState((prev) => ({
+        ...prev,
+        currentTime: audio.currentTime || 0,
+        duration: audio.duration && !isNaN(audio.duration) && isFinite(audio.duration) ? audio.duration : prev.duration,
+      }));
+    };
+
+    const onEnded = () => {
+      setPreviewState((prev) => ({
+        ...prev,
+        isPlaying: false,
+        currentTime: 0,
+      }));
+    };
+
+    const onError = () => {
+      setPreviewState((prev) => {
+        if (!prev.activeId) return prev;
+        const currentItem = searchResults.find((r) => r.id === prev.activeId);
+        if (currentItem && currentItem.id && !currentItem.id.startsWith('apple_') && prev.sourceType === 'audio') {
+          return {
+            ...prev,
+            sourceType: 'youtube_embed',
+            embedUrl: `https://www.youtube-nocookie.com/embed/${currentItem.id}?autoplay=1&enablejsapi=1`,
+            isLoading: false,
+            isPlaying: true,
+            error: null,
+          };
+        }
+        return {
+          ...prev,
+          isLoading: false,
+          isPlaying: false,
+          error: 'Preview audio could not be played.',
+        };
+      });
+    };
+
+    audio.addEventListener('timeupdate', onTimeUpdate);
+    audio.addEventListener('ended', onEnded);
+    audio.addEventListener('error', onError);
+
+    return () => {
+      audio.removeEventListener('timeupdate', onTimeUpdate);
+      audio.removeEventListener('ended', onEnded);
+      audio.removeEventListener('error', onError);
+      try {
+        audio.pause();
+        audio.removeAttribute('src');
+        audio.load();
+      } catch (e) {}
+    };
+  }, [searchResults]);
+
+  // Sound Testing toggle: Audition track before downloading
+  const handleToggleSoundTest = async (item) => {
+    if (previewState.activeId === item.id) {
+      if (previewState.isPlaying) {
+        if (previewAudioRef.current && previewState.sourceType === 'audio') {
+          previewAudioRef.current.pause();
+        }
+        setPreviewState((prev) => ({ ...prev, isPlaying: false }));
+      } else {
+        if (previewAudioRef.current && previewState.sourceType === 'audio') {
+          previewAudioRef.current.play().catch(console.warn);
+          setPreviewState((prev) => ({ ...prev, isPlaying: true }));
+        }
+      }
+      return;
+    }
+
+    // Stop previous preview
+    if (previewAudioRef.current) {
+      try {
+        previewAudioRef.current.pause();
+        previewAudioRef.current.removeAttribute('src');
+        previewAudioRef.current.load();
+      } catch (e) {}
+    }
+
+    // Pause main player if active so the user can test the sound clearly
+    if (audioEngine && audioEngine.isPlaying) {
+      audioEngine.pause();
+    }
+
+    setPreviewState({
+      activeId: item.id,
+      isPlaying: false,
+      isLoading: true,
+      currentTime: 0,
+      duration: item.durationSec || 30,
+      volume: previewState.volume,
+      isMuted: previewState.isMuted,
+      error: null,
+      sourceType: 'audio',
+      embedUrl: null,
+    });
+
+    try {
+      const source = await resolvePreviewSource(item);
+      if (!source || !source.url) {
+        throw new Error('No audio preview stream available');
+      }
+
+      if (source.type === 'youtube_embed') {
+        setPreviewState((prev) => ({
+          ...prev,
+          isLoading: false,
+          isPlaying: true,
+          sourceType: 'youtube_embed',
+          embedUrl: source.url,
+        }));
+        return;
+      }
+
+      const audio = previewAudioRef.current || new Audio();
+      previewAudioRef.current = audio;
+      audio.src = source.url;
+      audio.volume = previewState.isMuted ? 0 : previewState.volume;
+      audio.preload = 'auto';
+
+      await audio.play();
+      setPreviewState((prev) => ({
+        ...prev,
+        isLoading: false,
+        isPlaying: true,
+        sourceType: 'audio',
+        duration: audio.duration && !isNaN(audio.duration) && isFinite(audio.duration) ? audio.duration : (item.durationSec || 30),
+      }));
+    } catch (err) {
+      console.warn('Sound test preview notice:', err.message);
+      if (item.id && !item.id.startsWith('apple_')) {
+        setPreviewState((prev) => ({
+          ...prev,
+          isLoading: false,
+          isPlaying: true,
+          sourceType: 'youtube_embed',
+          embedUrl: `https://www.youtube-nocookie.com/embed/${item.id}?autoplay=1&enablejsapi=1`,
+          error: null,
+        }));
+      } else {
+        setPreviewState((prev) => ({
+          ...prev,
+          isLoading: false,
+          isPlaying: false,
+          error: 'Could not stream preview for this track.',
+        }));
+        if (toast) {
+          toast.warning('Audio preview stream not available. You can still download the full track!', {
+            title: 'Sound Test Notice',
+          });
+        }
+      }
+    }
+  };
+
+  const handleSeekPreview = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const newTime = ratio * (previewState.duration || 30);
+    if (previewAudioRef.current && previewState.sourceType === 'audio') {
+      previewAudioRef.current.currentTime = newTime;
+    }
+    setPreviewState((prev) => ({ ...prev, currentTime: newTime }));
+  };
+
+  const handleTogglePreviewMute = () => {
+    const nextMuted = !previewState.isMuted;
+    if (previewAudioRef.current && previewState.sourceType === 'audio') {
+      previewAudioRef.current.volume = nextMuted ? 0 : previewState.volume;
+    }
+    setPreviewState((prev) => ({ ...prev, isMuted: nextMuted }));
+  };
+
+  const handleChangePreviewVolume = (val) => {
+    const v = parseFloat(val);
+    if (previewAudioRef.current && previewState.sourceType === 'audio') {
+      previewAudioRef.current.volume = v;
+    }
+    setPreviewState((prev) => ({ ...prev, volume: v, isMuted: v === 0 }));
+  };
+
+  const handleStopPreview = () => {
+    if (previewAudioRef.current) {
+      try {
+        previewAudioRef.current.pause();
+        previewAudioRef.current.removeAttribute('src');
+        previewAudioRef.current.load();
+      } catch (e) {}
+    }
+    setPreviewState((prev) => ({
+      ...prev,
+      activeId: null,
+      isPlaying: false,
+      isLoading: false,
+      currentTime: 0,
+      embedUrl: null,
+    }));
+  };
+
+  const formatPreviewTime = (secs) => {
+    if (!secs || isNaN(secs) || !isFinite(secs)) return '0:00';
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
 
   // Playlist Destination state
   const [selectedPlaylistId, setSelectedPlaylistId] = useState('');
@@ -89,7 +341,7 @@ export default function DownloaderView({
   const [downloadStatus, setDownloadStatus] = useState(null);
 
   // Batch Web download state (max 10)
-  const [batchUrlsText, setBatchUrlsText] = useState('');
+  const [batchUrlsText, setBatchUrlsText] = useState(savedSession?.batchUrlsText || '');
   const [isBatchDownloading, setIsBatchDownloading] = useState(false);
   const [batchItems, setBatchItems] = useState([]);
   const [batchProgress, setBatchProgress] = useState(null);
@@ -107,7 +359,76 @@ export default function DownloaderView({
     .filter((u) => u.length > 0)
     .slice(0, 10);
 
-  // 1. YouTube Search Handler
+  // 1. Sync prefilledQuery when component is persistently mounted
+  useEffect(() => {
+    if (!prefilledQuery) return;
+    const isUrl = prefilledQuery.trim().startsWith('http');
+    if (isUrl) {
+      setWebUrl(prefilledQuery);
+      setActiveTab('youtube');
+    } else {
+      setSearchQuery(prefilledQuery);
+      setActiveTab('search');
+      executeSearch(prefilledQuery);
+    }
+  }, [prefilledQuery]);
+
+  // 2. Persist Search & Queue State so it remains across tab switches and refreshes (up to 2h)
+  useEffect(() => {
+    if (searchResults.length > 0 || hasSearched || searchQuery || batchUrlsText) {
+      saveSearchSession({
+        query: searchQuery,
+        results: searchResults,
+        hasSearched,
+        activeTab,
+        downloadedIds: Array.from(downloadedSearchIds),
+        batchUrlsText,
+      });
+    }
+  }, [searchQuery, searchResults, hasSearched, activeTab, downloadedSearchIds, batchUrlsText]);
+
+  // 3. Warn before closing or reloading if background downloads are actively in progress
+  useEffect(() => {
+    const isAnyDownloading =
+      isDownloading || isBatchDownloading || downloadingSearchIds.size > 0;
+
+    const handleBeforeUnload = (e) => {
+      if (isAnyDownloading) {
+        e.preventDefault();
+        e.returnValue = 'Downloads are in progress. If you leave or reload now, background downloads will be stopped.';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDownloading, isBatchDownloading, downloadingSearchIds.size]);
+
+  // 4. Report active background downloads status to parent (App.jsx)
+  useEffect(() => {
+    const activeCount =
+      downloadingSearchIds.size +
+      (isDownloading ? 1 : 0) +
+      (isBatchDownloading ? (batchProgress ? Math.max(1, batchProgress.total - batchProgress.current) : 1) : 0);
+
+    if (onDownloadStatusChange) {
+      onDownloadStatusChange({
+        isDownloading: activeCount > 0,
+        count: activeCount,
+        singleProgress: downloadProgress,
+        batchProgress,
+      });
+    }
+  }, [
+    downloadingSearchIds.size,
+    isDownloading,
+    isBatchDownloading,
+    downloadProgress,
+    batchProgress,
+    onDownloadStatusChange,
+  ]);
+
+  // 3. YouTube Search Handler
   const executeSearch = async (queryText) => {
     const q = (queryText ?? searchQuery).trim();
     if (!q) return;
@@ -623,6 +944,77 @@ export default function DownloaderView({
         </div>
       </div>
 
+      {/* Active Background Downloads Indicator Banner */}
+      {(downloadingSearchIds.size > 0 || isDownloading || isBatchDownloading) && (
+        <div
+          className="pulse-active-downloads-banner"
+          style={{
+            background: 'linear-gradient(135deg, rgba(0, 242, 254, 0.12) 0%, rgba(79, 172, 254, 0.05) 100%)',
+            border: '1px solid rgba(0, 242, 254, 0.4)',
+            borderRadius: 12,
+            padding: '12px 18px',
+            marginBottom: 18,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            boxShadow: '0 4px 20px rgba(0, 242, 254, 0.1)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                background: 'rgba(0, 242, 254, 0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <Loader2 size={18} className="spin" color="#00f2fe" />
+            </div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#ffffff', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span>
+                  Downloading {downloadingSearchIds.size + (isDownloading ? 1 : 0) + (isBatchDownloading ? (batchProgress ? Math.max(1, batchProgress.total - batchProgress.current) : 1) : 0)} track(s) in background...
+                </span>
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    padding: '2px 7px',
+                    borderRadius: 12,
+                    background: 'rgba(0, 242, 254, 0.2)',
+                    color: '#00f2fe',
+                    border: '1px solid rgba(0, 242, 254, 0.4)',
+                  }}
+                >
+                  Running
+                </span>
+              </div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 2 }}>
+                Downloads run in the background until finished. You can freely browse other playlists and library views!
+              </div>
+            </div>
+          </div>
+          {isBatchDownloading && batchProgress && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', minWidth: 120 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--pulse-accent)' }}>
+                {batchProgress.current} / {batchProgress.total} finished
+              </span>
+              <div style={{ width: 120, height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 3, marginTop: 4, overflow: 'hidden' }}>
+                <div style={{ width: `${batchProgress.percent}%`, height: '100%', background: 'linear-gradient(90deg, #00f2fe, #4facfe)', transition: 'width 0.3s' }} />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Main Tabs */}
       <div className="pulse-tab-bar" style={{ marginBottom: 18 }}>
         <button
@@ -765,13 +1157,43 @@ export default function DownloaderView({
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   padding: '0 4px',
+                  flexWrap: 'wrap',
+                  gap: 8,
                 }}
               >
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-secondary)' }}>
-                  Found {searchResults.length} YouTube Tracks
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-secondary)' }}>
+                    Found {searchResults.length} YouTube Tracks
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchResults([]);
+                      setSearchQuery('');
+                      setHasSearched(false);
+                      clearSearchSession();
+                      handleStopPreview();
+                    }}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: 4,
+                      color: 'var(--text-muted)',
+                      fontSize: 11,
+                      cursor: 'pointer',
+                      padding: '2px 7px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                    title="Clear search results"
+                  >
+                    <X size={11} />
+                    <span>Clear Search</span>
+                  </button>
+                </div>
                 <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
-                  Click "Paste Link" or "Download" directly
+                  Click "Test Sound" to audition beat, or "Download" directly
                 </span>
               </div>
 
@@ -780,191 +1202,363 @@ export default function DownloaderView({
                 const inPlaylist = checkItemInPlaylist(item);
                 const isItemDownloading = downloadingSearchIds.has(item.id);
                 const isItemDownloaded = downloadedSearchIds.has(item.id) || Boolean(inLibrary);
+                const isActivePreview = previewState.activeId === item.id;
 
                 return (
-                  <div key={item.id} className="youtube-result-card">
-                    {/* Thumbnail */}
-                    <div className="youtube-thumb-wrapper">
-                      {item.thumbnail ? (
-                        <img
-                          src={item.thumbnail}
-                          alt={item.title}
-                          className="youtube-thumb-img"
-                          loading="lazy"
-                        />
-                      ) : (
+                  <div key={item.id} style={{ display: 'flex', flexDirection: 'column' }}>
+                    <div className={`youtube-result-card ${isActivePreview ? 'is-previewing' : ''}`}>
+                      {/* Thumbnail with Quick Play Overlay */}
+                      <div className="youtube-thumb-wrapper">
+                        {item.thumbnail ? (
+                          <img
+                            src={item.thumbnail}
+                            alt={item.title}
+                            className="youtube-thumb-img"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              background: 'var(--pulse-surface)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <Music size={22} color="var(--text-muted)" />
+                          </div>
+                        )}
+                        {item.duration && (
+                          <span className="youtube-duration-badge">{item.duration}</span>
+                        )}
+
+                        {/* Thumbnail Sound Test Play Overlay */}
                         <div
+                          className={`youtube-thumb-play-overlay ${isActivePreview && previewState.isPlaying ? 'is-active' : ''}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleSoundTest(item);
+                          }}
+                          title={isActivePreview && previewState.isPlaying ? 'Pause sound test' : 'Test sound of this track'}
+                        >
+                          {isActivePreview && previewState.isLoading ? (
+                            <Loader2 size={20} className="spin" color="#00f2fe" />
+                          ) : isActivePreview && previewState.isPlaying ? (
+                            <Pause size={20} color="#00f2fe" />
+                          ) : (
+                            <Play size={20} fill="#ffffff" color="#ffffff" style={{ marginLeft: 2 }} />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Meta info */}
+                      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <span
+                            style={{
+                              color: '#ffffff',
+                              fontWeight: 700,
+                              fontSize: 13.5,
+                              lineHeight: 1.35,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              maxWidth: '100%',
+                            }}
+                            title={item.title}
+                          >
+                            {item.cleanTitle || item.title}
+                          </span>
+
+                          {/* Duplicate Badges */}
+                          {isItemDownloaded && (
+                            <span
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 800,
+                                color: '#10b981',
+                                background: 'rgba(16, 185, 129, 0.14)',
+                                border: '1px solid rgba(16, 185, 129, 0.3)',
+                                padding: '1px 6px',
+                                borderRadius: 4,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 3,
+                              }}
+                            >
+                              <Check size={10} />
+                              <span>In Library</span>
+                            </span>
+                          )}
+
+                          {selectedPlaylist && inPlaylist && (
+                            <span
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 800,
+                                color: 'var(--pulse-accent)',
+                                background: 'rgba(0, 242, 254, 0.12)',
+                                border: '1px solid rgba(0, 242, 254, 0.3)',
+                                padding: '1px 6px',
+                                borderRadius: 4,
+                              }}
+                            >
+                              ✓ In {selectedPlaylist.name}
+                            </span>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
+                          <span style={{ fontWeight: 600, color: 'var(--pulse-accent-subtle, #a0aec0)' }}>
+                            {item.cleanArtist || item.channel}
+                          </span>
+                          {item.views && (
+                            <>
+                              <span style={{ color: 'var(--text-muted)' }}>•</span>
+                              <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{item.views}</span>
+                            </>
+                          )}
+                          {item.publishedTime && (
+                            <>
+                              <span style={{ color: 'var(--text-muted)' }}>•</span>
+                              <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{item.publishedTime}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Actions Column */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                        {/* Button 0: Test Sound / Preview */}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleSoundTest(item)}
+                          className={`pulse-test-sound-btn ${isActivePreview && previewState.isPlaying ? 'active' : ''}`}
+                          title={isActivePreview && previewState.isPlaying ? 'Pause sound test' : 'Test sound of track before downloading'}
+                        >
+                          {isActivePreview && previewState.isLoading ? (
+                            <>
+                              <Loader2 size={13} className="spin" />
+                              <span>Loading...</span>
+                            </>
+                          ) : isActivePreview && previewState.isPlaying ? (
+                            <>
+                              <Pause size={13} />
+                              <span>Testing...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Play size={13} fill="currentColor" />
+                              <span>Test Sound</span>
+                            </>
+                          )}
+                        </button>
+
+                        {/* Button 1: Paste Link into Downloader */}
+                        <button
+                          type="button"
+                          onClick={() => handleUseInDownloader(item)}
+                          className="aura-btn-secondary"
                           style={{
-                            width: '100%',
-                            height: '100%',
-                            background: 'var(--pulse-surface)',
+                            padding: '6px 12px',
+                            fontSize: 11.5,
+                            fontWeight: 700,
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center',
+                            gap: 5,
                           }}
+                          title="Paste link and metadata directly into the Downloader tab"
                         >
-                          <Music size={22} color="var(--text-muted)" />
-                        </div>
-                      )}
-                      {item.duration && (
-                        <span className="youtube-duration-badge">{item.duration}</span>
-                      )}
-                    </div>
+                          <Link2 size={13} color="var(--pulse-accent)" />
+                          <span>Paste Link</span>
+                        </button>
 
-                    {/* Meta info */}
-                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <span
+                        {/* Button 2: 1-Click Fast Download */}
+                        <button
+                          type="button"
+                          onClick={() => handleDirectDownloadFromSearch(item)}
+                          disabled={isItemDownloading}
+                          className="aura-btn-primary"
                           style={{
-                            color: '#ffffff',
+                            padding: '6px 14px',
+                            fontSize: 11.5,
                             fontWeight: 700,
-                            fontSize: 13.5,
-                            lineHeight: 1.35,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            maxWidth: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 5,
                           }}
-                          title={item.title}
+                          title={selectedPlaylist ? `Download to "${selectedPlaylist.name}" & Offline Storage` : 'Download to Offline Storage'}
                         >
-                          {item.cleanTitle || item.title}
-                        </span>
+                          {isItemDownloading ? (
+                            <>
+                              <Loader2 size={13} className="spin" />
+                              <span>Extracting...</span>
+                            </>
+                          ) : isItemDownloaded ? (
+                            <>
+                              <CheckCircle size={13} color="#10b981" />
+                              <span>Saved</span>
+                            </>
+                          ) : (
+                            <>
+                              <Download size={13} />
+                              <span>Download</span>
+                            </>
+                          )}
+                        </button>
 
-                        {/* Duplicate Badges */}
-                        {isItemDownloaded && (
-                          <span
-                            style={{
-                              fontSize: 10,
-                              fontWeight: 800,
-                              color: '#10b981',
-                              background: 'rgba(16, 185, 129, 0.14)',
-                              border: '1px solid rgba(16, 185, 129, 0.3)',
-                              padding: '1px 6px',
-                              borderRadius: 4,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 3,
-                            }}
-                          >
-                            <Check size={10} />
-                            <span>In Library</span>
-                          </span>
-                        )}
-
-                        {selectedPlaylist && inPlaylist && (
-                          <span
-                            style={{
-                              fontSize: 10,
-                              fontWeight: 800,
-                              color: 'var(--pulse-accent)',
-                              background: 'rgba(0, 242, 254, 0.12)',
-                              border: '1px solid rgba(0, 242, 254, 0.3)',
-                              padding: '1px 6px',
-                              borderRadius: 4,
-                            }}
-                          >
-                            ✓ In {selectedPlaylist.name}
-                          </span>
-                        )}
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
-                        <span style={{ fontWeight: 600, color: 'var(--pulse-accent-subtle, #a0aec0)' }}>
-                          {item.cleanArtist || item.channel}
-                        </span>
-                        {item.views && (
-                          <>
-                            <span style={{ color: 'var(--text-muted)' }}>•</span>
-                            <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{item.views}</span>
-                          </>
-                        )}
-                        {item.publishedTime && (
-                          <>
-                            <span style={{ color: 'var(--text-muted)' }}>•</span>
-                            <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{item.publishedTime}</span>
-                          </>
-                        )}
+                        {/* Button 3: Add to batch */}
+                        <button
+                          type="button"
+                          onClick={() => handleAddToBatch(item)}
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid var(--border-subtle)',
+                            borderRadius: 'var(--radius-sm)',
+                            color: 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            padding: '6px 8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            fontSize: 11,
+                            fontWeight: 600,
+                          }}
+                          title="Add link to batch downloader list"
+                        >
+                          <Plus size={13} />
+                          <span>Batch</span>
+                        </button>
                       </div>
                     </div>
 
-                    {/* Actions Column */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                      {/* Button 1: Paste Link into Downloader */}
-                      <button
-                        type="button"
-                        onClick={() => handleUseInDownloader(item)}
-                        className="aura-btn-secondary"
-                        style={{
-                          padding: '6px 12px',
-                          fontSize: 11.5,
-                          fontWeight: 700,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 5,
-                        }}
-                        title="Paste link and metadata directly into the Downloader tab"
-                      >
-                        <Link2 size={13} color="var(--pulse-accent)" />
-                        <span>Paste Link</span>
-                      </button>
+                    {/* Expandable Sound Testing Audition Bar */}
+                    {isActivePreview && (
+                      <div className="youtube-preview-audition-bar">
+                        <div className="preview-audition-header">
+                          <div className="preview-audition-tag">
+                            <Headphones size={13} color="var(--pulse-accent)" />
+                            <span style={{ fontWeight: 700, fontSize: 11.5, color: '#00f2fe' }}>
+                              {previewState.isLoading
+                                ? 'Buffering Audio Stream...'
+                                : previewState.isPlaying
+                                ? 'Testing Sound (Lossless Stream)'
+                                : 'Audio Paused'}
+                            </span>
+                            {/* Animated equalizer bars */}
+                            {previewState.isPlaying && (
+                              <div className="pulse-soundbars">
+                                <span className="pulse-bar bar-1"></span>
+                                <span className="pulse-bar bar-2"></span>
+                                <span className="pulse-bar bar-3"></span>
+                                <span className="pulse-bar bar-4"></span>
+                              </div>
+                            )}
+                          </div>
 
-                      {/* Button 2: 1-Click Fast Download */}
-                      <button
-                        type="button"
-                        onClick={() => handleDirectDownloadFromSearch(item)}
-                        disabled={isItemDownloading}
-                        className="aura-btn-primary"
-                        style={{
-                          padding: '6px 14px',
-                          fontSize: 11.5,
-                          fontWeight: 700,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 5,
-                        }}
-                        title={selectedPlaylist ? `Download to "${selectedPlaylist.name}" & Offline Storage` : 'Download to Offline Storage'}
-                      >
-                        {isItemDownloading ? (
-                          <>
-                            <Loader2 size={13} className="spin" />
-                            <span>Extracting...</span>
-                          </>
-                        ) : isItemDownloaded ? (
-                          <>
-                            <CheckCircle size={13} color="#10b981" />
-                            <span>Saved</span>
-                          </>
-                        ) : (
-                          <>
-                            <Download size={13} />
-                            <span>Download</span>
-                          </>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <button
+                              type="button"
+                              onClick={() => handleDirectDownloadFromSearch(item)}
+                              disabled={isItemDownloading}
+                              className="aura-btn-primary"
+                              style={{
+                                padding: '4px 10px',
+                                fontSize: 11,
+                                fontWeight: 700,
+                                background: 'linear-gradient(135deg, #00f2fe 0%, #4facfe 100%)',
+                                color: '#000000',
+                              }}
+                              title="Download this track to your library"
+                            >
+                              <Download size={12} />
+                              <span>Sounds Good • Download Now</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={handleStopPreview}
+                              className="preview-close-btn"
+                              title="Close sound preview"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Scrub & Volume Row */}
+                        {previewState.sourceType === 'audio' && (
+                          <div className="preview-player-controls">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleSoundTest(item)}
+                              className="preview-play-btn"
+                              title={previewState.isPlaying ? 'Pause' : 'Play'}
+                            >
+                              {previewState.isPlaying ? <Pause size={13} /> : <Play size={13} fill="currentColor" />}
+                            </button>
+
+                            <span className="preview-time-badge">
+                              {formatPreviewTime(previewState.currentTime)}
+                            </span>
+
+                            {/* Clickable Seek / Scrubber Bar */}
+                            <div
+                              className="preview-seek-track"
+                              onClick={handleSeekPreview}
+                              title="Click to seek beat/drop"
+                            >
+                              <div
+                                className="preview-seek-fill"
+                                style={{
+                                  width: `${Math.min(100, Math.max(0, (previewState.currentTime / (previewState.duration || 30)) * 100))}%`,
+                                }}
+                              />
+                            </div>
+
+                            <span className="preview-time-badge muted">
+                              {formatPreviewTime(previewState.duration)}
+                            </span>
+
+                            {/* Volume & Mute */}
+                            <div className="preview-volume-group">
+                              <button
+                                type="button"
+                                onClick={handleTogglePreviewMute}
+                                className="preview-vol-btn"
+                                title={previewState.isMuted ? 'Unmute' : 'Mute'}
+                              >
+                                {previewState.isMuted ? <VolumeX size={13} /> : <Volume2 size={13} />}
+                              </button>
+                              <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.05"
+                                value={previewState.isMuted ? 0 : previewState.volume}
+                                onChange={(e) => handleChangePreviewVolume(e.target.value)}
+                                className="preview-vol-slider"
+                                title="Preview volume"
+                              />
+                            </div>
+                          </div>
                         )}
-                      </button>
 
-                      {/* Button 3: Add to batch */}
-                      <button
-                        type="button"
-                        onClick={() => handleAddToBatch(item)}
-                        style={{
-                          background: 'rgba(255, 255, 255, 0.05)',
-                          border: '1px solid var(--border-subtle)',
-                          borderRadius: 'var(--radius-sm)',
-                          color: 'var(--text-secondary)',
-                          cursor: 'pointer',
-                          padding: '6px 8px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 4,
-                          fontSize: 11,
-                          fontWeight: 600,
-                        }}
-                        title="Add link to batch downloader list"
-                      >
-                        <Plus size={13} />
-                        <span>Batch</span>
-                      </button>
-                    </div>
+                        {/* YouTube Embed Player Fallback if stream requires it */}
+                        {previewState.sourceType === 'youtube_embed' && previewState.embedUrl && (
+                          <div className="preview-embed-container">
+                            <iframe
+                              src={previewState.embedUrl}
+                              title={`Preview ${item.title}`}
+                              allow="autoplay; encrypted-media"
+                              className="preview-embed-iframe"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}

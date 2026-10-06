@@ -134,6 +134,12 @@ export default function App() {
   const [isShuffle, setIsShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState('all'); // 'off' | 'all' | 'one'
 
+  // Background active downloads tracking
+  const [activeDownloads, setActiveDownloads] = useState({ isDownloading: false, count: 0 });
+  const handleDownloadStatusChange = useCallback((status) => {
+    setActiveDownloads(status || { isDownloading: false, count: 0 });
+  }, []);
+
   // Refs for current values inside event callbacks
   const currentTrackRef = useRef(currentTrack);
   currentTrackRef.current = currentTrack;
@@ -817,6 +823,7 @@ export default function App() {
           selectedPlaylistId={selectedPlaylistId}
           setSelectedPlaylistId={setSelectedPlaylistId}
           onPlaylistContextMenu={handlePlaylistContextMenu}
+          activeDownloads={activeDownloads}
         />
 
         {/* Central Viewport */}
@@ -836,6 +843,7 @@ export default function App() {
             onGoBack={handleGoBack}
             onGoForward={handleGoForward}
             onGoHome={handleGoHome}
+            activeDownloads={activeDownloads}
           />
 
           {/* Pure Playlists & Collection Main View */}
@@ -889,7 +897,13 @@ export default function App() {
             />
           )}
 
-          {currentView === 'downloader' && (
+          {/* Persistently Mounted Downloader View: Retains Search State and Background Downloads */}
+          <div
+            className="pulse-downloader-mount-wrapper"
+            style={{
+              display: currentView === 'downloader' ? 'contents' : 'none',
+            }}
+          >
             <DownloaderView
               prefilledQuery={prefilledDownloaderQuery}
               playlists={playlists}
@@ -908,8 +922,9 @@ export default function App() {
               }}
               onPlayTrack={handlePlayTrack}
               toast={toast}
+              onDownloadStatusChange={handleDownloadStatusChange}
             />
-          )}
+          </div>
         </main>
       </div>
 
@@ -957,6 +972,7 @@ export default function App() {
         user={user}
         onOpenAuth={() => setShowAuthModal(true)}
         onOpenShare={() => setShowShare(true)}
+        activeDownloads={activeDownloads}
       />
 
       {/* Fullscreen Mobile Player Overlay */}

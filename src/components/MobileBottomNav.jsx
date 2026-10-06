@@ -1,7 +1,14 @@
 import React from 'react';
 import { Library, CloudDownload, User, Smartphone } from 'lucide-react';
 
-export default function MobileBottomNav({ currentView, setCurrentView, user, onOpenAuth, onOpenShare }) {
+export default function MobileBottomNav({
+  currentView,
+  setCurrentView,
+  user,
+  onOpenAuth,
+  onOpenShare,
+  activeDownloads = { isDownloading: false, count: 0 },
+}) {
   return (
     <nav className="aura-mobile-nav">
       <button
@@ -16,7 +23,25 @@ export default function MobileBottomNav({ currentView, setCurrentView, user, onO
         className={`aura-mobile-tab ${currentView === 'downloader' ? 'active' : ''}`}
         onClick={() => setCurrentView('downloader')}
       >
-        <CloudDownload size={22} />
+        <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+          <CloudDownload size={22} />
+          {activeDownloads && activeDownloads.isDownloading && (
+            <span
+              style={{
+                position: 'absolute',
+                top: -2,
+                right: -4,
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: '#00f2fe',
+                boxShadow: '0 0 8px #00f2fe',
+                animation: 'pulseDownloadGlow 1.6s infinite',
+              }}
+              title="Download active in background"
+            />
+          )}
+        </div>
         <span>Download</span>
       </button>
 

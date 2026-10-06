@@ -32,6 +32,7 @@ export default function Sidebar({
   setSelectedPlaylistId,
   onPlaylistContextMenu,
   onNavigate,
+  activeDownloads = { isDownloading: false, count: 0 },
 }) {
   const isCloudConnected = isSupabaseConfigured();
 
@@ -72,9 +73,24 @@ export default function Sidebar({
           <button
             className={`aura-nav-btn ${currentView === 'downloader' ? 'active' : ''}`}
             onClick={() => handleNav('downloader', null)}
+            style={{ position: 'relative' }}
           >
             <CloudDownload size={19} />
             <span>Download</span>
+            {activeDownloads && activeDownloads.isDownloading && (
+              <span
+                style={{
+                  marginLeft: 'auto',
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  background: '#00f2fe',
+                  boxShadow: '0 0 8px #00f2fe',
+                  animation: 'pulseDownloadGlow 1.6s infinite',
+                }}
+                title="Download running in background"
+              />
+            )}
           </button>
         </nav>
       </div>

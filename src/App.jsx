@@ -983,6 +983,8 @@ export default function App() {
         isPlaying={isPlaying}
         currentTime={currentTime}
         duration={duration}
+        volume={volume}
+        onVolumeChange={handleVolumeChange}
         isLiked={currentTrack ? likedIds.has(currentTrack.id) : false}
         isShuffle={isShuffle}
         repeatMode={repeatMode}
@@ -994,6 +996,7 @@ export default function App() {
         onToggleRepeat={handleToggleRepeat}
         onToggleLike={() => handleToggleLike()}
         onOpenEqualizer={handleOpenEqualizer}
+        onOpenQueue={() => setShowQueue(true)}
         onOpenShare={() => setShowShare(true)}
         onOpenSupabase={() => setShowSupabaseModal(true)}
       />

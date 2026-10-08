@@ -128,21 +128,99 @@ button, input, optgroup, select, textarea {
   flex: 1;
   min-height: 0;
   padding: 8px 8px 0;
-  gap: 8px;
+  gap: 0;
   overflow: hidden;
 }
 
 
 /* ==========================================================================
-   SIDEBAR
+   SIDEBAR & RESIZABLE PANELS
    ========================================================================== */
 
 .aura-sidebar {
   width: var(--sidebar-width);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
   flex-shrink: 0;
+}
+
+.aura-sidebar.is-resizing,
+.aura-sidebar-top-card.is-resizing,
+.aura-main-content.is-resizing {
+  transition: none !important;
+  user-select: none !important;
+}
+
+.aura-sidebar-top-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Vertical Splitter (between Top Card & Library Shelf) */
+.aura-resizer-row {
+  height: 8px;
+  width: 100%;
+  flex-shrink: 0;
+  cursor: row-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 20;
+  user-select: none;
+  touch-action: none;
+}
+
+.aura-resizer-row .aura-resizer-line {
+  height: 2px;
+  width: 32px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: none;
+}
+
+.aura-resizer-row:hover .aura-resizer-line,
+.aura-resizer-row.is-resizing .aura-resizer-line {
+  width: 56px;
+  height: 3px;
+  background: var(--pulse-accent, #00c2d1);
+  box-shadow: 0 0 10px rgba(0, 194, 209, 0.8), 0 0 2px rgba(255, 255, 255, 0.8);
+}
+
+/* Horizontal Splitter (between Sidebar & Main Content) */
+.aura-resizer-col {
+  width: 8px;
+  height: 100%;
+  flex-shrink: 0;
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 20;
+  user-select: none;
+  touch-action: none;
+}
+
+.aura-resizer-col .aura-resizer-line {
+  width: 2px;
+  height: 36px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: none;
+}
+
+.aura-resizer-col:hover .aura-resizer-line,
+.aura-resizer-col.is-resizing .aura-resizer-line {
+  height: 64px;
+  width: 3px;
+  background: var(--pulse-accent, #00c2d1);
+  box-shadow: 0 0 10px rgba(0, 194, 209, 0.8), 0 0 2px rgba(255, 255, 255, 0.8);
 }
 
 .aura-glass-card {
@@ -1334,6 +1412,11 @@ button, input, optgroup, select, textarea {
   }
 
   .aura-sidebar {
+    display: none !important;
+  }
+
+  .aura-resizer-col,
+  .aura-resizer-row {
     display: none !important;
   }
 

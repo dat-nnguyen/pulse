@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Library,
   Plus,
@@ -16,6 +16,8 @@ import {
 import { isSupabaseConfigured } from '../services/supabaseClient';
 
 export default function Sidebar({
+  sidebarWidth,
+  isResizingSidebar = false,
   currentView,
   setCurrentView,
   playlists = [],
@@ -36,6 +38,64 @@ export default function Sidebar({
 }) {
   const isCloudConnected = isSupabaseConfigured();
 
+  // Top card height state with localStorage persistence
+  const [topCardHeight, setTopCardHeight] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pulse_sidebar_top_height');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= 120 && parsed <= 420) {
+          return parsed;
+        }
+      }
+    } catch (e) {}
+    return 174;
+  });
+  const [isResizingTopCard, setIsResizingTopCard] = useState(false);
+  const dragStartRef = useRef({ startY: 0, startHeight: 174 });
+
+  const handleTopCardResizeStart = useCallback((e) => {
+    e.preventDefault();
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    dragStartRef.current = { startY: clientY, startHeight: topCardHeight };
+    setIsResizingTopCard(true);
+
+    const onMove = (moveEvent) => {
+      const currentY = moveEvent.touches ? moveEvent.touches[0].clientY : moveEvent.clientY;
+      const deltaY = currentY - dragStartRef.current.startY;
+      let nextHeight = Math.max(120, Math.min(420, dragStartRef.current.startHeight + deltaY));
+      // Snap to default if within 6px
+      if (Math.abs(nextHeight - 174) < 6) {
+        nextHeight = 174;
+      }
+      setTopCardHeight(nextHeight);
+      try {
+        localStorage.setItem('pulse_sidebar_top_height', String(nextHeight));
+      } catch (err) {}
+    };
+
+    const onEnd = () => {
+      setIsResizingTopCard(false);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onEnd);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onEnd);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onEnd);
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchmove', onMove);
+    window.addEventListener('touchend', onEnd);
+  }, [topCardHeight]);
+
+  const handleResetTopCardHeight = useCallback(() => {
+    setTopCardHeight(174);
+    try {
+      localStorage.setItem('pulse_sidebar_top_height', '174');
+    } catch (e) {}
+  }, []);
+
   const handleNav = (view, playlistId = null) => {
     if (onNavigate) {
       onNavigate(view, playlistId);
@@ -46,9 +106,15 @@ export default function Sidebar({
   };
 
   return (
-    <aside className="aura-sidebar">
+    <aside
+      className={`aura-sidebar ${isResizingSidebar ? 'is-resizing' : ''}`}
+      style={sidebarWidth ? { width: `${sidebarWidth}px` } : undefined}
+    >
       {/* Brand & Main Navigation Card */}
-      <div className="aura-glass-card aura-sidebar-top-card">
+      <div
+        className={`aura-glass-card aura-sidebar-top-card ${isResizingTopCard ? 'is-resizing' : ''}`}
+        style={{ height: `${topCardHeight}px` }}
+      >
         {/* macOS Traffic Lights Clearance & Window Drag Handle */}
         <div className="aura-sidebar-drag-handle" title="Drag to move Pulse" />
         <div className="aura-brand-header">
@@ -93,6 +159,19 @@ export default function Sidebar({
             )}
           </button>
         </nav>
+      </div>
+
+      {/* Vertical Resizer between Top Navigation Card and Library Shelf */}
+      <div
+        className={`aura-resizer-row ${isResizingTopCard ? 'is-resizing' : ''}`}
+        onMouseDown={handleTopCardResizeStart}
+        onTouchStart={handleTopCardResizeStart}
+        onDoubleClick={handleResetTopCardHeight}
+        title="Drag to resize panel • Double-click to reset"
+        role="separator"
+        aria-orientation="horizontal"
+      >
+        <div className="aura-resizer-line" />
       </div>
 
       {/* Library Shelf Card */}

@@ -140,6 +140,64 @@ export default function App() {
     setActiveDownloads(status || { isDownloading: false, count: 0 });
   }, []);
 
+  // Adjustable Sidebar Width with localStorage persistence
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pulse_sidebar_width');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= 190 && parsed <= 600) {
+          return parsed;
+        }
+      }
+    } catch (e) {}
+    return 270;
+  });
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  const sidebarDragStartRef = useRef({ startX: 0, startWidth: 270 });
+
+  const handleSidebarResizeStart = useCallback((e) => {
+    e.preventDefault();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    sidebarDragStartRef.current = { startX: clientX, startWidth: sidebarWidth };
+    setIsResizingSidebar(true);
+
+    const onMove = (moveEvent) => {
+      const currentX = moveEvent.touches ? moveEvent.touches[0].clientX : moveEvent.clientX;
+      const deltaX = currentX - sidebarDragStartRef.current.startX;
+      const maxWidth = Math.min(560, Math.floor(window.innerWidth * 0.45));
+      let nextWidth = Math.max(190, Math.min(maxWidth, sidebarDragStartRef.current.startWidth + deltaX));
+      // Snap to default if within 6px
+      if (Math.abs(nextWidth - 270) < 6) {
+        nextWidth = 270;
+      }
+      setSidebarWidth(nextWidth);
+      try {
+        localStorage.setItem('pulse_sidebar_width', String(nextWidth));
+      } catch (err) {}
+    };
+
+    const onEnd = () => {
+      setIsResizingSidebar(false);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onEnd);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onEnd);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onEnd);
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onEnd);
+  }, [sidebarWidth]);
+
+  const handleResetSidebarWidth = useCallback(() => {
+    setSidebarWidth(270);
+    try {
+      localStorage.setItem('pulse_sidebar_width', '270');
+    } catch (e) {}
+  }, []);
+
   // Refs for current values inside event callbacks
   const currentTrackRef = useRef(currentTrack);
   currentTrackRef.current = currentTrack;
@@ -807,6 +865,8 @@ export default function App() {
       <div className="aura-main-wrapper">
         {/* Desktop Sidebar */}
         <Sidebar
+          sidebarWidth={sidebarWidth}
+          isResizingSidebar={isResizingSidebar}
           currentView={currentView}
           setCurrentView={(v) => navigateTo(v, null)}
           onNavigate={navigateTo}
@@ -826,8 +886,21 @@ export default function App() {
           activeDownloads={activeDownloads}
         />
 
+        {/* Horizontal Resizer between Sidebar and Main Content */}
+        <div
+          className={`aura-resizer-col ${isResizingSidebar ? 'is-resizing' : ''}`}
+          onMouseDown={handleSidebarResizeStart}
+          onTouchStart={handleSidebarResizeStart}
+          onDoubleClick={handleResetSidebarWidth}
+          title="Drag to resize sidebar width • Double-click to reset"
+          role="separator"
+          aria-orientation="vertical"
+        >
+          <div className="aura-resizer-line" />
+        </div>
+
         {/* Central Viewport */}
-        <main className="aura-main-content">
+        <main className={`aura-main-content ${isResizingSidebar ? 'is-resizing' : ''}`}>
           <TopBar
             currentView={currentView}
             selectedPlaylistId={selectedPlaylistId}

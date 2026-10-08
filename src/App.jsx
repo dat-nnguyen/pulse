@@ -146,15 +146,15 @@ export default function App() {
       const saved = localStorage.getItem('pulse_sidebar_width');
       if (saved) {
         const parsed = parseInt(saved, 10);
-        if (!isNaN(parsed) && parsed >= 190 && parsed <= 600) {
-          return parsed;
+        if (!isNaN(parsed)) {
+          return Math.max(260, Math.min(600, parsed));
         }
       }
     } catch (e) {}
-    return 270;
+    return 275;
   });
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
-  const sidebarDragStartRef = useRef({ startX: 0, startWidth: 270 });
+  const sidebarDragStartRef = useRef({ startX: 0, startWidth: 275 });
 
   const handleSidebarResizeStart = useCallback((e) => {
     e.preventDefault();
@@ -166,10 +166,10 @@ export default function App() {
       const currentX = moveEvent.touches ? moveEvent.touches[0].clientX : moveEvent.clientX;
       const deltaX = currentX - sidebarDragStartRef.current.startX;
       const maxWidth = Math.min(560, Math.floor(window.innerWidth * 0.45));
-      let nextWidth = Math.max(190, Math.min(maxWidth, sidebarDragStartRef.current.startWidth + deltaX));
+      let nextWidth = Math.max(260, Math.min(maxWidth, sidebarDragStartRef.current.startWidth + deltaX));
       // Snap to default if within 6px
-      if (Math.abs(nextWidth - 270) < 6) {
-        nextWidth = 270;
+      if (Math.abs(nextWidth - 275) < 6) {
+        nextWidth = 275;
       }
       setSidebarWidth(nextWidth);
       try {
@@ -192,9 +192,9 @@ export default function App() {
   }, [sidebarWidth]);
 
   const handleResetSidebarWidth = useCallback(() => {
-    setSidebarWidth(270);
+    setSidebarWidth(275);
     try {
-      localStorage.setItem('pulse_sidebar_width', '270');
+      localStorage.setItem('pulse_sidebar_width', '275');
     } catch (e) {}
   }, []);
 

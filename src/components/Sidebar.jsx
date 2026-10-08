@@ -44,15 +44,15 @@ export default function Sidebar({
       const saved = localStorage.getItem('pulse_sidebar_top_height');
       if (saved) {
         const parsed = parseInt(saved, 10);
-        if (!isNaN(parsed) && parsed >= 120 && parsed <= 420) {
-          return parsed;
+        if (!isNaN(parsed)) {
+          return Math.max(150, Math.min(420, parsed));
         }
       }
     } catch (e) {}
-    return 174;
+    return 192;
   });
   const [isResizingTopCard, setIsResizingTopCard] = useState(false);
-  const dragStartRef = useRef({ startY: 0, startHeight: 174 });
+  const dragStartRef = useRef({ startY: 0, startHeight: 192 });
 
   const handleTopCardResizeStart = useCallback((e) => {
     e.preventDefault();
@@ -63,10 +63,10 @@ export default function Sidebar({
     const onMove = (moveEvent) => {
       const currentY = moveEvent.touches ? moveEvent.touches[0].clientY : moveEvent.clientY;
       const deltaY = currentY - dragStartRef.current.startY;
-      let nextHeight = Math.max(120, Math.min(420, dragStartRef.current.startHeight + deltaY));
+      let nextHeight = Math.max(150, Math.min(420, dragStartRef.current.startHeight + deltaY));
       // Snap to default if within 6px
-      if (Math.abs(nextHeight - 174) < 6) {
-        nextHeight = 174;
+      if (Math.abs(nextHeight - 192) < 6) {
+        nextHeight = 192;
       }
       setTopCardHeight(nextHeight);
       try {
@@ -90,9 +90,9 @@ export default function Sidebar({
   }, [topCardHeight]);
 
   const handleResetTopCardHeight = useCallback(() => {
-    setTopCardHeight(174);
+    setTopCardHeight(192);
     try {
-      localStorage.setItem('pulse_sidebar_top_height', '174');
+      localStorage.setItem('pulse_sidebar_top_height', '192');
     } catch (e) {}
   }, []);
 
@@ -187,28 +187,40 @@ export default function Sidebar({
               alignItems: 'center',
               gap: 8,
               padding: 0,
+              minWidth: 0,
+              flex: 1,
+              overflow: 'hidden',
             }}
             onClick={() => {
               setCurrentView('home');
               setSelectedPlaylistId(null);
             }}
           >
-            <Disc3 size={17} color="var(--pulse-accent)" />
-            <span className="aura-shelf-title">Your Playlists</span>
+            <Disc3 size={17} color="var(--pulse-accent)" style={{ flexShrink: 0 }} />
+            <span
+              className="aura-shelf-title"
+              style={{
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              Your Playlists
+            </span>
           </button>
 
-          <div style={{ display: 'flex', gap: 4 }}>
+          <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
             <button
               className="aura-circle-btn"
-              style={{ width: 28, height: 28 }}
+              style={{ width: 26, height: 26, flexShrink: 0 }}
               title="Create Playlist"
               onClick={onCreatePlaylist}
             >
-              <Plus size={15} />
+              <Plus size={14} />
             </button>
             <button
               className="aura-circle-btn"
-              style={{ width: 28, height: 28 }}
+              style={{ width: 26, height: 26, flexShrink: 0 }}
               title="Equalizer & Visualizer"
               onClick={onOpenEqualizer}
             >
@@ -216,12 +228,12 @@ export default function Sidebar({
             </button>
             <button
               className="aura-circle-btn"
-              style={{ width: 28, height: 28, position: 'relative' }}
+              style={{ width: 26, height: 26, position: 'relative', flexShrink: 0 }}
               title={isCloudConnected ? "Cloud Sync: Connected" : "Cloud Sync Settings"}
               onClick={onOpenSupabase}
               aria-label="Cloud Sync Settings"
             >
-              <Cloud size={14} color={isCloudConnected ? "var(--pulse-accent)" : "currentColor"} />
+              <Cloud size={13} color={isCloudConnected ? "var(--pulse-accent)" : "currentColor"} />
               {isCloudConnected && (
                 <span
                   style={{

@@ -178,16 +178,17 @@ button, input, optgroup, select, textarea {
   height: 2px;
   width: 32px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--pulse-accent, #00c2d1);
+  opacity: 0;
   transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
   pointer-events: none;
 }
 
 .aura-resizer-row:hover .aura-resizer-line,
 .aura-resizer-row.is-resizing .aura-resizer-line {
+  opacity: 1;
   width: 56px;
   height: 3px;
-  background: var(--pulse-accent, #00c2d1);
   box-shadow: 0 0 10px rgba(0, 194, 209, 0.8), 0 0 2px rgba(255, 255, 255, 0.8);
 }
 
@@ -210,16 +211,17 @@ button, input, optgroup, select, textarea {
   width: 2px;
   height: 36px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--pulse-accent, #00c2d1);
+  opacity: 0;
   transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
   pointer-events: none;
 }
 
 .aura-resizer-col:hover .aura-resizer-line,
 .aura-resizer-col.is-resizing .aura-resizer-line {
+  opacity: 1;
   height: 64px;
   width: 3px;
-  background: var(--pulse-accent, #00c2d1);
   box-shadow: 0 0 10px rgba(0, 194, 209, 0.8), 0 0 2px rgba(255, 255, 255, 0.8);
 }
 
@@ -232,7 +234,7 @@ button, input, optgroup, select, textarea {
 
 /* Sidebar macOS traffic light clearance & window drag handle */
 .aura-sidebar-drag-handle {
-  height: 22px;
+  height: 38px;
   width: 100%;
   -webkit-app-region: drag;
   user-select: none;
@@ -347,13 +349,22 @@ button, input, optgroup, select, textarea {
   letter-spacing: 0.6px;
   color: var(--text-secondary);
   text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .aura-shelf-chips {
   display: flex;
-  gap: 6px;
+  gap: 5px;
   padding: 0 2px 8px;
   overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.aura-shelf-chips::-webkit-scrollbar {
+  display: none;
 }
 
 .aura-chip {
@@ -366,6 +377,7 @@ button, input, optgroup, select, textarea {
   border: 1px solid var(--border-subtle);
   cursor: pointer;
   white-space: nowrap;
+  flex-shrink: 0;
   transition: all var(--transition);
 }
 

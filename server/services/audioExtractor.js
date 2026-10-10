@@ -117,10 +117,15 @@ export async function extractAudioFromUrl(url, customMeta = {}) {
   };
 
   return new Promise((resolve, reject) => {
-    // Download best available audio stream (prefers m4a/aac, falls back to webm/opus) without needing ffmpeg
-    const cmd = `"${ytDlpCmd}" -f "ba[ext=m4a]/ba/b" --no-playlist -o "${outputPath}" --print-json "${url}"`;
+    const antiArgs = typeof config.getYtDlpAntiVerificationArgs === 'function'
+      ? config.getYtDlpAntiVerificationArgs()
+      : ['--js-runtimes', 'node', '--extractor-args', 'youtube:player_client=ios,android,mweb,web', '--geo-bypass'];
+    const antiArgsStr = antiArgs.map((a) => (a.includes(' ') ? `"${a}"` : a)).join(' ');
 
-    exec(cmd, { timeout: 90000, maxBuffer: 15 * 1024 * 1024, env: execEnv }, (error, stdout, stderr) => {
+    // Download best available audio stream with client fallback and JS runtime support
+    const cmd = `"${ytDlpCmd}" ${antiArgsStr} -f "ba[ext=m4a]/ba/b" --no-playlist -o "${outputPath}" --print-json "${url}"`;
+
+    exec(cmd, { timeout: 90000, maxBuffer: 15 * 1024 * 1024, env: execEnv }, async (error, stdout, stderr) => {
       let info = null;
       if (stdout) {
         try {
@@ -179,17 +184,66 @@ export async function extractAudioFromUrl(url, customMeta = {}) {
       }
 
       if (error) {
+        const stderrStr = stderr ? stderr.toString() : '';
+        const isVerificationRequired =
+          stderrStr.includes('Sign in to confirm you’re not a bot') ||
+          stderrStr.includes('Sign in to confirm you’re not a robot') ||
+          stderrStr.includes('Sign in to confirm your age') ||
+          stderrStr.includes('inappropriate for some users') ||
+          stderrStr.includes('HTTP Error 429');
+
+        // Automatic fallback: If YouTube requires verification (e.g. age-restricted music video or bot check),
+        // recover the song title via oEmbed/metadata and download the clean audio track
+        if (isVerificationRequired && !customMeta.__isRetry) {
+          try {
+            console.log('🔄 YouTube requires verification on direct video. Attempting clean audio fallback for:', url);
+            let fallbackTitle = customMeta.title;
+            let fallbackArtist = customMeta.artist;
+
+            if (!fallbackTitle || !fallbackArtist) {
+              try {
+                const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+                const oembedRes = await fetch(oembedUrl, { signal: AbortSignal.timeout(4000) });
+                if (oembedRes.ok) {
+                  const oembedData = await oembedRes.json();
+                  if (oembedData && oembedData.title) {
+                    const parsed = parseTitleAndArtist({ title: oembedData.title, uploader: oembedData.author_name }, customMeta);
+                    fallbackTitle = parsed.title;
+                    fallbackArtist = parsed.artist;
+                  }
+                }
+              } catch (oembedErr) {
+                // oembed failed, continue
+              }
+            }
+
+            if (fallbackTitle) {
+              const searchQuery = `ytsearch1:${(fallbackArtist || '').replace(/[-–—]/g, ' ')} ${fallbackTitle.replace(/[-–—]/g, ' ')} audio`.trim();
+              console.log('🔍 Searching clean audio fallback stream:', searchQuery);
+              const fallbackTrack = await extractAudioFromUrl(searchQuery, {
+                ...customMeta,
+                title: fallbackTitle,
+                artist: fallbackArtist || customMeta.artist,
+                __isRetry: true,
+              });
+              return resolve(fallbackTrack);
+            }
+          } catch (fallbackError) {
+            console.warn('Verification fallback attempt failed:', fallbackError.message);
+          }
+        }
+
         console.error('yt-dlp execution error:', {
           cmd,
           message: error.message,
-          stderr: stderr ? stderr.slice(0, 1000) : '',
+          stderr: stderrStr.slice(0, 1000),
         });
 
         let userMsg = 'Failed to extract audio from link. Please verify the URL.';
-        if (stderr) {
-          if (stderr.includes('Private video')) userMsg = 'This video is private or requires sign-in.';
-          else if (stderr.includes('Video unavailable')) userMsg = 'This video is unavailable or has been removed.';
-          else if (stderr.includes('Sign in to confirm you’re not a bot')) userMsg = 'YouTube requires verification for this link. Try another video.';
+        if (stderrStr) {
+          if (stderrStr.includes('Private video')) userMsg = 'This video is private or requires sign-in.';
+          else if (stderrStr.includes('Video unavailable')) userMsg = 'This video is unavailable or has been removed.';
+          else if (isVerificationRequired) userMsg = 'YouTube requires verification for this specific video. You can place a cookies.txt file in Application Support/pulse-music-player or try another upload.';
         }
         return reject(new Error(userMsg));
       }

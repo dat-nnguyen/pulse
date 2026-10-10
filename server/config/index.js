@@ -65,11 +65,15 @@ export function resolveYtDlpBinary() {
   return 'yt-dlp';
 }
 
-// Augment PATH so any spawned process can find yt-dlp or system tools
+// Augment PATH so any spawned process can find yt-dlp, node, or system tools
 const extraPaths = [
+  path.dirname(process.execPath),
   '/usr/local/bin',
   '/opt/homebrew/bin',
   '/opt/homebrew/sbin',
+  '/usr/bin',
+  '/bin',
+  path.join(homeDir, '.nvm', 'versions', 'node', 'v26.4.0', 'bin'),
   path.join(homeDir, '.local', 'bin'),
   path.join(homeDir, 'Library', 'Application Support', 'pulse-music-player', 'bin'),
   path.join(rootDir, 'bin'),
@@ -81,6 +85,41 @@ process.env.PATH = Array.from(new Set([...extraPaths, ...existingPaths])).filter
 
 const resolvedYtDlp = resolveYtDlpBinary();
 
+export function resolveCookiesFile() {
+  const candidateCookies = [
+    process.env.YOUTUBE_COOKIES_PATH,
+    path.join(homeDir, 'Library', 'Application Support', 'pulse-music-player', 'cookies.txt'),
+    path.join(homeDir, '.config', 'pulse-music-player', 'cookies.txt'),
+    path.join(homeDir, '.config', 'yt-dlp', 'cookies.txt'),
+    path.join(homeDir, 'Downloads', 'cookies.txt'),
+    path.join(rootDir, 'cookies.txt'),
+  ].filter(Boolean);
+
+  for (const c of candidateCookies) {
+    try {
+      if (fs.existsSync(c)) {
+        return c;
+      }
+    } catch (e) {}
+  }
+  return null;
+}
+
+export function getYtDlpAntiVerificationArgs() {
+  const args = [
+    '--js-runtimes', 'node',
+    '--extractor-args', 'youtube:player_client=ios,android,mweb,web',
+    '--geo-bypass',
+  ];
+
+  const cookieFile = resolveCookiesFile();
+  if (cookieFile) {
+    args.push('--cookies', cookieFile);
+  }
+
+  return args;
+}
+
 export const config = {
   port: process.env.PORT || 3030,
   host: process.env.HOST || '0.0.0.0',
@@ -90,6 +129,8 @@ export const config = {
   distDir: process.env.DIST_DIR || path.join(rootDir, 'dist'),
   venvYtDlp: resolvedYtDlp,
   resolveYtDlp: resolveYtDlpBinary,
+  resolveCookiesFile,
+  getYtDlpAntiVerificationArgs,
   corsOrigins: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : '*',
 };
 

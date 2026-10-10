@@ -54,7 +54,12 @@ export async function handleStream(req, res, next) {
     const existingPaths = (process.env.PATH || '').split(':');
     const enhancedPath = Array.from(new Set([...extraPaths, ...existingPaths])).filter(Boolean).join(':');
 
+    const antiArgs = typeof config.getYtDlpAntiVerificationArgs === 'function'
+      ? config.getYtDlpAntiVerificationArgs()
+      : ['--js-runtimes', 'node', '--extractor-args', 'youtube:player_client=ios,android,mweb,web', '--geo-bypass'];
+
     const proc = spawn(ytDlpCmd, [
+      ...antiArgs,
       '-f', 'ba[ext=m4a]/ba/b',
       '--no-playlist',
       '--buffer-size', '16K',

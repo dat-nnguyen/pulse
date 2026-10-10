@@ -113,7 +113,12 @@ export async function searchYouTubeYtDlp(query, limit = 10) {
     'yt-dlp';
 
   return new Promise((resolve) => {
-    const cmd = `"${ytDlpCmd}" "ytsearch${limit}:${query.replace(/"/g, '\\"')}" --dump-json --flat-playlist --no-warnings`;
+    const antiArgs = typeof config.getYtDlpAntiVerificationArgs === 'function'
+      ? config.getYtDlpAntiVerificationArgs()
+      : ['--js-runtimes', 'node', '--extractor-args', 'youtube:player_client=ios,android,mweb,web', '--geo-bypass'];
+    const antiArgsStr = antiArgs.map((a) => (a.includes(' ') ? `"${a}"` : a)).join(' ');
+
+    const cmd = `"${ytDlpCmd}" ${antiArgsStr} "ytsearch${limit}:${query.replace(/"/g, '\\"')}" --dump-json --flat-playlist --no-warnings`;
 
     exec(
       cmd,

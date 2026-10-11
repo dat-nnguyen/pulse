@@ -352,6 +352,12 @@ export default function App() {
     if (!track) return;
     const { isQueueAdvance = false, forceShuffle = false, isHistoryBack = false } = options;
 
+    // If the user clicks the currently loaded track (not a queue/history action), toggle play/pause
+    if (!isQueueAdvance && !isHistoryBack && currentTrackRef.current && currentTrackRef.current.id === track.id) {
+      audioEngine.togglePlay();
+      return;
+    }
+
     if (!isHistoryBack && currentTrackRef.current && currentTrackRef.current.id !== track.id) {
       playbackHistoryRef.current.push(currentTrackRef.current);
       if (playbackHistoryRef.current.length > 50) {

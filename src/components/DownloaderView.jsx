@@ -651,6 +651,8 @@ export default function DownloaderView({
     if (parsedBatchUrls.length === 0) return;
 
     setIsBatchDownloading(true);
+    setBatchUrlsText('');
+    setDownloadStatus(null);
     const initialItems = parsedBatchUrls.map((url, i) => ({
       id: i,
       url,

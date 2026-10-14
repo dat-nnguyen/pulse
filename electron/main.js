@@ -123,8 +123,8 @@ async function createWindow() {
   }
 
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 840,
+    width: 960,
+    height: 640,
     minWidth: 960,
     minHeight: 640,
     title: 'Pulse Music Player',

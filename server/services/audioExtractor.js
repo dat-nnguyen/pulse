@@ -86,6 +86,13 @@ export function parseTitleAndArtist(info, customMeta = {}) {
 }
 
 export async function extractAudioFromUrl(url, customMeta = {}) {
+  // Normalize YouTube watch links by stripping radio/playlist parameters (&list=RD..., &start_radio=1)
+  let cleanUrl = (url || '').trim();
+  const ytMatch = cleanUrl.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{11})/i);
+  if (ytMatch && ytMatch[1]) {
+    cleanUrl = `https://www.youtube.com/watch?v=${ytMatch[1]}`;
+  }
+
   const ytDlpCmd = (typeof config.resolveYtDlp === 'function' ? config.resolveYtDlp() : null)
     || (config.venvYtDlp && fs.existsSync(config.venvYtDlp) ? config.venvYtDlp : 'yt-dlp');
 
@@ -119,13 +126,13 @@ export async function extractAudioFromUrl(url, customMeta = {}) {
   return new Promise((resolve, reject) => {
     const antiArgs = typeof config.getYtDlpAntiVerificationArgs === 'function'
       ? config.getYtDlpAntiVerificationArgs()
-      : ['--js-runtimes', 'node', '--extractor-args', 'youtube:player_client=ios,android,mweb,web', '--geo-bypass'];
+      : ['--js-runtimes', 'node', '--extractor-args', 'youtube:player_client=ios,mweb,web,android', '--geo-bypass'];
     const antiArgsStr = antiArgs.map((a) => (a.includes(' ') ? `"${a}"` : a)).join(' ');
 
-    // Download best available audio stream with client fallback and JS runtime support
-    const cmd = `"${ytDlpCmd}" ${antiArgsStr} -f "ba[ext=m4a]/ba/b" --no-playlist -o "${outputPath}" --print-json "${url}"`;
+    // Prioritize clean M4A audio stream (format 140 / best audio), avoiding massive 360p video stream downloads
+    const cmd = `"${ytDlpCmd}" ${antiArgsStr} -f "140/ba[ext=m4a]/ba/b" --no-playlist -o "${outputPath}" --print-json "${cleanUrl}"`;
 
-    exec(cmd, { timeout: 90000, maxBuffer: 15 * 1024 * 1024, env: execEnv }, async (error, stdout, stderr) => {
+    exec(cmd, { timeout: 600000, maxBuffer: 30 * 1024 * 1024, env: execEnv }, async (error, stdout, stderr) => {
       let info = null;
       if (stdout) {
         try {
@@ -142,9 +149,11 @@ export async function extractAudioFromUrl(url, customMeta = {}) {
         }
       }
 
-      // Check if file was downloaded to cache
+      // Check if file was downloaded to cache (must be a completed file, not .part or .ytdl)
       const files = fs.existsSync(config.cacheDir) ? fs.readdirSync(config.cacheDir) : [];
-      const downloadedFile = files.find((f) => f.startsWith(outputId));
+      const downloadedFile = files.find(
+        (f) => f.startsWith(outputId) && !f.endsWith('.part') && !f.endsWith('.ytdl') && !f.endsWith('.temp')
+      );
 
       if (downloadedFile) {
         // If secondary rootDir cache exists and differs from primary, mirror file for local dev access
@@ -233,11 +242,26 @@ export async function extractAudioFromUrl(url, customMeta = {}) {
           }
         }
 
+        // Clean up any incomplete / part files left by failed or interrupted download
+        try {
+          const remainingFiles = fs.existsSync(config.cacheDir) ? fs.readdirSync(config.cacheDir) : [];
+          const partFiles = remainingFiles.filter((f) => f.startsWith(outputId));
+          for (const pf of partFiles) {
+            try {
+              fs.unlinkSync(path.join(config.cacheDir, pf));
+            } catch (e) {}
+          }
+        } catch (cleanupErr) {}
+
         console.error('yt-dlp execution error:', {
           cmd,
           message: error.message,
           stderr: stderrStr.slice(0, 1000),
         });
+
+        if (error.killed || error.signal === 'SIGTERM' || (error.message && (error.message.includes('TIMEDOUT') || error.message.includes('timeout')))) {
+          return reject(new Error('Download timed out. The audio file is exceptionally large or network speed is slow. Please try again.'));
+        }
 
         let userMsg = 'Failed to extract audio from link. Please verify the URL.';
         if (stderrStr) {

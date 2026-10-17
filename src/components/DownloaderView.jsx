@@ -36,7 +36,7 @@ function YoutubeIcon({ size = 16 }) {
   );
 }
 
-import { downloadFromWebUrl, downloadMultipleFromWebUrls } from '../services/musicDownloaderService';
+import { downloadFromWebUrl, downloadMultipleFromWebUrls, sanitizeMusicUrl } from '../services/musicDownloaderService';
 import { parseAudioFile } from '../services/localFileParser';
 import {
   saveTrack,
@@ -585,12 +585,13 @@ export default function DownloaderView({
     e.preventDefault();
     if (!webUrl.trim()) return;
 
+    const targetUrl = sanitizeMusicUrl(webUrl.trim());
     setIsDownloading(true);
     setDownloadStatus(null);
     setDownloadProgress({ status: 'Connecting to audio stream...', percent: 20 });
 
     try {
-      const track = await downloadFromWebUrl(webUrl.trim(), {
+      const track = await downloadFromWebUrl(targetUrl, {
         title: customTitle.trim() || undefined,
         artist: customArtist.trim() || undefined,
       });
@@ -634,11 +635,20 @@ export default function DownloaderView({
       setCustomTitle('');
       setCustomArtist('');
     } catch (err) {
+      let errorMsg = err.message || 'Download failed. Check the URL or try a direct audio link.';
+      if (
+        errorMsg.includes('signal timed out') ||
+        errorMsg.includes('timed out') ||
+        errorMsg.includes('timeout') ||
+        err.name === 'TimeoutError'
+      ) {
+        errorMsg = 'Download timed out. The audio track is very large (e.g. multi-hour mix) or network connection is slow. Please try again.';
+      }
       setDownloadStatus({
         type: 'error',
-        message: err.message || 'Download failed. Check the URL or try a direct audio link.',
+        message: errorMsg,
       });
-      if (toast) toast.error(err.message || 'Download failed.', { title: 'Download error' });
+      if (toast) toast.error(errorMsg, { title: 'Download error' });
     } finally {
       setIsDownloading(false);
       setDownloadProgress(null);

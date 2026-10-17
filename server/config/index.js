@@ -108,7 +108,7 @@ export function resolveCookiesFile() {
 export function getYtDlpAntiVerificationArgs() {
   const args = [
     '--js-runtimes', 'node',
-    '--extractor-args', 'youtube:player_client=ios,android,mweb,web',
+    '--extractor-args', 'youtube:player_client=ios,mweb,web,android',
     '--geo-bypass',
   ];
 

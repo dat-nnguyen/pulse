@@ -113,9 +113,20 @@ export function setBackendBaseUrl(url) {
   }
 }
 
+// Clean and normalize YouTube watch links by stripping radio/playlist parameters (&list=RD..., &start_radio=1)
+export function sanitizeMusicUrl(url) {
+  if (!url || typeof url !== 'string') return url;
+  const trimmed = url.trim();
+  const ytMatch = trimmed.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{11})/i);
+  if (ytMatch && ytMatch[1]) {
+    return `https://www.youtube.com/watch?v=${ytMatch[1]}`;
+  }
+  return trimmed;
+}
+
 // Download from YouTube or direct URL via backend or direct audio stream
 export async function downloadFromWebUrl(inputUrl, customMeta = {}) {
-  const trimmedUrl = (inputUrl || '').trim();
+  const trimmedUrl = sanitizeMusicUrl((inputUrl || '').trim());
   const baseUrl = getBackendBaseUrl();
 
   // 1. Direct audio stream provided in customMeta (e.g. from 1-Click Search on web)
@@ -144,7 +155,7 @@ export async function downloadFromWebUrl(inputUrl, customMeta = {}) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: trimmedUrl, ...customMeta }),
-        signal: AbortSignal.timeout(90000), // Allow 90s for high-quality audio extraction
+        signal: AbortSignal.timeout(600000), // Allow up to 10 minutes for large/multi-hour tracks & playlists
       });
 
       if (res.ok) {
@@ -165,7 +176,15 @@ export async function downloadFromWebUrl(inputUrl, customMeta = {}) {
         }
       }
     } catch (backendErr) {
-      if (backendErr.message && !backendErr.message.includes('fetch') && !backendErr.message.includes('timeout')) {
+      const msg = backendErr.message || '';
+      if (
+        msg.includes('timed out') ||
+        msg.includes('timeout') ||
+        backendErr.name === 'TimeoutError'
+      ) {
+        throw new Error('Download timed out. The audio track is very large (e.g. multi-hour mix) or network connection is slow. Please try again.');
+      }
+      if (!msg.includes('fetch')) {
         throw backendErr;
       }
     }

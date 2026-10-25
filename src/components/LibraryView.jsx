@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { ConfirmDialog, useConfirm } from './ConfirmDialog';
 import TrackContextMenu from './TrackContextMenu';
-import { downloadTrackAudioFile, detectPlaylistDuplicates } from '../services/storageService';
+import { downloadPlaylistForOffline, detectPlaylistDuplicates } from '../services/storageService';
 
 export default function LibraryView({
   playlistId,
@@ -47,11 +47,13 @@ export default function LibraryView({
   onDeletePlaylist,
   onPlaylistContextMenu,
   onEditPlaylist,
+  onOfflineDownloadComplete,
 }) {
   const currentPlaylist = playlists.find((p) => p.id === playlistId);
   const isCustomPlaylist = Boolean(currentPlaylist);
   const [playlistFilter, setPlaylistFilter] = useState('');
   const [contextMenu, setContextMenu] = useState(null); // { x, y, track }
+  const [isDownloadingPlaylist, setIsDownloadingPlaylist] = useState(false);
 
   // Detect duplicates in custom playlists
   const dupReport = useMemo(() => {
@@ -75,15 +77,7 @@ export default function LibraryView({
     title = 'Offline Storage';
     description = 'Saved locally to device storage • Lossless & 320kbps Original';
     bannerGradient = 'linear-gradient(180deg, #0c2b3d 0%, #0b0e14 100%)';
-    rawTracks = tracks.filter(
-      (t) =>
-        t.isDownloaded ||
-        Boolean(t.audioBlob) ||
-        (t.audioUrl &&
-          (t.audioUrl.startsWith('/audio/') ||
-            t.audioUrl.includes('localhost') ||
-            t.audioUrl.includes('127.0.0.1')))
-    );
+    rawTracks = tracks.filter((t) => Boolean(t.audioBlob && t.audioBlob.size > 0));
   } else if (playlistId && playlistId !== 'all') {
     const pl = playlists.find((p) => p.id === playlistId);
     if (pl) {
@@ -359,23 +353,33 @@ export default function LibraryView({
             </button>
           )}
 
-          {/* Download Audio Files to Device (up to 10) */}
+          {/* Save all playlist tracks on this device for offline playback */}
           {displayTracks.length > 0 && (
             <button
               className="aura-circle-btn"
-              title={`Download audio files to device (${Math.min(displayTracks.length, 10)} tracks max)`}
+              disabled={isDownloadingPlaylist}
+              title={isDownloadingPlaylist ? 'Saving tracks on this device…' : 'Save playlist for offline playback on this device'}
+              aria-label="Save playlist for offline playback"
               onClick={async () => {
-                const toDownload = displayTracks.slice(0, 10);
-                if (toast) toast.info(`Starting download of ${toDownload.length} audio file(s)...`, { title: 'Downloading Audio' });
-                for (const t of toDownload) {
-                  try {
-                    await downloadTrackAudioFile(t);
-                    await new Promise((r) => setTimeout(r, 450));
-                  } catch (e) {
-                    console.warn('Failed to download track file:', t.title, e);
-                  }
+                if (!isCustomPlaylist || !currentPlaylist || isDownloadingPlaylist) {
+                  if (!isCustomPlaylist) toast?.info('Choose a playlist to save its songs for offline playback.', { title: 'Offline downloads' });
+                  return;
                 }
-                if (toast) toast.success(`Finished downloading ${toDownload.length} track(s)!`, { title: 'Download Complete' });
+                setIsDownloadingPlaylist(true);
+                toast?.info(`Saving ${displayTracks.length} tracks on this device…`, { title: 'Downloading playlist' });
+                try {
+                  const result = await downloadPlaylistForOffline(currentPlaylist, displayTracks);
+                  await onOfflineDownloadComplete?.();
+                  if (result.failures.length) {
+                    toast?.warning(`Saved ${result.completed} of ${result.total} tracks. ${result.failures.length} could not be downloaded; check your connection and retry.`, { title: 'Some downloads failed' });
+                  } else {
+                    toast?.success(`Saved all ${result.completed} tracks for offline playback.`, { title: 'Offline playlist ready' });
+                  }
+                } catch (error) {
+                  toast?.error(error.message || 'Could not save this playlist for offline playback.');
+                } finally {
+                  setIsDownloadingPlaylist(false);
+                }
               }}
             >
               <Download size={18} />

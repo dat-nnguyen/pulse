@@ -39,114 +39,70 @@ export async function getDB() {
 }
 
 // Track operations: Local IndexedDB + Supabase Cloud
-export async function saveTrack(track) {
-  const db = await getDB();
-  let item = {
-    ...track,
-    addedAt: track.addedAt || Date.now(),
-    isDownloaded: Boolean(
-      track.audioBlob ||
-      track.isDownloaded ||
-      (track.audioUrl && (track.audioUrl.startsWith('/audio/') || track.audioUrl.includes('localhost') || track.audioUrl.includes('127.0.0.1')))
-    ),
-  };
-
-  // Preserve local URL for instant offline/desktop playback
-  if (item.audioUrl && (item.audioUrl.startsWith('/audio/') || item.audioUrl.includes('localhost') || item.audioUrl.includes('127.0.0.1'))) {
-    item.localAudioUrl = item.localAudioUrl || item.audioUrl;
-    item.isDownloaded = true;
-  }
-
 function resolveDeviceFetchTarget(url) {
   if (!url) return '';
   const backendBase = getBackendBaseUrl();
   if (url.startsWith('/audio/')) {
-    if (backendBase) {
-      return `${backendBase}${url}`;
-    }
+    if (backendBase) return `${backendBase}${url}`;
     if (typeof window !== 'undefined' && window.location.protocol.startsWith('http') && !window.location.protocol.startsWith('capacitor')) {
       return `${window.location.origin}${url}`;
     }
     const filename = url.split('/audio/').pop();
     return `https://wtrlpbumpwtauvxqwrrg.supabase.co/storage/v1/object/public/audio-files/audio/${filename}`;
   }
-  if (backendBase && (url.includes('127.0.0.1:3030') || url.includes('localhost:3030') || url.includes('192.168.') || url.includes('10.11.'))) {
+  if (backendBase && /127\.0\.0\.1:3030|localhost:3030|192\.168\.|10\.11\./.test(url)) {
     return url.replace(/http:\/\/[^/]+(:3030)?/, backendBase);
   }
   return url;
 }
 
-  // Eagerly fetch and store audioBlob in local IndexedDB so it lies in offline storage immediately!
-  if (!item.audioBlob && item.audioUrl) {
+// Track operations: Local IndexedDB + Supabase Cloud
+export async function saveTrack(track) {
+  const db = await getDB();
+  const item = {
+    ...track,
+    addedAt: track.addedAt || Date.now(),
+    isDownloaded: Boolean(track.audioBlob instanceof Blob && track.audioBlob.size > 0),
+  };
+
+  if (item.audioUrl && (item.audioUrl.startsWith('/audio/') || item.audioUrl.includes('localhost') || item.audioUrl.includes('127.0.0.1'))) {
+    item.localAudioUrl = item.localAudioUrl || item.audioUrl;
+  }
+
+  if (!item.audioBlob && item.audioUrl && (typeof navigator === 'undefined' || navigator.onLine)) {
     try {
-      const fetchTarget = resolveDeviceFetchTarget(item.localAudioUrl || item.audioUrl);
-      const res = await fetch(fetchTarget);
-      if (res.ok) {
-        const blob = await res.blob();
-        item.audioBlob = blob;
-        item.isDownloaded = true;
-        item.fileSizeBytes = item.fileSizeBytes || blob.size;
-        item.downloadedAt = item.downloadedAt || Date.now();
+      const response = await fetch(resolveDeviceFetchTarget(item.localAudioUrl || item.audioUrl));
+      if (response.ok) {
+        const blob = await response.blob();
+        if (blob.size > 0) {
+          item.audioBlob = blob;
+          item.isDownloaded = true;
+          item.fileSizeBytes = item.fileSizeBytes || blob.size;
+          item.downloadedAt = item.downloadedAt || Date.now();
+        }
       }
-    } catch (cacheErr) {
-      console.warn('Immediate offline audio blob caching notice:', cacheErr.message);
+    } catch (error) {
+      console.warn('Immediate offline audio blob caching notice:', error.message);
     }
   }
 
-  // If Supabase is configured, upload audio file & metadata to cloud
-  if (isSupabaseConfigured() && navigator.onLine) {
+  if (!item.offlineCacheOnly && isSupabaseConfigured() && (typeof navigator === 'undefined' || navigator.onLine)) {
     try {
-      // 1. If audioBlob exists (e.g. from local file import), upload to Supabase Storage
-      if (item.audioBlob && item.audioBlob instanceof Blob) {
+      if (item.audioBlob instanceof Blob && item.audioBlob.size > 0) {
         try {
-          const cloudAudioUrl = await uploadAudioToSupabaseStorage(
-            item.id,
-            item.audioBlob,
-            `${item.title || 'track'}.${(item.format || 'mp3').toLowerCase()}`
-          );
+          const cloudAudioUrl = await uploadAudioToSupabaseStorage(item.id, item.audioBlob, `${item.title || 'track'}.${(item.format || 'mp3').toLowerCase()}`);
           if (cloudAudioUrl) {
             item.cloudAudioUrl = cloudAudioUrl;
-            if (!item.localAudioUrl) {
-              item.audioUrl = cloudAudioUrl;
-            }
+            if (!item.localAudioUrl) item.audioUrl = cloudAudioUrl;
           }
-        } catch (uploadErr) {
-          console.warn('Audio storage upload warning:', uploadErr.message);
-        }
-      } else if (
-        item.audioUrl &&
-        (item.audioUrl.startsWith('/audio/') ||
-          item.audioUrl.startsWith('http://localhost') ||
-          item.audioUrl.startsWith('http://127.0.0.1'))
-      ) {
-        // If downloaded via local Mac backend, fetch the audio and upload to Supabase Storage
-        // so iPhone and Web can stream it globally!
-        try {
-          const fetchTarget = resolveDeviceFetchTarget(item.localAudioUrl || item.audioUrl);
-          const res = await fetch(fetchTarget);
-          if (res.ok) {
-            const blob = await res.blob();
-            item.audioBlob = blob;
-            const cloudAudioUrl = await uploadAudioToSupabaseStorage(
-              item.id,
-              blob,
-              `${item.title || 'track'}.${(item.format || 'm4a').toLowerCase()}`
-            );
-            if (cloudAudioUrl) {
-              item.cloudAudioUrl = cloudAudioUrl;
-            }
-          }
-        } catch (fetchErr) {
-          console.warn('Local audio stream to Supabase upload warning:', fetchErr.message);
+        } catch (error) {
+          console.warn('Audio storage upload warning:', error.message);
         }
       }
-
       const savedCloud = await saveTrackToSupabase(item);
-      if (savedCloud) {
-        item.isCloudSynced = true;
-      }
-    } catch (cloudErr) {
-      console.warn('Supabase cloud track upload warning:', cloudErr.message);
+      if (savedCloud) item.isCloudSynced = true;
+    } catch (error) {
+      console.warn('Supabase cloud track upload warning:', error.message);
     }
   }
 
@@ -154,7 +110,60 @@ function resolveDeviceFetchTarget(url) {
   return item;
 }
 
-// Complete Bidirectional Cloud Sync
+export async function cacheTrackForOffline(track, onProgress = () => {}) {
+  if (!track?.id) throw new Error('Missing track');
+  if (track.audioBlob instanceof Blob && track.audioBlob.size > 0) {
+    return { ...track, isDownloaded: true };
+  }
+
+  let url = track.audioUrlHighQuality || track.cloudAudioUrl || track.audioUrl || track.localAudioUrl;
+  const backendBase = getBackendBaseUrl();
+  const cloudUrl = track.cloudAudioUrl || (typeof track.audioUrl === 'string' && track.audioUrl.startsWith('https://') ? track.audioUrl : null);
+  if (url?.startsWith('/audio/')) {
+    const filename = url.split('/audio/').pop();
+    url = backendBase ? `${backendBase}${url}` : (cloudUrl || `https://wtrlpbumpwtauvxqwrrg.supabase.co/storage/v1/object/public/audio-files/audio/${filename}`);
+  } else if (backendBase && url && /127\.0\.0\.1|localhost|192\.168\.|10\.11\./.test(url)) {
+    url = url.replace(/http:\/\/[^/]+(:3030)?/, backendBase);
+  }
+  if (!url) throw new Error(`No audio source for ${track.title || track.id}`);
+
+  onProgress({ status: 'downloading', trackId: track.id });
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Download failed (${response.status})`);
+  const blob = await response.blob();
+  if (!blob.size) throw new Error('Downloaded audio is empty');
+
+  const saved = {
+    ...track,
+    audioBlob: blob,
+    isDownloaded: true,
+    offlineCacheOnly: true,
+    fileSizeBytes: blob.size,
+    downloadedAt: Date.now(),
+  };
+  const db = await getDB();
+  await db.put('tracks', saved);
+  onProgress({ status: 'complete', trackId: track.id, bytes: blob.size });
+  return saved;
+}
+
+export async function downloadPlaylistForOffline(playlist, tracks) {
+  const trackMap = new Map((tracks || []).map((track) => [track.id, track]));
+  const items = (playlist?.trackIds || []).map((id) => trackMap.get(id)).filter(Boolean);
+  const failures = [];
+  let completed = 0;
+
+  for (const track of items) {
+    try {
+      await cacheTrackForOffline(track);
+      completed += 1;
+    } catch (error) {
+      failures.push({ trackId: track.id, title: track.title, error: error.message });
+    }
+  }
+  return { completed, total: items.length, failures };
+}
+
 export async function syncLibraryWithCloud(force = false) {
   const db = await getDB();
   const localTracks = await db.getAll('tracks');

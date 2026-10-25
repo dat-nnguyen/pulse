@@ -40,6 +40,8 @@ class AudioEngine {
     this.isPlaying = false;
     this.volume = 0.8;
     this.audio.volume = this.volume;
+    this.preloadAudio = null;
+    this.preloadedTrackId = null;
 
     // Callbacks
     this.listeners = {
@@ -249,14 +251,6 @@ class AudioEngine {
       ['pause', () => this.pause()],
       ['previoustrack', () => this.notify('prevTrackRequest')],
       ['nexttrack', () => this.notify('nextTrackRequest')],
-      ['seekbackward', (details) => {
-        const skipTime = details.seekOffset || 10;
-        this.seek(Math.max(this.audio.currentTime - skipTime, 0));
-      }],
-      ['seekforward', (details) => {
-        const skipTime = details.seekOffset || 10;
-        this.seek(Math.min(this.audio.currentTime + skipTime, this.audio.duration || 0));
-      }],
       ['seekto', (details) => {
         if (details.seekTime != null) {
           this.seek(details.seekTime);
@@ -320,6 +314,42 @@ class AudioEngine {
         // Ignore edge position timing exceptions
       }
     }
+  }
+
+  preloadTrack(track) {
+    if (!track || track.id === this.currentTrack?.id || track.id === this.preloadedTrackId) return;
+
+    let src = track.cloudAudioUrl?.startsWith('http')
+      ? track.cloudAudioUrl
+      : (track.localAudioUrl || track.audioUrl || '');
+    const backendBase = getBackendBaseUrl();
+    const cloudUrl = getCloudFallbackUrl(track);
+    const isIOS = typeof navigator !== 'undefined' && (
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    );
+    const isCapacitor = typeof window !== 'undefined' && (
+      window.location.protocol === 'capacitor:' || !!window.Capacitor
+    );
+
+    if ((isIOS || isCapacitor) && cloudUrl) {
+      src = cloudUrl;
+    } else if (src.startsWith('/audio/')) {
+      src = backendBase ? `${backendBase}${src}` : (cloudUrl || `${window.location.origin}${src}`);
+    } else if (backendBase && (src.includes('127.0.0.1:3030') || src.includes('localhost:3030') || src.includes('192.168.') || src.includes('10.11.'))) {
+      src = src.replace(/http:\/\/[^/]+(:3030)?/, backendBase);
+    }
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && src.startsWith('http://') && cloudUrl?.startsWith('https://')) {
+      src = cloudUrl;
+    }
+    if (!src || src.startsWith('blob:')) return;
+
+    this.preloadAudio?.pause();
+    this.preloadAudio = new Audio();
+    this.preloadAudio.preload = 'auto';
+    this.preloadAudio.src = src;
+    this.preloadAudio.load();
+    this.preloadedTrackId = track.id;
   }
 
   async loadTrack(track) {
@@ -402,8 +432,14 @@ class AudioEngine {
       this.audio.removeAttribute('crossOrigin');
     }
 
+    if (this.preloadedTrackId === track.id && this.preloadAudio && !isLocalBlob) {
+      src = this.preloadAudio.currentSrc || this.preloadAudio.src;
+      this.preloadAudio.pause();
+      this.preloadAudio = null;
+    }
+
     this.audio.src = src;
-    this.audio.load();
+    this.preloadedTrackId = null;
     this.updateMediaSessionMetadata(track);
     this.notify('trackChange', track);
   }
@@ -414,13 +450,12 @@ class AudioEngine {
       return;
     }
     this.initWebAudio();
-    if (this.audioCtx && this.audioCtx.state === 'suspended') {
-      try {
-        await this.audioCtx.resume();
-      } catch (e) {}
-    }
+    const resumePromise = this.audioCtx && this.audioCtx.state === 'suspended'
+      ? this.audioCtx.resume().catch(() => {})
+      : Promise.resolve();
     try {
       await this.audio.play();
+      void resumePromise;
     } catch (e) {
       console.warn('Playback error / autoplay prevention:', e);
       if (this.audio.crossOrigin) {

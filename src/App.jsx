@@ -39,6 +39,7 @@ import PlaylistContextMenu from './components/PlaylistContextMenu';
 import { ConfirmDialog, useConfirm } from './components/ConfirmDialog';
 import { ToastContainer, useToast } from './components/ToastNotification';
 import { getCurrentUser, subscribeAuthChange } from './services/authService';
+import { playbackSync } from './services/playbackSyncService';
 
 export default function App() {
   // User Authentication State
@@ -205,6 +206,8 @@ export default function App() {
   tracksRef.current = tracks;
   const queueRef = useRef(queue);
   queueRef.current = queue;
+  const queueIndexRef = useRef(new Map());
+  queueIndexRef.current = new Map(queue.map((track, index) => [track.id, index]));
   const isShuffleRef = useRef(isShuffle);
   isShuffleRef.current = isShuffle;
   const repeatModeRef = useRef(repeatMode);
@@ -293,10 +296,14 @@ export default function App() {
     initDB();
 
     // Check user authentication & listen for recovery / auth changes
-    getCurrentUser().then((u) => setUser(u));
+    getCurrentUser().then((u) => {
+      setUser(u);
+      playbackSync.connect(u?.id);
+    });
     const unsubscribeAuth = subscribeAuthChange(
       async (u) => {
         setUser(u);
+        playbackSync.connect(u?.id);
         if (u) {
           try {
             const res = await syncLibraryWithCloud(true);
@@ -343,6 +350,7 @@ export default function App() {
     return () => {
       unsubscribeAuth();
       unsubscribeCloud();
+      playbackSync.disconnect();
       if (syncTimeout) clearTimeout(syncTimeout);
     };
   }, []);
@@ -358,6 +366,9 @@ export default function App() {
       return;
     }
 
+    if (playbackSync.request('playTrack', { trackId: track.id })) return;
+    if (user && playbackSync.channel && !playbackSync.isLeader) playbackSync.becomeLeader();
+
     if (!isHistoryBack && currentTrackRef.current && currentTrackRef.current.id !== track.id) {
       playbackHistoryRef.current.push(currentTrackRef.current);
       if (playbackHistoryRef.current.length > 50) {
@@ -367,6 +378,7 @@ export default function App() {
 
     setCurrentTrack(track);
     currentTrackRef.current = track;
+    playbackSync.publish({ trackId: track.id, isPlaying: true, currentTime: 0, queueIds: queueRef.current.map((item) => item.id) });
 
     const shouldShuffle = forceShuffle || isShuffleRef.current;
     if (forceShuffle) {
@@ -416,6 +428,10 @@ export default function App() {
     try {
       await audioEngine.loadTrack(track);
       await audioEngine.play();
+      const nextTrack = isQueueAdvance && Array.isArray(contextOrQueue)
+        ? contextOrQueue[0]
+        : queueRef.current[0];
+      if (nextTrack && nextTrack.id !== track.id) audioEngine.preloadTrack(nextTrack);
     } catch (e) {
       console.warn('Playback gesture required:', e);
     }
@@ -423,9 +439,14 @@ export default function App() {
 
   // Next Track Logic
   const handleNextTrack = useCallback(() => {
+    if (playbackSync.request('next')) return;
+    if (playbackSync.hasRemoteLeader) {
+      playbackSync.channel?.postMessage({ type: 'command', command: 'next', payload: {}, userId: user?.id, deviceId: playbackSync.deviceId });
+      return;
+    }
+    if (user && playbackSync.channel && !playbackSync.isLeader) playbackSync.becomeLeader();
     if (repeatModeRef.current === 'one' && currentTrackRef.current) {
-      audioEngine.seek(0);
-      audioEngine.play();
+      audioEngine.replayCurrentTrack?.() || (audioEngine.seek(0), audioEngine.play());
       return;
     }
 
@@ -459,10 +480,16 @@ export default function App() {
         handlePlayTrack(first, rest, { isQueueAdvance: true });
       }
     }
-  }, [handlePlayTrack]);
+  }, [handlePlayTrack, user]);
 
   // Previous Track Logic
   const handlePrevTrack = useCallback(() => {
+    if (playbackSync.request('previous')) return;
+    if (playbackSync.hasRemoteLeader) {
+      playbackSync.channel?.postMessage({ type: 'command', command: 'previous', payload: {}, userId: user?.id, deviceId: playbackSync.deviceId });
+      return;
+    }
+    if (user && playbackSync.channel && !playbackSync.isLeader) playbackSync.becomeLeader();
     if (currentTime > 3) {
       audioEngine.seek(0);
       return;
@@ -491,56 +518,81 @@ export default function App() {
     } else {
       handlePlayTrack(all[all.length - 1], []);
     }
-  }, [currentTime, handlePlayTrack]);
+  }, [currentTime, handlePlayTrack, user]);
 
-  // Audio Engine Event Listeners
+  const handleTogglePlay = useCallback(() => {
+    if (!currentTrackRef.current) return;
+    if (playbackSync.request('togglePlay')) return;
+    if (playbackSync.hasRemoteLeader) {
+      playbackSync.channel?.postMessage({ type: 'command', command: 'togglePlay', payload: {}, userId: user?.id, deviceId: playbackSync.deviceId });
+      return;
+    }
+    if (user && playbackSync.channel && !playbackSync.isLeader) playbackSync.becomeLeader();
+    audioEngine.togglePlay();
+  }, [user]);
+
+  // Audio engine events and playback sync subscriptions
   useEffect(() => {
     const unsubTime = audioEngine.on('timeUpdate', ({ currentTime, duration }) => {
       setCurrentTime(currentTime);
-      if (duration && isFinite(duration)) setDuration(duration);
+      if (duration && Number.isFinite(duration)) setDuration(duration);
     });
-
-    const unsubDuration = audioEngine.on('durationChange', (dur) => {
-      if (dur && isFinite(dur)) setDuration(dur);
+    const unsubDuration = audioEngine.on('durationChange', (value) => {
+      if (value && Number.isFinite(value)) setDuration(value);
     });
-
     const unsubPlayState = audioEngine.on('playState', (playing) => {
       setIsPlaying(playing);
+      playbackSync.publish({ trackId: currentTrackRef.current?.id, isPlaying: playing, currentTime: audioEngine.audio.currentTime || 0, queueIds: queueRef.current.map((track) => track.id) });
     });
-
-    const unsubEnded = audioEngine.on('ended', () => {
-      handleNextTrack();
+    const unsubTrackChange = audioEngine.on('trackChange', (track) => {
+      playbackSync.publish({ trackId: track?.id, isPlaying: audioEngine.isPlaying, currentTime: audioEngine.audio.currentTime || 0, queueIds: queueRef.current.map((item) => item.id) });
     });
-
-    const unsubNextReq = audioEngine.on('nextTrackRequest', () => {
-      handleNextTrack();
-    });
-
-    const unsubPrevReq = audioEngine.on('prevTrackRequest', () => {
-      handlePrevTrack();
-    });
-
-    const unsubError = audioEngine.on('error', (err) => {
-      console.warn('Audio playback error handled in App:', err);
+    const unsubEnded = audioEngine.on('ended', handleNextTrack);
+    const unsubNextReq = audioEngine.on('nextTrackRequest', handleNextTrack);
+    const unsubPrevReq = audioEngine.on('prevTrackRequest', handlePrevTrack);
+    const unsubError = audioEngine.on('error', (error) => {
+      console.warn('Audio playback error handled in App:', error);
       toast?.error?.('Playback error. Please check audio file or network connection.');
+    });
+    const unsubscribePlaybackSync = playbackSync.onMessage((message) => {
+      if (message.type === 'command' && playbackSync.isLeader) {
+        if (message.command === 'togglePlay') audioEngine.togglePlay();
+        if (message.command === 'next') handleNextTrack();
+        if (message.command === 'previous') handlePrevTrack();
+        if (message.command === 'playTrack') {
+          const target = tracksRef.current.find((item) => item.id === message.payload.trackId);
+          if (target) handlePlayTrack(target);
+        }
+        return;
+      }
+      if (message.type === 'state' && !playbackSync.isLeader) {
+        const state = message.state;
+        const track = tracksRef.current.find((item) => item.id === state.trackId);
+        if (track && currentTrackRef.current?.id !== track.id) {
+          currentTrackRef.current = track;
+          setCurrentTrack(track);
+        }
+        setIsPlaying(Boolean(state.isPlaying));
+        if (Number.isFinite(state.currentTime)) setCurrentTime(state.currentTime);
+        if (Array.isArray(state.queueIds)) {
+          const byId = new Map(tracksRef.current.map((item) => [item.id, item]));
+          setQueue(state.queueIds.map((id) => byId.get(id)).filter(Boolean));
+        }
+      }
     });
 
     return () => {
       unsubTime();
       unsubDuration();
       unsubPlayState();
+      unsubTrackChange();
       unsubEnded();
       unsubNextReq();
       unsubPrevReq();
       unsubError();
+      unsubscribePlaybackSync();
     };
-  }, [handleNextTrack, handlePrevTrack]);
-
-  // Toggle Play / Pause
-  const handleTogglePlay = () => {
-    if (!currentTrackRef.current) return;
-    audioEngine.togglePlay();
-  };
+  }, [handleNextTrack, handlePrevTrack, handlePlayTrack, handleTogglePlay, toast]);
 
   // Seek
   const handleSeek = (seconds) => {
@@ -973,6 +1025,7 @@ export default function App() {
               onPlaylistContextMenu={handlePlaylistContextMenu}
               onEditPlaylist={(pl) => setEditingPlaylist(pl)}
               toast={toast}
+              onOfflineDownloadComplete={async () => setTracks(await getAllTracks())}
             />
           )}
 
@@ -1083,21 +1136,24 @@ export default function App() {
       {/* Modals */}
       <EqualizerModal isOpen={showEqualizer} onClose={() => setShowEqualizer(false)} />
 
-      <QueueModal
-        isOpen={showQueue}
-        onClose={() => setShowQueue(false)}
-        currentTrack={currentTrack}
-        queue={queue}
-        isShuffle={isShuffle}
-        onToggleShuffle={handleToggleShuffle}
-        onShuffleQueue={handleShuffleQueue}
-        onPlayFromQueue={(track, idx) =>
-          handlePlayTrack(track, queue.slice(idx + 1), { isQueueAdvance: true })
-        }
-        onPlayTrack={handlePlayTrack}
-        onRemoveFromQueue={(idx) => setQueue((prev) => prev.filter((_, i) => i !== idx))}
-        onClearQueue={() => setQueue([])}
-      />
+      {showQueue && (
+        <QueueModal
+          isOpen={showQueue}
+          onClose={() => setShowQueue(false)}
+          currentTrack={currentTrack}
+          queue={queue}
+          isShuffle={isShuffle}
+          onToggleShuffle={handleToggleShuffle}
+          onShuffleQueue={handleShuffleQueue}
+          onPlayFromQueue={(track, idx) => {
+            const queuePosition = queueIndexRef.current.get(track.id) ?? idx;
+            handlePlayTrack(track, queue.slice(queuePosition + 1), { isQueueAdvance: true });
+          }}
+          onPlayTrack={handlePlayTrack}
+          onRemoveFromQueue={(idx) => setQueue((prev) => prev.filter((_, i) => i !== idx))}
+          onClearQueue={() => setQueue([])}
+        />
+      )}
 
       <ShareModal
         isOpen={showShare}

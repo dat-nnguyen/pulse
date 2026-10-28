@@ -1,5 +1,6 @@
 import { getBackendBaseUrl } from './backendService.js';
 import { repairM4aTiming } from './mp4TimingService.js';
+import { downloadHlsAudio, isHlsUrl } from './hlsAudioService.js';
 
 const STORAGE_AUDIO = 'https://wtrlpbumpwtauvxqwrrg.supabase.co/storage/v1/object/public/audio-files/audio';
 const MIME_TYPES = {
@@ -112,6 +113,9 @@ export async function fetchAudioBlob(url, track = {}, onProgress = () => {}) {
   if (!response.ok) throw new Error(`Download failed (${response.status})`);
   // A fragment is not a complete offline download.
   if (response.status === 206) throw new Error('The server returned incomplete audio');
+  if (isHlsUrl(url) || /mpegurl/i.test(response.headers.get('content-type') || '')) {
+    return prepareAudioBlob(await downloadHlsAudio(await response.text(), response.url || url, onProgress), { ...track, format: 'M4A' });
+  }
   const totalBytes = Number(response.headers.get('content-length')) || 0;
   const chunks = [];
   let receivedBytes = 0;

@@ -4,6 +4,14 @@ import { setBackendBaseUrl } from '../src/services/backendService.js';
 import { fragmentedM4aFixture } from './fixtures/fragmentedM4a.js';
 import { repairM4aTiming } from '../src/services/mp4TimingService.js';
 import { parseDurationToSeconds } from '../src/services/podcastService.js';
+const hlsInstances = vi.hoisted(() => []);
+vi.mock('hls.js', () => ({ default: class {
+  static isSupported() { return true; }
+  static Events = { ERROR: 'error' };
+  constructor() { this.destroy = vi.fn(); this.loadSource = vi.fn(); hlsInstances.push(this); }
+  on() {}
+  attachMedia(audio) { audio.src = 'blob:hls-media-source'; }
+} }));
 
 class TestAudio extends EventTarget {
   constructor() {
@@ -62,6 +70,21 @@ afterEach(() => {
 });
 
 describe('Playback transitions', () => {
+  it('uses native HLS on iPhone and a media-source player on browsers without native HLS', async () => {
+    const native = new AudioEngine();
+    native.audio.canPlayType = () => 'probably';
+    native.loadTrack(track('podcast', { audioUrl: 'https://cdn.example/podcast.m3u8', format: 'HLS' }));
+    await native.play();
+    expect(native.audio.src).toBe('https://cdn.example/podcast.m3u8');
+    const browser = new AudioEngine();
+    browser.loadTrack(track('podcast', { audioUrl: 'https://cdn.example/podcast.m3u8', format: 'HLS' }));
+    await browser.play();
+    expect(hlsInstances.at(-1).loadSource).toHaveBeenCalledWith('https://cdn.example/podcast.m3u8');
+    expect(browser.audio.src).toBe('blob:hls-media-source');
+    const hls = hlsInstances.at(-1);
+    browser.loadTrack(track('next'));
+    expect(hls.destroy).toHaveBeenCalledOnce();
+  });
   it('repairs a legacy iPhone M4A before decoding instead of waiting for a playback error', async () => {
     vi.stubGlobal('navigator', { userAgent: 'iPhone', platform: 'iPhone' });
     const createURL = vi.spyOn(URL, 'createObjectURL');

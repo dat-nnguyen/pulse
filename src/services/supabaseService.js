@@ -1,10 +1,14 @@
-import { getSupabaseClient, isSupabaseConfigured, getSupabaseCredentials } from './supabaseClient';
+import { getSupabaseClient, isSupabaseConfigured, getSupabaseCredentials } from './supabaseClient.js';
+import { createHlsAudioPackage, isHlsUrl } from './hlsAudioService.js';
 export { isSupabaseConfigured, getSupabaseCredentials };
 
 // Upload audio blob/file to Supabase Storage Bucket ('audio-files')
 export async function uploadAudioToSupabaseStorage(trackId, fileBlob, filename = 'track.mp3') {
   const client = getSupabaseClient();
   if (!client) throw new Error('Supabase is not configured');
+  if (fileBlob.size > 32 * 1024 * 1024 && /\.(m4a|mp4)$/i.test(filename)) {
+    return uploadLargeAudioToStorage(client, trackId, fileBlob);
+  }
 
   const fileExt = (filename.split('.').pop() || 'mp3').toLowerCase();
   const filePath = `audio/${trackId}.${fileExt}`;
@@ -30,6 +34,22 @@ export async function uploadAudioToSupabaseStorage(trackId, fileBlob, filename =
 
   const { data } = client.storage.from('audio-files').getPublicUrl(filePath);
   return data.publicUrl;
+}
+
+export async function uploadLargeAudioToStorage(client, trackId, blob) {
+  const media = await createHlsAudioPackage(blob);
+  const prefix = `audio/${trackId}/hls-v1`;
+  // Publish the playlist only after every media part is available.
+  for (let index = 0; index < media.assets.length; index += 3) {
+    await Promise.all(media.assets.slice(index, index + 3).map(async (asset) => {
+      const { error } = await client.storage.from('audio-files').upload(`${prefix}/${asset.name}`, new Blob([asset.bytes], { type: asset.type }), { upsert: true, contentType: asset.type });
+      if (error) throw error;
+    }));
+  }
+  const path = `${prefix}/index.m3u8`;
+  const { error } = await client.storage.from('audio-files').upload(path, new Blob([media.playlist], { type: 'application/vnd.apple.mpegurl' }), { upsert: true, contentType: 'application/vnd.apple.mpegurl' });
+  if (error) throw error;
+  return client.storage.from('audio-files').getPublicUrl(path).data.publicUrl;
 }
 
 // Upload album cover image to Supabase Storage
@@ -62,7 +82,7 @@ export async function saveTrackToSupabase(track) {
     cover_url: track.coverUrl || null,
     audio_url: track.cloudAudioUrl || track.audioUrl,
     bitrate: track.bitrate || '320kbps Original',
-    format: track.format || 'MP3',
+    format: isHlsUrl(track.cloudAudioUrl || track.audioUrl) ? 'HLS' : (track.format || 'MP3'),
     type: track.type || 'music',
   };
 

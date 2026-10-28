@@ -2,6 +2,7 @@
 import { getBackendBaseUrl } from './backendService.js';
 import { finiteDuration, getTrackAudioSources, prepareAudioBlob, downloadAudioForTrack, isAppleMobileAudio } from './audioMediaService.js';
 import { repairM4aTiming, AUDIO_TIMING_VERSION } from './mp4TimingService.js';
+import { isHlsUrl } from './hlsAudioService.js';
 export { getCloudFallbackUrl } from './audioMediaService.js';
 
 export class AudioEngine {
@@ -37,6 +38,7 @@ export class AudioEngine {
     this.knownDuration = 0;
     this.pendingPreparation = null;
     this.preloadPreparation = null;
+    this.hls = null;
 
     // Callbacks
     this.listeners = {
@@ -144,6 +146,8 @@ export class AudioEngine {
 
   advanceSource(error) {
     clearTimeout(this.startupTimer);
+    this.hls?.destroy();
+    this.hls = null;
     if (this.sourceIndex >= this.sourceCandidates.length) return false;
     const resumeAt = this.audio.currentTime || 0;
     // CORS failure through an enabled EQ must fall back to a native element:
@@ -398,7 +402,8 @@ export class AudioEngine {
       } else src = getTrackAudioSources(prepared)[0];
       if (!src) return;
       this.preloadAudio = new Audio();
-      this.preloadAudio.preload = prepared.type === 'podcast' ? 'metadata' : 'auto';
+      if (isHlsUrl(src) && !this.audio.canPlayType?.('application/vnd.apple.mpegurl')) return;
+      this.preloadAudio.preload = prepared.type === 'podcast' || prepared.duration > 1800 ? 'metadata' : 'auto';
       this.configureSource(this.preloadAudio, src);
       this.preloadAudio.load();
     };
@@ -419,6 +424,20 @@ export class AudioEngine {
     this.audio.defaultPlaybackRate = 1;
     this.audio.playbackRate = 1;
     this.audio.preservesPitch = true;
+    const source = this.sourceCandidates[0] || '';
+    if (isHlsUrl(source) && !this.audio.canPlayType?.('application/vnd.apple.mpegurl')) {
+      const version = this.sourceVersion;
+      return import('hls.js').then(({ default: Hls }) => {
+        if (version !== this.sourceVersion) return;
+        if (!Hls.isSupported()) throw new Error('HLS audio is not supported by this browser');
+        this.hls = new Hls({ maxBufferLength: 30, backBufferLength: 30 });
+        this.hls.on(Hls.Events.ERROR, (_event, data) => {
+          if (version === this.sourceVersion && data.fatal) this.advanceSource(new Error(`Audio stream failed: ${data.details}`));
+        });
+        this.hls.loadSource(source);
+        this.hls.attachMedia(this.audio);
+      });
+    }
     this.configureSource(this.audio, this.sourceCandidates[0] || '');
     this.audio.load();
   }
@@ -428,6 +447,8 @@ export class AudioEngine {
     clearTimeout(this.startupTimer);
     this.sourceVersion += 1;
     const version = this.sourceVersion;
+    this.hls?.destroy();
+    this.hls = null;
     this.wantsToPlay = false;
     this.audio.pause();
     const oldBlobUrl = this.currentBlobUrl;
@@ -446,11 +467,11 @@ export class AudioEngine {
       this.sourceCandidates = [];
       this.configureSource(this.audio, '');
       this.audio.load();
-      this.pendingPreparation = (warmPreparation || this.preparePlaybackTrack(track)).then((prepared) => {
+      this.pendingPreparation = (warmPreparation || this.preparePlaybackTrack(track)).then(async (prepared) => {
         if (version !== this.sourceVersion) return;
         this.currentTrack = prepared;
-        this.applyTrackSource(prepared, warmBlob);
-        this.pendingPreparation = null;
+        await this.applyTrackSource(prepared, warmBlob);
+        if (version === this.sourceVersion) this.pendingPreparation = null;
       }).catch((error) => {
         if (version !== this.sourceVersion) return;
         this.pendingPreparation = null;
@@ -458,7 +479,17 @@ export class AudioEngine {
         this.notify('playState', false);
         this.notify('error', error);
       });
-    } else this.applyTrackSource(track, warmBlob);
+    } else {
+      const pending = this.applyTrackSource(track, warmBlob);
+      this.pendingPreparation = pending ? pending.then(() => {
+        if (version === this.sourceVersion) this.pendingPreparation = null;
+      }).catch((error) => {
+        if (version !== this.sourceVersion) return;
+        this.pendingPreparation = null;
+        this.wantsToPlay = false;
+        this.notify('error', error);
+      }) : null;
+    }
     if (oldBlobUrl) URL.revokeObjectURL(oldBlobUrl);
     this.clearPreload();
     this.notify('trackChange', track);

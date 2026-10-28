@@ -12,7 +12,8 @@ import {
   deleteTrackFromSupabase,
   deletePlaylistFromSupabase,
 } from './supabaseService';
-import { getBackendBaseUrl } from './musicDownloaderService.js';
+import { downloadAudioForTrack, prepareAudioBlob, readAudioDuration, finiteDuration } from './audioMediaService.js';
+import { repairM4aTiming, AUDIO_TIMING_VERSION } from './mp4TimingService.js';
 
 const DB_NAME = 'PulseAudioDB';
 const DB_VERSION = 2;
@@ -38,22 +39,44 @@ export async function getDB() {
   });
 }
 
-// Track operations: Local IndexedDB + Supabase Cloud
-function resolveDeviceFetchTarget(url) {
-  if (!url) return '';
-  const backendBase = getBackendBaseUrl();
-  if (url.startsWith('/audio/')) {
-    if (backendBase) return `${backendBase}${url}`;
-    if (typeof window !== 'undefined' && window.location.protocol.startsWith('http') && !window.location.protocol.startsWith('capacitor')) {
-      return `${window.location.origin}${url}`;
+function audioFormat(mime, fallback = '') {
+  return ({ 'audio/mp4': 'M4A', 'audio/mpeg': 'MP3', 'audio/aac': 'AAC', 'audio/flac': 'FLAC',
+    'audio/wav': 'WAV', 'audio/ogg': 'OGG', 'audio/webm': 'WEBM' })[mime.split(';')[0]] || fallback || 'MP3';
+}
+
+export async function updateTrackDuration(id, duration) {
+  if (!id || !finiteDuration(duration)) return;
+  const db = await getDB();
+  const track = await db.get('tracks', id);
+  if (track && (!track.durationVerified || track.duration !== duration)) {
+    await db.put('tracks', { ...track, duration, durationVerified: true });
+  }
+}
+
+async function migrateAudioTiming(tracks, db) {
+  const migrated = [];
+  for (const track of tracks) {
+    if (!(track.audioBlob instanceof Blob) || !track.audioBlob.size || track.audioTimingVersion === AUDIO_TIMING_VERSION) {
+      migrated.push(track);
+      continue;
     }
-    const filename = url.split('/audio/').pop();
-    return `https://wtrlpbumpwtauvxqwrrg.supabase.co/storage/v1/object/public/audio-files/audio/${filename}`;
+    const timing = await repairM4aTiming(track.audioBlob);
+    const fixed = { ...track, audioBlob: timing.blob, audioTimingVersion: AUDIO_TIMING_VERSION,
+      ...(timing.changed && timing.duration ? { duration: timing.duration, durationVerified: true } : {}) };
+    await db.put('tracks', fixed);
+    migrated.push(fixed);
   }
-  if (backendBase && /127\.0\.0\.1:3030|localhost:3030|192\.168\.|10\.11\./.test(url)) {
-    return url.replace(/http:\/\/[^/]+(:3030)?/, backendBase);
-  }
-  return url;
+  return migrated;
+}
+
+// Persist a repaired playback cache locally; do not re-upload a user's library.
+export async function cachePreparedPlaybackTrack(track) {
+  const db = await getDB();
+  const existing = await db.get('tracks', track.id);
+  const saved = { ...existing, ...track, addedAt: existing?.addedAt || track.addedAt || Date.now(),
+    isDownloaded: true, fileSizeBytes: track.audioBlob.size, audioTimingVersion: AUDIO_TIMING_VERSION };
+  await db.put('tracks', saved);
+  return saved;
 }
 
 // Track operations: Local IndexedDB + Supabase Cloud
@@ -69,22 +92,23 @@ export async function saveTrack(track) {
     item.localAudioUrl = item.localAudioUrl || item.audioUrl;
   }
 
-  if (!item.audioBlob && item.audioUrl && (typeof navigator === 'undefined' || navigator.onLine)) {
-    try {
-      const response = await fetch(resolveDeviceFetchTarget(item.localAudioUrl || item.audioUrl));
-      if (response.ok) {
-        const blob = await response.blob();
-        if (blob.size > 0) {
-          item.audioBlob = blob;
-          item.isDownloaded = true;
-          item.fileSizeBytes = item.fileSizeBytes || blob.size;
-          item.downloadedAt = item.downloadedAt || Date.now();
-        }
-      }
-    } catch (error) {
-      console.warn('Immediate offline audio blob caching notice:', error.message);
-    }
+  if (!item.audioBlob && (item.audioUrl || item.cloudAudioUrl) && (typeof navigator === 'undefined' || navigator.onLine)) {
+    // A download must contain audio, not just a remote URL or an HTML error page.
+    item.audioBlob = await downloadAudioForTrack(item);
   }
+  if (item.audioBlob instanceof Blob && item.audioBlob.size > 0) {
+    item.audioBlob = await prepareAudioBlob(item.audioBlob, item);
+    const measured = item.durationVerified && item.audioTimingVersion === AUDIO_TIMING_VERSION
+      ? finiteDuration(item.duration) : await readAudioDuration(item.audioBlob);
+    item.duration = measured || finiteDuration(item.duration);
+    item.durationVerified = Boolean(measured);
+    item.format = audioFormat(item.audioBlob.type, item.format);
+    item.isDownloaded = true;
+    item.fileSizeBytes = item.audioBlob.size;
+    item.downloadedAt = item.downloadedAt || Date.now();
+    item.audioTimingVersion = AUDIO_TIMING_VERSION;
+  }
+  await db.put('tracks', item);
 
   if (!item.offlineCacheOnly && isSupabaseConfigured() && (typeof navigator === 'undefined' || navigator.onLine)) {
     try {
@@ -112,30 +136,33 @@ export async function saveTrack(track) {
 
 export async function cacheTrackForOffline(track, onProgress = () => {}) {
   if (!track?.id) throw new Error('Missing track');
-  if (track.audioBlob instanceof Blob && track.audioBlob.size > 0) {
-    return { ...track, isDownloaded: true };
+  const existing = await getTrackById(track.id);
+  const cached = existing?.audioBlob instanceof Blob && existing.audioBlob.size > 0 ? existing : track;
+  if (cached.audioBlob instanceof Blob && cached.audioBlob.size > 0) {
+    let audioBlob;
+    try { audioBlob = await prepareAudioBlob(cached.audioBlob, cached); }
+    catch { /* Re-download an old cache entry containing an HTML/error response. */ }
+    if (audioBlob) {
+      const timing = await repairM4aTiming(cached.audioBlob);
+      const saved = { ...track, ...cached, audioBlob, isDownloaded: true, audioTimingVersion: AUDIO_TIMING_VERSION,
+        ...(timing.changed && timing.duration ? { duration: timing.duration, durationVerified: true } : {}) };
+      const db = await getDB();
+      await db.put('tracks', saved);
+      return saved;
+    }
   }
-
-  let url = track.audioUrlHighQuality || track.cloudAudioUrl || track.audioUrl || track.localAudioUrl;
-  const backendBase = getBackendBaseUrl();
-  const cloudUrl = track.cloudAudioUrl || (typeof track.audioUrl === 'string' && track.audioUrl.startsWith('https://') ? track.audioUrl : null);
-  if (url?.startsWith('/audio/')) {
-    const filename = url.split('/audio/').pop();
-    url = backendBase ? `${backendBase}${url}` : (cloudUrl || `https://wtrlpbumpwtauvxqwrrg.supabase.co/storage/v1/object/public/audio-files/audio/${filename}`);
-  } else if (backendBase && url && /127\.0\.0\.1|localhost|192\.168\.|10\.11\./.test(url)) {
-    url = url.replace(/http:\/\/[^/]+(:3030)?/, backendBase);
-  }
-  if (!url) throw new Error(`No audio source for ${track.title || track.id}`);
 
   onProgress({ status: 'downloading', trackId: track.id });
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Download failed (${response.status})`);
-  const blob = await response.blob();
-  if (!blob.size) throw new Error('Downloaded audio is empty');
+  const blob = await downloadAudioForTrack({ ...cached, ...track }, onProgress);
+  const measured = await readAudioDuration(blob);
 
   const saved = {
     ...track,
     audioBlob: blob,
+    duration: measured || finiteDuration(track.duration),
+    durationVerified: Boolean(measured),
+    audioTimingVersion: AUDIO_TIMING_VERSION,
+    format: audioFormat(blob.type, track.format),
     isDownloaded: true,
     offlineCacheOnly: true,
     fileSizeBytes: blob.size,
@@ -166,7 +193,7 @@ export async function downloadPlaylistForOffline(playlist, tracks) {
 
 export async function syncLibraryWithCloud(force = false) {
   const db = await getDB();
-  const localTracks = await db.getAll('tracks');
+  const localTracks = await migrateAudioTiming(await db.getAll('tracks'), db);
   const localPlaylists = await db.getAll('playlists');
   const localLikes = await db.getAll('likes');
 
@@ -200,16 +227,14 @@ export async function syncLibraryWithCloud(force = false) {
         ...ct,
         // Retain local audioBlob for instant zero-latency playback if cached
         audioBlob: local?.audioBlob || ct.audioBlob,
-        localAudioUrl: local?.localAudioUrl || (ct.audioUrl && (ct.audioUrl.startsWith('/audio/') || ct.audioUrl.includes('localhost') || ct.audioUrl.includes('127.0.0.1')) ? ct.audioUrl : null),
+        localAudioUrl: local?.localAudioUrl || ((ct.audioUrl && (ct.audioUrl.startsWith('/audio/') || ct.audioUrl.includes('localhost') || ct.audioUrl.includes('127.0.0.1'))) ? ct.audioUrl : null),
+        duration: local?.durationVerified ? local.duration : ct.duration,
+        durationVerified: Boolean(local?.durationVerified),
+        audioTimingVersion: local?.audioTimingVersion,
+        format: local?.audioBlob ? local.format : ct.format,
         cloudAudioUrl: resolvedCloudUrl,
         audioUrl: resolvedCloudUrl || ct.audioUrl,
-        isDownloaded: Boolean(
-          local?.isDownloaded ||
-          local?.audioBlob ||
-          ct.audioBlob ||
-          ct.isDownloaded ||
-          (local?.audioUrl && (local.audioUrl.startsWith('/audio/') || local.audioUrl.includes('localhost') || local.audioUrl.includes('127.0.0.1')))
-        ),
+        isDownloaded: Boolean((local?.audioBlob || ct.audioBlob)?.size),
         isCloudSynced: true,
       };
       await db.put('tracks', merged);
@@ -292,11 +317,11 @@ export async function syncLibraryWithCloud(force = false) {
   }
 }
 
-export async function getAllTracks() {
+export async function getAllTracks({ syncCloud = true } = {}) {
   const db = await getDB();
-  const localTracks = await db.getAllFromIndex('tracks', 'addedAt');
+  const localTracks = await migrateAudioTiming(await db.getAllFromIndex('tracks', 'addedAt'), db);
 
-  if (isSupabaseConfigured() && navigator.onLine) {
+  if (syncCloud && isSupabaseConfigured() && navigator.onLine) {
     try {
       const syncResult = await syncLibraryWithCloud();
       if (syncResult.synced && Array.isArray(syncResult.tracks)) {
@@ -361,12 +386,12 @@ export async function toggleLike(trackId) {
   return isLiked;
 }
 
-export async function getLikedIds() {
+export async function getLikedIds({ syncCloud = true } = {}) {
   const db = await getDB();
   const items = await db.getAll('likes');
   const localSet = new Set(items.map((i) => i.id));
 
-  if (isSupabaseConfigured() && navigator.onLine) {
+  if (syncCloud && isSupabaseConfigured() && navigator.onLine) {
     try {
       const cloudLikes = await fetchLikesFromSupabase();
       cloudLikes.forEach((id) => {
@@ -400,11 +425,11 @@ export async function savePlaylist(playlist) {
   return pl;
 }
 
-export async function getAllPlaylists() {
+export async function getAllPlaylists({ syncCloud = true } = {}) {
   const db = await getDB();
   const localPlaylists = await db.getAll('playlists');
 
-  if (isSupabaseConfigured() && navigator.onLine) {
+  if (syncCloud && isSupabaseConfigured() && navigator.onLine) {
     try {
       const cloudPlaylists = await fetchPlaylistsFromSupabase();
       for (const cp of cloudPlaylists) {
@@ -433,16 +458,10 @@ export async function deletePlaylist(id) {
 // Export / Download Audio File directly to Device / Browser Downloads
 export async function downloadTrackAudioFile(track) {
   try {
-    let blob = track.audioBlob;
-    if (!blob) {
-      const url = track.audioUrlHighQuality || track.audioUrl;
-      if (!url) throw new Error('No audio URL found for this track');
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`Failed to fetch audio stream (${res.status})`);
-      blob = await res.blob();
-    }
-
-    const ext = (track.format || 'mp3').toLowerCase();
+    const blob = track.audioBlob instanceof Blob && track.audioBlob.size
+      ? await prepareAudioBlob(track.audioBlob, track)
+      : await downloadAudioForTrack(track);
+    const ext = audioFormat(blob.type, track.format).toLowerCase();
     const safeTitle = (track.title || 'track').replace(/[/\\?%*:|"<>]/g, '_');
     const safeArtist = (track.artist || 'artist').replace(/[/\\?%*:|"<>]/g, '_');
     const filename = `${safeArtist} - ${safeTitle}.${ext}`;

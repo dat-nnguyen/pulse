@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { audioEngine } from './services/audioEngine';
 import {
   getAllTracks,
   saveTrack,
+  updateTrackDuration,
+  cachePreparedPlaybackTrack,
   deleteTrack as removeTrackFromDB,
   getLikedIds,
   toggleLike as toggleLikeInDB,
@@ -27,7 +29,8 @@ import MobileMiniPlayer from './components/MobileMiniPlayer';
 import MobileFullPlayer from './components/MobileFullPlayer';
 import HomeView from './components/HomeView';
 import LibraryView from './components/LibraryView';
-import DownloaderView from './components/DownloaderView';
+const DownloaderView = lazy(() => import('./components/DownloaderView'));
+
 import EqualizerModal from './components/EqualizerModal';
 import QueueModal from './components/QueueModal';
 import ShareModal from './components/ShareModal';
@@ -55,6 +58,7 @@ export default function App() {
   const [playlistContextMenu, setPlaylistContextMenu] = useState(null); // { x, y, playlist }
 
   // Navigation & View State
+  const [hasOpenedDownloader, setHasOpenedDownloader] = useState(false);
   const [currentView, setCurrentView] = useState('home'); // 'home' | 'playlist' | 'downloader'
   const [selectedPlaylistId, setSelectedPlaylistId] = useState(null);
   const [navHistory, setNavHistory] = useState([
@@ -66,6 +70,7 @@ export default function App() {
 
   // Two-way Navigation History Stack
   const navigateTo = useCallback((view, playlistId = null) => {
+    if (view === 'downloader') setHasOpenedDownloader(true);
     const current = navHistory[navIndex];
     if (current && current.view === view && current.playlistId === playlistId) {
       return;
@@ -125,7 +130,7 @@ export default function App() {
   const [playlists, setPlaylists] = useState([]);
   const [likedIds, setLikedIds] = useState(new Set());
   const [currentTrack, setCurrentTrack] = useState(null);
-  const [queue, setQueue] = useState([]);
+  const [queue, setQueueState] = useState([]);
 
   // Audio Playback State
   const [isPlaying, setIsPlaying] = useState(false);
@@ -206,6 +211,11 @@ export default function App() {
   tracksRef.current = tracks;
   const queueRef = useRef(queue);
   queueRef.current = queue;
+  const setQueue = useCallback((update) => {
+    const next = typeof update === 'function' ? update(queueRef.current) : update;
+    queueRef.current = next;
+    setQueueState(next);
+  }, []);
   const queueIndexRef = useRef(new Map());
   queueIndexRef.current = new Map(queue.map((track, index) => [track.id, index]));
   const isShuffleRef = useRef(isShuffle);
@@ -222,7 +232,10 @@ export default function App() {
   useEffect(() => {
     async function initDB() {
       try {
-        let dbTracks = await getAllTracks();
+        const [localTracks, localPlaylists, localLikes] = await Promise.all([
+          getAllTracks({ syncCloud: false }), getAllPlaylists({ syncCloud: false }), getLikedIds({ syncCloud: false }),
+        ]);
+        let dbTracks = localTracks;
 
         // Purge any previously seeded mock/sample tracks
         const mockTrackIds = new Set(['sample_1', 'sample_2', 'sample_3', 'sample_4']);
@@ -240,15 +253,11 @@ export default function App() {
 
         dbTracks = cleanedTracks.map((t) => ({
           ...t,
-          isDownloaded: Boolean(
-            t.isDownloaded ||
-            t.audioBlob ||
-            (t.audioUrl && (t.audioUrl.startsWith('/audio/') || t.audioUrl.includes('localhost') || t.audioUrl.includes('127.0.0.1')))
-          ),
+          isDownloaded: Boolean(t.audioBlob instanceof Blob && t.audioBlob.size > 0),
         }));
         setTracks(dbTracks);
 
-        let dbPlaylists = await getAllPlaylists();
+        let dbPlaylists = localPlaylists;
         // Also clean up any mock track IDs that were placed in playlists
         if (hasDeletedMock && dbPlaylists && dbPlaylists.length > 0) {
           const updatedPlaylists = [];
@@ -273,7 +282,7 @@ export default function App() {
         }
         setPlaylists(dbPlaylists);
 
-        const dbLiked = await getLikedIds();
+        const dbLiked = localLikes;
         mockTrackIds.forEach((id) => dbLiked.delete(id));
         setLikedIds(dbLiked);
 
@@ -288,6 +297,17 @@ export default function App() {
         ) {
           audioEngine.pause();
           setCurrentTrack(null);
+        }
+        // Render the local library first; refresh cloud data once in the background.
+        const refreshed = await syncLibraryWithCloud();
+        if (refreshed.synced) {
+          setTracks(refreshed.tracks);
+          setPlaylists(refreshed.playlists);
+          setLikedIds(refreshed.likedIds);
+          if (!currentTrackRef.current && refreshed.tracks.length) {
+            setCurrentTrack(refreshed.tracks[0]);
+            audioEngine.loadTrack(refreshed.tracks[0]);
+          }
         }
       } catch (err) {
         console.error('Database initialization error:', err);
@@ -426,16 +446,12 @@ export default function App() {
     }
 
     try {
-      await audioEngine.loadTrack(track);
+      audioEngine.loadTrack(track);
       await audioEngine.play();
-      const nextTrack = isQueueAdvance && Array.isArray(contextOrQueue)
-        ? contextOrQueue[0]
-        : queueRef.current[0];
-      if (nextTrack && nextTrack.id !== track.id) audioEngine.preloadTrack(nextTrack);
     } catch (e) {
       console.warn('Playback gesture required:', e);
     }
-  }, []);
+  }, [setQueue, user]);
 
   // Next Track Logic
   const handleNextTrack = useCallback(() => {
@@ -446,7 +462,8 @@ export default function App() {
     }
     if (user && playbackSync.channel && !playbackSync.isLeader) playbackSync.becomeLeader();
     if (repeatModeRef.current === 'one' && currentTrackRef.current) {
-      audioEngine.replayCurrentTrack?.() || (audioEngine.seek(0), audioEngine.play());
+      audioEngine.seek(0);
+      audioEngine.play().catch((error) => console.warn('Replay failed:', error));
       return;
     }
 
@@ -480,7 +497,7 @@ export default function App() {
         handlePlayTrack(first, rest, { isQueueAdvance: true });
       }
     }
-  }, [handlePlayTrack, user]);
+  }, [handlePlayTrack, setQueue, user]);
 
   // Previous Track Logic
   const handlePrevTrack = useCallback(() => {
@@ -490,7 +507,7 @@ export default function App() {
       return;
     }
     if (user && playbackSync.channel && !playbackSync.isLeader) playbackSync.becomeLeader();
-    if (currentTime > 3) {
+    if (audioEngine.audio.currentTime > 3) {
       audioEngine.seek(0);
       return;
     }
@@ -518,7 +535,7 @@ export default function App() {
     } else {
       handlePlayTrack(all[all.length - 1], []);
     }
-  }, [currentTime, handlePlayTrack, user]);
+  }, [handlePlayTrack, setQueue, user]);
 
   const handleTogglePlay = useCallback(() => {
     if (!currentTrackRef.current) return;
@@ -531,6 +548,11 @@ export default function App() {
     audioEngine.togglePlay();
   }, [user]);
 
+  // React state now contains the actual next item, including shuffle/reorder changes.
+  useEffect(() => {
+    audioEngine.preloadTrack(queue[0] || null);
+  }, [queue, currentTrack?.id]);
+
   // Audio engine events and playback sync subscriptions
   useEffect(() => {
     const unsubTime = audioEngine.on('timeUpdate', ({ currentTime, duration }) => {
@@ -538,13 +560,27 @@ export default function App() {
       if (duration && Number.isFinite(duration)) setDuration(duration);
     });
     const unsubDuration = audioEngine.on('durationChange', (value) => {
-      if (value && Number.isFinite(value)) setDuration(value);
+      if (Number.isFinite(value)) setDuration(value);
+    });
+    const unsubPrepared = audioEngine.on('trackPrepared', (prepared) => {
+      setTracks((items) => items.map((item) => item.id === prepared.id ? { ...item, ...prepared } : item));
+      cachePreparedPlaybackTrack(prepared).catch((error) => console.warn('Playback cache repair failed:', error));
+    });
+    const unsubResolved = audioEngine.on('durationResolved', ({ trackId, duration: measured }) => {
+      setTracks((items) => items.map((item) => item.id === trackId
+        ? { ...item, duration: measured, durationVerified: true } : item));
+      if (currentTrackRef.current?.id === trackId) {
+        setCurrentTrack((item) => item?.id === trackId ? { ...item, duration: measured, durationVerified: true } : item);
+      }
+      updateTrackDuration(trackId, measured).catch((error) => console.warn('Duration cache update failed:', error));
     });
     const unsubPlayState = audioEngine.on('playState', (playing) => {
       setIsPlaying(playing);
       playbackSync.publish({ trackId: currentTrackRef.current?.id, isPlaying: playing, currentTime: audioEngine.audio.currentTime || 0, queueIds: queueRef.current.map((track) => track.id) });
     });
     const unsubTrackChange = audioEngine.on('trackChange', (track) => {
+      setCurrentTime(0);
+      setDuration(0);
       playbackSync.publish({ trackId: track?.id, isPlaying: audioEngine.isPlaying, currentTime: audioEngine.audio.currentTime || 0, queueIds: queueRef.current.map((item) => item.id) });
     });
     const unsubEnded = audioEngine.on('ended', handleNextTrack);
@@ -584,6 +620,8 @@ export default function App() {
     return () => {
       unsubTime();
       unsubDuration();
+      unsubResolved();
+      unsubPrepared();
       unsubPlayState();
       unsubTrackChange();
       unsubEnded();
@@ -592,7 +630,7 @@ export default function App() {
       unsubError();
       unsubscribePlaybackSync();
     };
-  }, [handleNextTrack, handlePrevTrack, handlePlayTrack, handleTogglePlay, toast]);
+  }, [handleNextTrack, handlePrevTrack, handlePlayTrack, handleTogglePlay, setQueue, toast]);
 
   // Seek
   const handleSeek = (seconds) => {
@@ -635,7 +673,7 @@ export default function App() {
 
       return next;
     });
-  }, [toast]);
+  }, [setQueue, toast]);
 
   // Explicit queue shuffle button
   const handleShuffleQueue = useCallback(() => {
@@ -644,7 +682,7 @@ export default function App() {
       setQueue(shuffled);
       toast.info('Queue shuffled', { title: 'Queue' });
     }
-  }, [toast]);
+  }, [setQueue, toast]);
 
   // Playlist shuffle action (from Library / Playlist view or context menu)
   const handleShufflePlaylist = useCallback((playlistTracks) => {
@@ -653,14 +691,14 @@ export default function App() {
     const startTrack = playlistTracks[randomIndex];
     handlePlayTrack(startTrack, playlistTracks, { forceShuffle: true });
     toast.info(`Shuffling ${playlistTracks.length} tracks`, { title: 'Shuffle' });
-  }, [handlePlayTrack, toast]);
+  }, [handlePlayTrack, setQueue, toast]);
 
   // Add a track to the end of the current queue
   const handleAddToQueue = useCallback((track) => {
     if (!track) return;
     setQueue((prev) => [...prev, track]);
     toast.info(`Added "${track.title}" to queue`, { title: 'Queue' });
-  }, [toast]);
+  }, [setQueue, toast]);
 
   // Repeat toggle ('off' -> 'all' -> 'one' -> 'off')
   const handleToggleRepeat = () => {
@@ -1036,6 +1074,7 @@ export default function App() {
               display: currentView === 'downloader' ? 'contents' : 'none',
             }}
           >
+            {hasOpenedDownloader && <Suspense fallback={<div role="status" style={{ padding: 24 }}>Loading downloads…</div>}>
             <DownloaderView
               prefilledQuery={prefilledDownloaderQuery}
               playlists={playlists}
@@ -1056,6 +1095,7 @@ export default function App() {
               toast={toast}
               onDownloadStatusChange={handleDownloadStatusChange}
             />
+            </Suspense>}
           </div>
         </main>
       </div>

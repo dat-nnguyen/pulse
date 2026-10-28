@@ -28,13 +28,7 @@ export default function HomeView({
   onEditPlaylist,
 }) {
   const offlineTracks = tracks.filter(
-    (t) =>
-      t.isDownloaded ||
-      Boolean(t.audioBlob) ||
-      (t.audioUrl &&
-        (t.audioUrl.startsWith('/audio/') ||
-          t.audioUrl.includes('localhost') ||
-          t.audioUrl.includes('127.0.0.1')))
+    (t) => Boolean(t.audioBlob instanceof Blob && t.audioBlob.size > 0)
   );
 
   return (

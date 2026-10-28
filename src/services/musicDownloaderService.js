@@ -1,6 +1,9 @@
 // Service for downloading and caching music from YouTube, SoundCloud, or direct audio URLs
 
 import { saveTrack } from './storageService';
+import { getBackendBaseUrl } from './backendService.js';
+import { downloadAudioForTrack } from './audioMediaService.js';
+export { getBackendBaseUrl, setBackendBaseUrl } from './backendService.js';
 
 // Mock audio tracks removed - start with clean library
 export const SAMPLE_TRACKS = [];
@@ -9,31 +12,7 @@ export const SAMPLE_TRACKS = [];
 export async function downloadTrackToLocal(track, onProgress = () => {}) {
   try {
     onProgress({ status: 'downloading', percent: 10 });
-    const url = track.audioUrlHighQuality || track.audioUrl;
-    
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Download failed with status ${response.status}`);
-
-    const contentLength = response.headers.get('content-length');
-    const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
-    
-    const reader = response.body.getReader();
-    let receivedBytes = 0;
-    const chunks = [];
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      receivedBytes += value.length;
-      if (totalBytes > 0) {
-        const percent = Math.min(95, Math.round((receivedBytes / totalBytes) * 100));
-        onProgress({ status: 'downloading', percent, receivedBytes, totalBytes });
-      }
-    }
-
-    const mimeType = track.format === 'FLAC' ? 'audio/flac' : 'audio/mpeg';
-    const audioBlob = new Blob(chunks, { type: mimeType });
+    const audioBlob = await downloadAudioForTrack(track, onProgress);
 
     onProgress({ status: 'saving', percent: 98 });
     const saved = await saveTrack({
@@ -49,67 +28,6 @@ export async function downloadTrackToLocal(track, onProgress = () => {}) {
   } catch (err) {
     console.error('Download to local error:', err);
     throw err;
-  }
-}
-
-let memoryBackendUrl = null;
-
-export function getBackendBaseUrl() {
-  if (memoryBackendUrl && memoryBackendUrl.trim()) {
-    return memoryBackendUrl.trim().replace(/\/+$/, '');
-  }
-
-  try {
-    const custom = typeof localStorage !== 'undefined' && typeof localStorage.getItem === 'function'
-      ? localStorage.getItem('pulse_backend_url')
-      : null;
-    if (custom && custom.trim()) return custom.trim().replace(/\/+$/, '');
-  } catch (e) {
-    // localStorage not accessible (e.g. Node or restricted iframe)
-  }
-
-  const envUrl = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_BACKEND_URL : null;
-  if (envUrl && envUrl.trim()) return envUrl.trim().replace(/\/+$/, '');
-
-  if (typeof window !== 'undefined') {
-    const isCapacitor = window.location.protocol === 'capacitor:' || !!window.Capacitor;
-
-    // Running inside iOS/Android native app via Capacitor
-    if (isCapacitor) {
-      return 'http://192.168.1.102:3030';
-    }
-
-    // Running inside Electron desktop packaged app (file://)
-    if (window.location.protocol === 'file:' || !window.location.host) {
-      return 'http://127.0.0.1:3030';
-    }
-
-    // Running in standard web browser on localhost or 127.0.0.1
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      // Relative URL "" routes through Vite dev proxy or same-origin server with zero CORS restrictions
-      return '';
-    }
-
-    // Running in web browser connected via LAN IP (e.g. http://192.168.1.102:5173 on phone)
-    if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(window.location.hostname)) {
-      return `http://${window.location.hostname}:3030`;
-    }
-  }
-  return '';
-}
-
-export function setBackendBaseUrl(url) {
-  memoryBackendUrl = url && url.trim() ? url.trim().replace(/\/+$/, '') : null;
-  try {
-    if (typeof localStorage !== 'undefined' && typeof localStorage.setItem === 'function') {
-      if (url && url.trim()) {
-        localStorage.setItem('pulse_backend_url', url.trim().replace(/\/+$/, ''));
-      } else {
-        localStorage.removeItem('pulse_backend_url');
-      }
-    }
-  } catch (e) {
-    // Ignore localStorage access restrictions
   }
 }
 
@@ -139,11 +57,41 @@ export async function downloadFromWebUrl(inputUrl, customMeta = {}) {
       album: customMeta.album || 'Web Audio Downloads',
       audioUrl: directAudio,
       coverUrl: customMeta.coverUrl || '',
-      duration: customMeta.duration || 180,
+      duration: customMeta.previewUrl && (!customMeta.audioUrl || customMeta.audioUrl === customMeta.previewUrl) ? 0 : (customMeta.duration || 0),
       bitrate: '256 kbps High-Fidelity',
-      format: 'M4A',
-      type: 'music',
+      format: customMeta.format || '',
+      type: customMeta.type || 'music',
+      isPreview: Boolean(customMeta.previewUrl && (!customMeta.audioUrl || customMeta.audioUrl === customMeta.previewUrl)),
       isDownloaded: true,
+    };
+    return downloadTrackToLocal(track);
+  }
+
+  // 3. Direct Audio URL (.mp3, .m4a, .flac, .wav, .ogg, .aac)
+  const isDirectAudio = /\.(mp3|m4a|wav|flac|ogg|aac)(\?.*)?$/i.test(trimmedUrl);
+  if (isDirectAudio) {
+    const rawFilename = trimmedUrl.split('/').pop().split('?')[0];
+    const cleanName = decodeURIComponent(rawFilename.replace(/\.[^/.]+$/, '').replace(/[_]/g, ' ')).trim();
+    let title = customMeta.title || cleanName;
+    let artist = customMeta.artist || 'Web Audio';
+
+    if (!customMeta.title && !customMeta.artist && cleanName.includes(' - ')) {
+      const parts = cleanName.split(' - ');
+      artist = parts[0].trim();
+      title = parts.slice(1).join(' - ').trim();
+    }
+
+    const track = {
+      id: `web_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      title,
+      artist,
+      album: customMeta.album || 'Downloaded Tracks',
+      audioUrl: trimmedUrl,
+      coverUrl: customMeta.coverUrl || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80',
+      duration: customMeta.duration || 0,
+      bitrate: '320 kbps Original',
+      format: trimmedUrl.split('.').pop().split('?')[0].toUpperCase(),
+      type: customMeta.type || 'music',
     };
     return downloadTrackToLocal(track);
   }
@@ -190,35 +138,6 @@ export async function downloadFromWebUrl(inputUrl, customMeta = {}) {
     }
   }
 
-  // 3. Direct Audio URL (.mp3, .m4a, .flac, .wav, .ogg, .aac)
-  const isDirectAudio = /\.(mp3|m4a|wav|flac|ogg|aac)(\?.*)?$/i.test(trimmedUrl);
-  if (isDirectAudio) {
-    const rawFilename = trimmedUrl.split('/').pop().split('?')[0];
-    const cleanName = decodeURIComponent(rawFilename.replace(/\.[^/.]+$/, '').replace(/[_]/g, ' ')).trim();
-    let title = customMeta.title || cleanName;
-    let artist = customMeta.artist || 'Web Audio';
-
-    if (!customMeta.title && !customMeta.artist && cleanName.includes(' - ')) {
-      const parts = cleanName.split(' - ');
-      artist = parts[0].trim();
-      title = parts.slice(1).join(' - ').trim();
-    }
-
-    const track = {
-      id: `web_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      title,
-      artist,
-      album: customMeta.album || 'Downloaded Tracks',
-      audioUrl: trimmedUrl,
-      coverUrl: customMeta.coverUrl || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80',
-      duration: 180,
-      bitrate: '320 kbps Original',
-      format: trimmedUrl.split('.').pop().split('?')[0].toUpperCase(),
-      type: 'music',
-    };
-    return downloadTrackToLocal(track);
-  }
-
   // 4. Standalone Web Fallback for YouTube or title queries
   if (customMeta.title || customMeta.artist) {
     try {
@@ -237,7 +156,8 @@ export async function downloadFromWebUrl(inputUrl, customMeta = {}) {
             album: topSong.collectionName || 'Web Audio Downloads',
             audioUrl: topSong.previewUrl,
             coverUrl: topSong.artworkUrl100 ? topSong.artworkUrl100.replace('100x100bb', '600x600bb') : '',
-            duration: Math.round((topSong.trackTimeMillis || 180000) / 1000),
+            duration: 0,
+            isPreview: true,
             bitrate: '256 kbps High-Fidelity',
             format: 'M4A',
             type: 'music',

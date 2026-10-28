@@ -78,13 +78,16 @@ export async function fetchPodcastFeed(feedUrl) {
     const title = item.querySelector('title')?.textContent || `Episode ${idx + 1}`;
     const description = item.querySelector('description, itunes\\:summary')?.textContent || '';
     const pubDate = item.querySelector('pubDate')?.textContent || '';
-    const duration = item.querySelector('itunes\\:duration')?.textContent || '00:00';
+    const duration = item.getElementsByTagNameNS('*', 'duration')[0]?.textContent || '0';
     const enclosure = item.querySelector('enclosure');
-    const audioUrl = enclosure?.getAttribute('url') || '';
-    const length = enclosure?.getAttribute('length') || '';
+    const rawAudioUrl = enclosure?.getAttribute('url') || '';
+    let audioUrl = '';
+    try { if (rawAudioUrl) audioUrl = new URL(rawAudioUrl, feedUrl).href; } catch { /* invalid enclosure */ }
+    const mimeType = enclosure?.getAttribute('type') || '';
+    const episodeKey = item.querySelector('guid')?.textContent || audioUrl || String(idx);
 
     return {
-      id: `pod_${item.querySelector('guid')?.textContent || idx}_${Date.now()}`,
+      id: `pod_${stableEpisodeId(`${feedUrl}:${episodeKey}`)}`,
       title,
       artist: podcastTitle,
       album: podcastTitle,
@@ -93,6 +96,8 @@ export async function fetchPodcastFeed(feedUrl) {
       duration: parseDurationToSeconds(duration),
       formattedDuration: formatDurationDisplay(duration),
       audioUrl,
+      audioMimeType: mimeType,
+      format: ({ 'audio/mpeg': 'MP3', 'audio/mp4': 'M4A', 'audio/aac': 'AAC', 'audio/ogg': 'OGG' })[mimeType] || '',
       coverUrl: podcastImg,
       type: 'podcast',
       bitrate: 'Original Broadcast Quality',
@@ -108,13 +113,16 @@ export async function fetchPodcastFeed(feedUrl) {
   };
 }
 
-function parseDurationToSeconds(dur) {
-  if (!dur) return 0;
-  if (/^\d+$/.test(dur.trim())) return parseInt(dur.trim(), 10);
-  const parts = dur.split(':').map((p) => parseInt(p, 10));
-  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  if (parts.length === 2) return parts[0] * 60 + parts[1];
-  return 0;
+function stableEpisodeId(value) {
+  let hash = 2166136261;
+  for (const char of value) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+  return (hash >>> 0).toString(36);
+}
+
+export function parseDurationToSeconds(value) {
+  const parts = String(value || '').trim().split(':');
+  if (!parts.length || parts.length > 3 || parts.some((part) => !/^\d+(?:\.\d+)?$/.test(part))) return 0;
+  return parts.reduce((seconds, part) => seconds * 60 + Number(part), 0);
 }
 
 function formatDurationDisplay(dur) {

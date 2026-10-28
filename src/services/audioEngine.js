@@ -1,24 +1,10 @@
 // Audio Engine with Web Audio API Equalizer, Visualizer, and MediaSession lock-screen controls
-import { getBackendBaseUrl } from './musicDownloaderService.js';
+import { getBackendBaseUrl } from './backendService.js';
+import { finiteDuration, getTrackAudioSources, prepareAudioBlob, downloadAudioForTrack, isAppleMobileAudio } from './audioMediaService.js';
+import { repairM4aTiming, AUDIO_TIMING_VERSION } from './mp4TimingService.js';
+export { getCloudFallbackUrl } from './audioMediaService.js';
 
-const SUPABASE_STORAGE_AUDIO = 'https://wtrlpbumpwtauvxqwrrg.supabase.co/storage/v1/object/public/audio-files/audio';
-
-export function getCloudFallbackUrl(track) {
-  if (track?.cloudAudioUrl && track.cloudAudioUrl.startsWith('http')) {
-    return track.cloudAudioUrl;
-  }
-  const raw = track?.audioUrl || track?.localAudioUrl || '';
-  if (raw.startsWith('https://') || (raw.startsWith('http://') && !raw.includes('127.0.0.1') && !raw.includes('localhost') && !raw.includes('192.168.') && !raw.includes('10.11.'))) {
-    return raw;
-  }
-  if (raw.includes('/audio/')) {
-    const filename = raw.split('/audio/').pop();
-    if (filename) return `${SUPABASE_STORAGE_AUDIO}/${filename}`;
-  }
-  return null;
-}
-
-class AudioEngine {
+export class AudioEngine {
   constructor() {
     this.audio = new Audio();
     this.audio.preload = 'auto';
@@ -42,6 +28,15 @@ class AudioEngine {
     this.audio.volume = this.volume;
     this.preloadAudio = null;
     this.preloadedTrackId = null;
+    this.preloadedBlobUrl = null;
+    this.sourceVersion = 0;
+    this.sourceCandidates = [];
+    this.sourceIndex = -1;
+    this.wantsToPlay = false;
+    this.startupTimer = null;
+    this.knownDuration = 0;
+    this.pendingPreparation = null;
+    this.preloadPreparation = null;
 
     // Callbacks
     this.listeners = {
@@ -68,14 +63,8 @@ class AudioEngine {
       if (this.audioCtx && this.audioCtx.state === 'suspended') {
         this.audioCtx.resume().catch(() => {});
       }
-      if (!this.audio.src) {
-        // Silent 1-sample WAV to prime WebKit media playback pipeline on first touch
-        this.audio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
-        this.audio.play().then(() => {
-          this.audio.pause();
-          this.audio.src = '';
-        }).catch(() => {});
-      }
+      // The real play call runs directly in the gesture. A silent sample's delayed
+      // promise used to pause and clear a newly selected track on the first tap.
       window.removeEventListener('touchstart', unlock, true);
       window.removeEventListener('touchend', unlock, true);
       window.removeEventListener('click', unlock, true);
@@ -86,102 +75,124 @@ class AudioEngine {
   }
 
   setupAudioListeners() {
-    this.audio.addEventListener('timeupdate', () => {
-      const cur = this.audio.currentTime || 0;
-      const dur = this.audio.duration || 0;
-      this.notify('timeUpdate', { currentTime: cur, duration: dur });
-      this.updateMediaSessionPosition(cur, dur);
+    const audio = this.audio;
+    const listen = (event, callback) => audio.addEventListener(event, (...args) => {
+      if (audio === this.audio && !(this.currentTrack && !this.sourceCandidates.length)) callback(...args);
     });
-
-    this.audio.addEventListener('durationchange', () => {
-      this.notify('durationChange', this.audio.duration || 0);
+    const durationChanged = () => {
+      const duration = audio.readyState >= 1 ? finiteDuration(audio.duration) : 0;
+      if (!duration || duration === this.knownDuration) return;
+      this.knownDuration = duration;
+      this.notify('durationChange', duration);
+      this.notify('durationResolved', { trackId: this.currentTrack?.id, duration });
+      this.updateMediaSessionPosition(audio.currentTime || 0, duration);
+    };
+    listen('loadedmetadata', durationChanged);
+    listen('durationchange', durationChanged);
+    listen('timeupdate', () => {
+      durationChanged();
+      const currentTime = Math.max(0, audio.currentTime || 0);
+      this.notify('timeUpdate', { currentTime, duration: this.knownDuration });
+      this.updateMediaSessionPosition(currentTime, this.knownDuration);
     });
-
-    this.audio.addEventListener('play', () => {
+    listen('play', () => {
       this.isPlaying = true;
-      if (this.audioCtx && this.audioCtx.state === 'suspended') {
-        this.audioCtx.resume().catch(() => {});
-      }
+      if (this.audioCtx?.state === 'suspended') this.audioCtx.resume().catch(() => {});
       this.notify('playState', true);
-      if ('mediaSession' in navigator) {
-        navigator.mediaSession.playbackState = 'playing';
-      }
+      if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
     });
-
-    this.audio.addEventListener('pause', () => {
+    listen('playing', () => clearTimeout(this.startupTimer));
+    listen('pause', () => {
       this.isPlaying = false;
       this.notify('playState', false);
-      if ('mediaSession' in navigator) {
-        navigator.mediaSession.playbackState = 'paused';
-      }
+      if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
     });
-
-    this.audio.addEventListener('ended', () => {
+    listen('ended', () => {
+      this.isPlaying = false;
+      this.wantsToPlay = false;
+      this.notify('playState', false);
       this.notify('ended');
     });
-
-    this.audio.addEventListener('error', (e) => {
-      const mediaErr = this.audio.error;
-      console.warn('Audio playback error:', mediaErr ? `code ${mediaErr.code}: ${mediaErr.message}` : e);
-
-      // Multi-step fallback 1: If current src was local /audio/ or failed, try cloudAudioUrl if available
-      const cloudFallback = getCloudFallbackUrl(this.currentTrack);
-      if (cloudFallback && this.audio.src !== cloudFallback) {
-        console.log('Playback stream failed, falling back to Supabase Cloud Audio CDN URL...');
-        this.audio.removeAttribute('crossOrigin');
-        this.audio.src = cloudFallback;
-        this.audio.load();
-        if (this.isPlaying) {
-          this.audio.play().catch((playErr) => console.warn('Cloud audio fallback play error:', playErr));
-        }
-        return;
-      }
-
-      // Multi-step fallback 2: Automatic blob fallback: if blob URL failed, fallback to local/server URL
-      if (this.currentBlobUrl && (this.currentTrack?.localAudioUrl || this.currentTrack?.audioUrl)) {
-        console.warn('Blob audio failed, falling back to direct server URL...');
-        this.currentBlobUrl = null;
-        let fallbackSrc = this.currentTrack.localAudioUrl || this.currentTrack.audioUrl;
-        const backendBase = getBackendBaseUrl();
-        if (fallbackSrc.startsWith('/audio/') && backendBase) {
-          fallbackSrc = `${backendBase}${fallbackSrc}`;
-        }
-        this.audio.removeAttribute('crossOrigin');
-        this.audio.src = fallbackSrc;
-        this.audio.load();
-        if (this.isPlaying) {
-          this.audio.play().catch((playErr) => console.warn('Fallback play error:', playErr));
-        }
-        return;
-      }
-
-      // Multi-step fallback 3: Automatic CORS fallback: if failed with crossOrigin, retry without crossOrigin
-      if (this.audio.crossOrigin) {
-        console.log('CORS playback issue detected. Retrying without crossOrigin attribute...');
-        this.audio.removeAttribute('crossOrigin');
-        const currentSrc = this.audio.src;
-        this.audio.src = '';
-        this.audio.src = currentSrc;
-        this.audio.load();
-        if (this.isPlaying) {
-          this.audio.play().catch((playErr) => console.warn('CORS fallback play error:', playErr));
-        }
-        return;
-      }
-
-      this.notify('error', e);
+    listen('error', () => {
+      if (!audio.error || audio.error.code === 1 || !this.currentTrack) return;
+      this.advanceSource(audio.error);
     });
   }
 
+  configureSource(audio, source) {
+    // Native playback avoids requiring CORS from podcast hosts. Only an active
+    // Web Audio graph needs anonymous CORS for remote media.
+    if (!source) {
+      audio.removeAttribute('src');
+      return;
+    }
+    if (this.isWebAudioInitialized && /^https?:/.test(source)) audio.crossOrigin = 'anonymous';
+    else audio.removeAttribute('crossOrigin');
+    audio.src = source;
+  }
+
+  armStartupTimeout() {
+    clearTimeout(this.startupTimer);
+    if (this.sourceIndex + 1 >= this.sourceCandidates.length) return;
+    const version = this.sourceVersion;
+    this.startupTimer = setTimeout(() => {
+      if (version === this.sourceVersion && this.wantsToPlay && this.audio.readyState < 3) {
+        this.advanceSource(new Error('Audio source did not become ready'));
+      }
+    }, 8000);
+  }
+
+  advanceSource(error) {
+    clearTimeout(this.startupTimer);
+    if (this.sourceIndex >= this.sourceCandidates.length) return false;
+    const resumeAt = this.audio.currentTime || 0;
+    // CORS failure through an enabled EQ must fall back to a native element:
+    // removing crossOrigin alone leaves MediaElementAudioSource output silent.
+    if (this.isWebAudioInitialized && /^https?:/.test(this.audio.src)) {
+      this.useNativePlayback();
+      this.sourceIndex -= 1;
+    }
+    this.sourceVersion += 1;
+    const source = this.sourceCandidates[++this.sourceIndex];
+    if (!source) {
+      this.wantsToPlay = false;
+      this.isPlaying = false;
+      this.notify('playState', false);
+      this.notify('error', error);
+      return false;
+    }
+    this.configureSource(this.audio, source);
+    if (resumeAt > 0) {
+      const audio = this.audio;
+      const version = this.sourceVersion;
+      audio.addEventListener('loadedmetadata', () => {
+        if (audio === this.audio && version === this.sourceVersion) this.seek(resumeAt);
+      }, { once: true });
+    }
+    this.audio.load();
+    if (this.wantsToPlay) this.play().catch((playError) => this.notify('error', playError));
+    return true;
+  }
+
+  useNativePlayback() {
+    const previous = this.audio;
+    this.audio = new Audio();
+    this.audio.preload = 'auto';
+    this.audio.playsInline = true;
+    this.audio.volume = this.volume;
+    this.setupAudioListeners();
+    previous.pause();
+    previous.removeAttribute('src');
+    previous.load();
+    this.sourceNode?.disconnect();
+    this.audioCtx?.close().catch(() => {});
+    this.audioCtx = this.sourceNode = this.analyserNode = this.bassNode = null;
+    this.eqNodes = [];
+    this.isWebAudioInitialized = false;
+  }
+
   initWebAudio(force = false) {
-    if (this.isWebAudioInitialized) return;
-    const isIOS = typeof navigator !== 'undefined' && (
-      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-    );
-    // On iOS WebKit, avoid createMediaElementSource unless explicitly forced (e.g. Equalizer)
-    // because WebKit mutes cross-origin streams and disables AVAudioSession background lock-screen playback
-    if (isIOS && !force) return;
+    if (this.isWebAudioInitialized || !force) return;
 
     try {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -237,9 +248,28 @@ class AudioEngine {
       this.analyserNode.connect(this.audioCtx.destination);
 
       this.isWebAudioInitialized = true;
+      // Existing native streams must be re-requested with CORS before entering
+      // Web Audio; otherwise even CORS-capable hosts produce silent output.
+      if (/^https?:/.test(this.audio.src) && !this.audio.crossOrigin) {
+        const resumeAt = this.audio.currentTime || 0;
+        this.sourceIndex -= 1;
+        this.advanceSourceForEqualizer(resumeAt);
+      }
     } catch (err) {
       console.warn('Web Audio initialization note (CORS or permissions):', err);
     }
+  }
+
+  advanceSourceForEqualizer(resumeAt) {
+    this.sourceVersion += 1;
+    const version = this.sourceVersion;
+    const source = this.sourceCandidates[++this.sourceIndex];
+    this.configureSource(this.audio, source);
+    this.audio.addEventListener('loadedmetadata', () => {
+      if (version === this.sourceVersion) this.seek(resumeAt);
+    }, { once: true });
+    this.audio.load();
+    if (this.wantsToPlay) this.play().catch((error) => this.notify('error', error));
   }
 
   // Setup Apple & standard lock screen controls via MediaSession
@@ -247,7 +277,7 @@ class AudioEngine {
     if (!('mediaSession' in navigator)) return;
 
     const actionHandlers = [
-      ['play', () => this.play()],
+      ['play', () => this.play().catch((error) => this.notify('error', error))],
       ['pause', () => this.pause()],
       ['previoustrack', () => this.notify('prevTrackRequest')],
       ['nexttrack', () => this.notify('nextTrackRequest')],
@@ -269,10 +299,19 @@ class AudioEngine {
         // unsupported action in this browser
       }
     }
+
+    // Explicitly unregister WebKit's default 10-second lock-screen skip buttons.
+    for (const action of ['seekbackward', 'seekforward']) {
+      try {
+        navigator.mediaSession.setActionHandler(action, null);
+      } catch (error) {
+        // unsupported action in this browser
+      }
+    }
   }
 
   updateMediaSessionMetadata(track) {
-    if (!('mediaSession' in navigator) || !track) return;
+    if (!('mediaSession' in navigator) || !track || typeof window.MediaMetadata !== 'function') return;
 
     const artwork = [];
     if (track.coverUrl) {
@@ -316,183 +355,181 @@ class AudioEngine {
     }
   }
 
-  preloadTrack(track) {
-    if (!track || track.id === this.currentTrack?.id || track.id === this.preloadedTrackId) return;
-
-    let src = track.cloudAudioUrl?.startsWith('http')
-      ? track.cloudAudioUrl
-      : (track.localAudioUrl || track.audioUrl || '');
-    const backendBase = getBackendBaseUrl();
-    const cloudUrl = getCloudFallbackUrl(track);
-    const isIOS = typeof navigator !== 'undefined' && (
-      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-    );
-    const isCapacitor = typeof window !== 'undefined' && (
-      window.location.protocol === 'capacitor:' || !!window.Capacitor
-    );
-
-    if ((isIOS || isCapacitor) && cloudUrl) {
-      src = cloudUrl;
-    } else if (src.startsWith('/audio/')) {
-      src = backendBase ? `${backendBase}${src}` : (cloudUrl || `${window.location.origin}${src}`);
-    } else if (backendBase && (src.includes('127.0.0.1:3030') || src.includes('localhost:3030') || src.includes('192.168.') || src.includes('10.11.'))) {
-      src = src.replace(/http:\/\/[^/]+(:3030)?/, backendBase);
-    }
-    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && src.startsWith('http://') && cloudUrl?.startsWith('https://')) {
-      src = cloudUrl;
-    }
-    if (!src || src.startsWith('blob:')) return;
-
-    this.preloadAudio?.pause();
-    this.preloadAudio = new Audio();
-    this.preloadAudio.preload = 'auto';
-    this.preloadAudio.src = src;
-    this.preloadAudio.load();
-    this.preloadedTrackId = track.id;
-  }
-
-  async loadTrack(track) {
-    if (!track) return;
-    this.currentTrack = track;
-    this.initWebAudio();
-
-    if (this.audioCtx && this.audioCtx.state === 'suspended') {
-      this.audioCtx.resume().catch(() => {});
-    }
-
-    const isIOS = typeof navigator !== 'undefined' && (
-      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-    );
-    const isCapacitor = typeof window !== 'undefined' && (
-      window.location.protocol === 'capacitor:' || !!window.Capacitor
-    );
-
-    // Determine audio URL (blob url or streaming url)
-    let src = '';
-    let isLocalBlob = false;
-
-    if (track.audioBlob && track.audioBlob instanceof Blob && track.audioBlob.size > 0) {
-      if (this.currentBlobUrl) {
-        try {
-          URL.revokeObjectURL(this.currentBlobUrl);
-        } catch (e) {}
-      }
-      this.currentBlobUrl = URL.createObjectURL(track.audioBlob);
-      src = this.currentBlobUrl;
-      isLocalBlob = true;
-    } else if (track.cloudAudioUrl && track.cloudAudioUrl.startsWith('http')) {
-      src = track.cloudAudioUrl;
-    } else {
-      src = track.localAudioUrl || track.audioUrl || '';
-    }
-
-    const backendBase = getBackendBaseUrl();
-    const cloudUrl = getCloudFallbackUrl(track);
-
-    // On iPhone (iOS or Capacitor native app), prioritize high-speed Supabase CDN stream
-    // so playback starts instantly without waiting for or timing out on local Mac LAN IP
-    if ((isIOS || isCapacitor) && !isLocalBlob) {
-      if (cloudUrl) {
-        src = cloudUrl;
-      } else if (src.startsWith('/audio/')) {
-        src = backendBase ? `${backendBase}${src}` : `${SUPABASE_STORAGE_AUDIO}/${src.split('/audio/').pop()}`;
-      }
-    } else if (src && src.startsWith('/audio/')) {
-      if (backendBase) {
-        src = `${backendBase}${src}`;
-      } else if (cloudUrl) {
-        src = cloudUrl;
-      } else if (typeof window !== 'undefined' && window.location.protocol.startsWith('http') && !isCapacitor) {
-        src = `${window.location.origin}${src}`;
-      } else {
-        src = `http://127.0.0.1:3030${src}`;
-      }
-    } else if (src && backendBase && (src.includes('127.0.0.1:3030') || src.includes('localhost:3030') || src.includes('192.168.') || src.includes('10.11.'))) {
-      src = src.replace(/http:\/\/[^/]+(:3030)?/, backendBase);
-    }
-
-    // Avoid Mixed Content error if page is loaded on HTTPS:
-    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && src.startsWith('http://')) {
-      if (cloudUrl && cloudUrl.startsWith('https://')) {
-        src = cloudUrl;
-      }
-    }
-
-    // Blob and data URLs must NEVER have crossOrigin set in WebKit/Chromium
-    if (isLocalBlob || src.startsWith('blob:') || src.startsWith('data:') || src.startsWith('file:')) {
-      this.audio.removeAttribute('crossOrigin');
-    } else if (isIOS) {
-      // On iOS WebKit, omitting crossOrigin ensures native AVPlayer streams without CORS preflight restrictions
-      this.audio.removeAttribute('crossOrigin');
-    } else if (src.startsWith('http://') || src.startsWith('https://')) {
-      this.audio.crossOrigin = 'anonymous';
-    } else {
-      this.audio.removeAttribute('crossOrigin');
-    }
-
-    if (this.preloadedTrackId === track.id && this.preloadAudio && !isLocalBlob) {
-      src = this.preloadAudio.currentSrc || this.preloadAudio.src;
+  clearPreload() {
+    if (this.preloadAudio) {
       this.preloadAudio.pause();
+      this.preloadAudio.removeAttribute('src');
+      this.preloadAudio.load();
       this.preloadAudio = null;
     }
-
-    this.audio.src = src;
+    if (this.preloadedBlobUrl) URL.revokeObjectURL(this.preloadedBlobUrl);
+    this.preloadedBlobUrl = null;
     this.preloadedTrackId = null;
-    this.updateMediaSessionMetadata(track);
+    this.preloadPreparation = null;
+  }
+
+  needsTimingPreparation(track) {
+    return isAppleMobileAudio() && (track.audioBlob instanceof Blob
+      ? track.audioTimingVersion !== AUDIO_TIMING_VERSION
+      : /^(M4A|MP4)$/i.test(track.format || '') || /\.(m4a|mp4)(?:[?#]|$)/i.test(track.audioUrl || track.cloudAudioUrl || ''));
+  }
+
+  async preparePlaybackTrack(track) {
+    const audioBlob = track.audioBlob instanceof Blob && track.audioBlob.size
+      ? await prepareAudioBlob(track.audioBlob, track) : await downloadAudioForTrack(track);
+    const timing = await repairM4aTiming(audioBlob);
+    const prepared = { ...track, audioBlob, audioTimingVersion: AUDIO_TIMING_VERSION,
+      ...(timing.duration ? { duration: timing.duration, durationVerified: true } : {}) };
+    this.notify('trackPrepared', prepared);
+    return prepared;
+  }
+
+  preloadTrack(track) {
+    if (track && track.id === this.preloadedTrackId) return;
+    this.clearPreload();
+    if (!track || track.id === this.currentTrack?.id) return;
+    this.preloadedTrackId = track.id;
+    const preload = (prepared) => {
+      if (this.preloadedTrackId !== prepared.id || this.currentTrack?.id === prepared.id) return;
+      let src;
+      if (prepared.audioBlob instanceof Blob && prepared.audioBlob.size > 0) {
+        this.preloadedBlobUrl = URL.createObjectURL(prepared.audioBlob);
+        src = this.preloadedBlobUrl;
+      } else src = getTrackAudioSources(prepared)[0];
+      if (!src) return;
+      this.preloadAudio = new Audio();
+      this.preloadAudio.preload = prepared.type === 'podcast' ? 'metadata' : 'auto';
+      this.configureSource(this.preloadAudio, src);
+      this.preloadAudio.load();
+    };
+    if (this.needsTimingPreparation(track)) {
+      this.preloadPreparation = this.preparePlaybackTrack(track);
+      this.preloadPreparation.then(preload).catch(() => {
+        if (this.preloadedTrackId === track.id) this.clearPreload();
+      });
+    } else preload(track);
+  }
+
+  applyTrackSource(track, warmBlob = null) {
+    if (track.audioBlob instanceof Blob && track.audioBlob.size > 0) {
+      this.currentBlobUrl = warmBlob || URL.createObjectURL(track.audioBlob);
+    }
+    this.sourceCandidates = [this.currentBlobUrl, ...getTrackAudioSources(track)].filter(Boolean);
+    this.sourceIndex = 0;
+    this.audio.defaultPlaybackRate = 1;
+    this.audio.playbackRate = 1;
+    this.audio.preservesPitch = true;
+    this.configureSource(this.audio, this.sourceCandidates[0] || '');
+    this.audio.load();
+  }
+
+  loadTrack(track) {
+    if (!track) return;
+    clearTimeout(this.startupTimer);
+    this.sourceVersion += 1;
+    const version = this.sourceVersion;
+    this.wantsToPlay = false;
+    this.audio.pause();
+    const oldBlobUrl = this.currentBlobUrl;
+    this.currentBlobUrl = null;
+    const isWarm = this.preloadedTrackId === track.id;
+    const warmBlob = isWarm ? this.preloadedBlobUrl : null;
+    const warmPreparation = isWarm ? this.preloadPreparation : null;
+    if (warmBlob) this.preloadedBlobUrl = null;
+    this.currentTrack = track;
+    this.knownDuration = 0;
+    this.isPlaying = false;
+    this.pendingPreparation = null;
+    if (this.needsTimingPreparation(track)) {
+      // Repair before the first decode: this error emits no media error, so a
+      // fallback triggered only by `error` never fixes the doubled iOS timeline.
+      this.sourceCandidates = [];
+      this.configureSource(this.audio, '');
+      this.audio.load();
+      this.pendingPreparation = (warmPreparation || this.preparePlaybackTrack(track)).then((prepared) => {
+        if (version !== this.sourceVersion) return;
+        this.currentTrack = prepared;
+        this.applyTrackSource(prepared, warmBlob);
+        this.pendingPreparation = null;
+      }).catch((error) => {
+        if (version !== this.sourceVersion) return;
+        this.pendingPreparation = null;
+        this.wantsToPlay = false;
+        this.notify('playState', false);
+        this.notify('error', error);
+      });
+    } else this.applyTrackSource(track, warmBlob);
+    if (oldBlobUrl) URL.revokeObjectURL(oldBlobUrl);
+    this.clearPreload();
     this.notify('trackChange', track);
+    this.notify('timeUpdate', { currentTime: 0, duration: 0 });
+    this.notify('durationChange', 0);
+    if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession) {
+      try { navigator.mediaSession.setPositionState(); } catch { /* unsupported */ }
+    }
+    this.updateMediaSessionMetadata(track);
   }
 
   async play() {
-    if (!this.audio.src) {
-      console.warn('AudioEngine: No audio source loaded to play');
+    if (!this.currentTrack) return;
+    this.wantsToPlay = true;
+    const version = this.sourceVersion;
+    if (this.pendingPreparation) {
+      // Safari requires a play call in the original gesture. Prime the same
+      // element while the M4A is repaired; never clear/pause it from a delayed
+      // promise, which could otherwise interrupt the real track.
+      if (isAppleMobileAudio()) {
+        this.audio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+        this.audio.play().catch(() => {});
+      }
+      await this.pendingPreparation;
+      if (version !== this.sourceVersion || !this.wantsToPlay) return;
+    }
+    if (!this.sourceCandidates[this.sourceIndex]) {
+      this.wantsToPlay = false;
       return;
     }
-    this.initWebAudio();
-    const resumePromise = this.audioCtx && this.audioCtx.state === 'suspended'
-      ? this.audioCtx.resume().catch(() => {})
-      : Promise.resolve();
+    this.audio.defaultPlaybackRate = 1;
+    this.audio.playbackRate = 1;
+    if (this.audioCtx?.state === 'suspended') this.audioCtx.resume().catch(() => {});
+    this.armStartupTimeout();
     try {
+      // Invoke synchronously in the tap/click handler for WebKit's gesture policy.
       await this.audio.play();
-      void resumePromise;
-    } catch (e) {
-      console.warn('Playback error / autoplay prevention:', e);
-      if (this.audio.crossOrigin) {
-        console.log('Retrying audio.play() without crossOrigin attribute...');
-        this.audio.removeAttribute('crossOrigin');
-        const currSrc = this.audio.src;
-        this.audio.src = '';
-        this.audio.src = currSrc;
-        this.audio.load();
-        await this.audio.play();
-      } else {
-        throw e;
+    } catch (error) {
+      if (version !== this.sourceVersion || !this.wantsToPlay) return;
+      clearTimeout(this.startupTimer);
+      if (error.name === 'NotAllowedError' || error.name === 'AbortError') {
+        this.wantsToPlay = false;
+        this.isPlaying = false;
+        this.notify('playState', false);
+        throw error;
       }
+      if (!this.advanceSource(error)) throw error;
     }
   }
 
   pause() {
+    this.wantsToPlay = false;
+    clearTimeout(this.startupTimer);
     this.audio.pause();
   }
 
   togglePlay() {
-    if (this.isPlaying) {
-      this.pause();
-    } else {
-      if (!this.audio.src && this.currentTrack) {
-        this.loadTrack(this.currentTrack).then(() => this.play().catch(() => {}));
-        return;
-      }
-      if (!this.audio.src) return;
-      this.play().catch(() => {});
+    if (this.wantsToPlay || this.isPlaying) this.pause();
+    else if (this.currentTrack) {
+      if (!this.pendingPreparation && (!this.audio.src || !this.sourceCandidates[this.sourceIndex])) this.loadTrack(this.currentTrack);
+      this.play().catch((error) => this.notify('error', error));
     }
   }
 
   seek(seconds) {
-    if (isFinite(seconds)) {
-      this.audio.currentTime = seconds;
-      this.updateMediaSessionPosition(seconds, this.audio.duration);
+    if (Number.isFinite(seconds)) {
+      const duration = finiteDuration(this.audio.duration);
+      const position = Math.max(0, duration ? Math.min(seconds, duration) : seconds);
+      try { this.audio.currentTime = position; } catch { return; }
+      this.notify('timeUpdate', { currentTime: position, duration: this.knownDuration });
+      this.updateMediaSessionPosition(position, this.knownDuration);
     }
   }
 

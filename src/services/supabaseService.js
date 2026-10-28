@@ -58,7 +58,7 @@ export async function saveTrackToSupabase(track) {
     title: track.title || 'Untitled Track',
     artist: track.artist || 'Unknown Artist',
     album: track.album || 'Single',
-    duration: Math.round(track.duration || 180),
+    duration: Number.isFinite(track.duration) && track.duration > 0 ? Math.round(track.duration) : 0,
     cover_url: track.coverUrl || null,
     audio_url: track.cloudAudioUrl || track.audioUrl,
     bitrate: track.bitrate || '320kbps Original',

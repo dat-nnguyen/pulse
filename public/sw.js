@@ -1,98 +1,52 @@
-// Pulse Audio Player — Modern Service Worker
-const CACHE_NAME = 'pulse-cache-v2';
-
-// Only precache truly static shell assets
-const PRECACHE_ASSETS = [
-  '/',
-  '/favicon.svg',
-  '/manifest.json'
-];
+// Each release gets its own cache; keep previous bundles for tabs still playing.
+const CACHE_NAME = 'pulse-cache-__PULSE_BUILD_ID__';
+const SHELL = ['/', '/index.html', '/favicon.svg', '/manifest.json'];
 
 self.addEventListener('install', (event) => {
-  // Take control immediately
-  self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(PRECACHE_ASSETS).catch((err) => {
-        console.warn('Precache error (non-fatal):', err);
-      });
-    })
-  );
+  event.waitUntil((async () => {
+    const response = await fetch('/asset-manifest.json', { cache: 'no-store' });
+    if (!response.ok) throw new Error('Offline asset manifest is unavailable');
+    const assets = await response.json();
+    if (!Array.isArray(assets) || assets.some((path) => typeof path !== 'string' || !/^\/assets\/[\w.-]+\.(js|css)$/.test(path))) {
+      throw new Error('Invalid offline asset manifest');
+    }
+    const cache = await caches.open(CACHE_NAME);
+    await cache.addAll([...SHELL, ...assets]);
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) => {
-      // Delete all old or previous caches (including spotify-local-v1)
-      return Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) {
-            console.log('Purging legacy cache:', key);
-            return caches.delete(key);
-          }
-        })
-      );
-    })
-  );
-  self.clients.claim();
+  event.waitUntil((async () => {
+    const keys = (await caches.keys()).filter((key) => key.startsWith('pulse-cache-'));
+    const keep = new Set([CACHE_NAME, ...keys.filter((key) => key !== CACHE_NAME).slice(-2)]);
+    await Promise.all(keys.filter((key) => !keep.has(key)).map((key) => caches.delete(key)));
+    await self.clients.claim();
+  })());
 });
 
 self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
+  const request = event.request;
+  const url = new URL(request.url);
+  if (request.method !== 'GET' || url.origin !== self.location.origin ||
+    url.pathname.startsWith('/api/') || url.pathname.startsWith('/audio/') ||
+    request.destination === 'audio' || request.destination === 'video' || request.headers.has('range')) return;
 
-  // Bypass service worker for local development, API requests, Vite dev server, or audio streaming
-  if (
-    url.hostname === 'localhost' ||
-    url.hostname === '127.0.0.1' ||
-    url.pathname.startsWith('/@') ||
-    url.pathname.startsWith('/src/') ||
-    url.pathname.startsWith('/api/') ||
-    url.pathname.startsWith('/audio/') ||
-    event.request.destination === 'audio' ||
-    event.request.method !== 'GET'
-  ) {
+  const save = (response) => {
+    if (response?.status === 200) {
+      const copy = response.clone();
+      event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)));
+    }
+    return response;
+  };
+  if (request.mode === 'navigate') {
+    event.respondWith(fetch(request).then(save).catch(async () =>
+      (await caches.match(request)) || (await caches.match('/')) || (await caches.match('/index.html'))));
     return;
   }
-
-  // 1. Navigation requests (HTML pages): Network-First
-  // Always fetch fresh HTML so user gets the latest bundle hashes. Fallback to cache only when offline.
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          if (response && response.status === 200) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        })
-        .catch(() => {
-          return caches.match('/') || caches.match('/index.html');
-        })
-    );
-    return;
-  }
-
-  // 2. Static bundled assets (/assets/*): Cache-First with Network fallback
-  // These have content hashes in their filename so they are immutable.
   if (url.pathname.startsWith('/assets/')) {
-    event.respondWith(
-      caches.match(event.request).then((cached) => {
-        if (cached) return cached;
-        return fetch(event.request).then((response) => {
-          if (response && response.status === 200) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        });
-      })
-    );
+    event.respondWith(caches.match(request).then((cached) => cached || fetch(request).then(save)));
     return;
   }
-
-  // 3. All other requests: Network-First with safe fallback (NEVER fallback to index.html for assets)
-  event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request))
-  );
+  event.respondWith(fetch(request).catch(() => caches.match(request)));
 });

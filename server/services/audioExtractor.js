@@ -171,7 +171,7 @@ export async function extractAudioFromUrl(url, customMeta = {}) {
 
         const ext = path.extname(downloadedFile).replace('.', '').toUpperCase() || 'M4A';
         const { title: trackTitle, artist: trackArtist } = parseTitleAndArtist(info, customMeta);
-        const trackDuration = Math.round((info && info.duration) || 180);
+        const trackDuration = Math.max(0, Number(info?.duration) || 0);
         const coverUrl = (info && info.thumbnail) || '';
 
         return resolve({
@@ -180,13 +180,13 @@ export async function extractAudioFromUrl(url, customMeta = {}) {
             id: outputId,
             title: trackTitle,
             artist: trackArtist,
-            album: (info && info.album) || 'Web Audio Downloads',
+            album: customMeta.album || (info && info.album) || 'Web Audio Downloads',
             duration: trackDuration,
             coverUrl,
             audioUrl: `/audio/${downloadedFile}`,
             bitrate: '320 kbps (High Quality)',
             format: ext,
-            type: 'music',
+            type: customMeta.type === 'podcast' ? 'podcast' : 'music',
             isDownloaded: true,
           },
         });

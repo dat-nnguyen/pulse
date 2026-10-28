@@ -1,75 +1,22 @@
 // Local file parser for user's MP3, FLAC, WAV, M4A files
 
+import { readAudioDuration, prepareAudioBlob } from './audioMediaService.js';
+
 export async function parseAudioFile(file) {
-  return new Promise((resolve) => {
-    const objectUrl = URL.createObjectURL(file);
-    const audio = new Audio();
-    audio.preload = 'metadata';
-
-    audio.onloadedmetadata = () => {
-      const duration = Math.round(audio.duration) || 0;
-      
-      // Clean filename
-      const rawName = file.name.replace(/\.[^/.]+$/, '');
-      let title = rawName;
-      let artist = 'Local Artist';
-      let album = 'Local Files';
-
-      // Parse common "Artist - Title" pattern
-      if (rawName.includes(' - ')) {
-        const parts = rawName.split(' - ');
-        artist = parts[0].trim();
-        title = parts.slice(1).join(' - ').trim();
-      }
-
-      const extension = file.name.split('.').pop().toUpperCase();
-      let format = extension;
-      let bitrate = 'Lossless Original';
-      if (format === 'MP3') bitrate = '320 kbps Original';
-      if (format === 'FLAC') bitrate = 'FLAC Lossless 24-bit';
-      if (format === 'WAV') bitrate = 'WAV Uncompressed';
-
-      // Default high-quality visual placeholder
-      const coverUrl = generateAlbumArt(title, artist);
-
-      resolve({
-        id: `local_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        title,
-        artist,
-        album,
-        duration,
-        audioBlob: file,
-        audioUrl: objectUrl,
-        coverUrl,
-        format,
-        bitrate,
-        isDownloaded: true,
-        type: 'music',
-        addedAt: Date.now(),
-        fileSizeBytes: file.size,
-      });
-    };
-
-    audio.onerror = () => {
-      resolve({
-        id: `local_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        title: file.name,
-        artist: 'Local Artist',
-        album: 'Local Files',
-        duration: 180,
-        audioBlob: file,
-        audioUrl: objectUrl,
-        coverUrl: generateAlbumArt(file.name, 'Local'),
-        format: file.name.split('.').pop().toUpperCase(),
-        bitrate: 'Original Quality',
-        isDownloaded: true,
-        type: 'music',
-        addedAt: Date.now(),
-      });
-    };
-
-    audio.src = objectUrl;
-  });
+  const audioBlob = await prepareAudioBlob(file, { format: file.name.split('.').pop() });
+  const duration = await readAudioDuration(audioBlob);
+  const rawName = file.name.replace(/\.[^/.]+$/, '');
+  const parts = rawName.split(' - ');
+  const artist = parts.length > 1 ? parts[0].trim() : 'Local Artist';
+  const title = parts.length > 1 ? parts.slice(1).join(' - ').trim() : rawName;
+  const format = file.name.split('.').pop().toUpperCase();
+  const bitrate = ({ MP3: '320 kbps Original', FLAC: 'FLAC Lossless 24-bit', WAV: 'WAV Uncompressed' })[format] || 'Lossless Original';
+  return {
+    id: `local_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    title, artist, album: 'Local Files', duration, durationVerified: Boolean(duration),
+    audioBlob, coverUrl: generateAlbumArt(title, artist), format, bitrate,
+    isDownloaded: true, type: 'music', addedAt: Date.now(), fileSizeBytes: file.size,
+  };
 }
 
 function generateAlbumArt(title, artist) {

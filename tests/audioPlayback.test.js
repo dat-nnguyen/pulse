@@ -70,6 +70,120 @@ afterEach(() => {
 });
 
 describe('Playback transitions', () => {
+  it('uses the HLS player when a failed direct source falls back to HLS', async () => {
+    const engine = new AudioEngine();
+    engine.loadTrack(track('fallback', { cloudAudioUrl: 'https://cloud.example/expired.mp3', audioUrl: 'https://cdn.example/live.m3u8' }));
+    await engine.play();
+    engine.audio.fail();
+    await engine.pendingPreparation;
+    expect(hlsInstances.at(-1).loadSource).toHaveBeenCalledWith('https://cdn.example/live.m3u8');
+    expect(engine.audio.src).toBe('blob:hls-media-source');
+  });
+
+  it('reports a stalled final source instead of staying in playing state forever', async () => {
+    vi.useFakeTimers();
+    const engine = new AudioEngine();
+    const errors = vi.fn();
+    engine.on('error', errors);
+    engine.loadTrack(track('stuck'));
+    await engine.play();
+    await vi.advanceTimersByTimeAsync(8000);
+    expect(errors).toHaveBeenCalledOnce();
+    expect(engine.wantsToPlay).toBe(false);
+    expect(engine.isPlaying).toBe(false);
+  });
+
+  it('resumes an interrupted audio context when playback is requested', async () => {
+    const engine = new AudioEngine();
+    engine.audioCtx = { state: 'interrupted', resume: vi.fn().mockResolvedValue() };
+    engine.loadTrack(track('wake'));
+    await engine.play();
+    expect(engine.audioCtx.resume).toHaveBeenCalled();
+  });
+
+  it('recovers native playback and position when the EQ context cannot resume', async () => {
+    const engine = new AudioEngine();
+    engine.loadTrack(track('recover'));
+    await engine.play();
+    const previous = engine.audio;
+    previous.currentTime = 42;
+    const context = { state: 'suspended', resume: vi.fn().mockRejectedValue(new Error('Output device lost')),
+      close: vi.fn().mockResolvedValue() };
+    engine.audioCtx = context;
+    engine.isWebAudioInitialized = true;
+    await engine.play();
+    await Promise.resolve();
+    expect(engine.audio).not.toBe(previous);
+    expect(engine.audio.src).toBe('https://cdn.example/recover.mp3');
+    expect(engine.audioCtx).toBeNull();
+    engine.audio.metadata(180);
+    expect(engine.audio.currentTime).toBe(42);
+    expect(engine.wantsToPlay).toBe(true);
+  });
+
+  it('does not let a delayed EQ recovery replace a newer track', async () => {
+    const engine = new AudioEngine();
+    let rejectResume;
+    engine.audioCtx = { state: 'suspended', resume: vi.fn(() => new Promise((_, reject) => { rejectResume = reject; })) };
+    engine.loadTrack(track('old'));
+    await engine.play();
+    const audio = engine.audio;
+    engine.loadTrack(track('new'));
+    rejectResume(new Error('Old resume failed'));
+    await Promise.resolve();
+    expect(engine.audio).toBe(audio);
+    expect(engine.audio.src).toBe('https://cdn.example/new.mp3');
+  });
+
+  it('recovers when resume never settles, but respects a user pause', async () => {
+    vi.useFakeTimers();
+    for (const pause of [false, true]) {
+      const engine = new AudioEngine();
+      engine.loadTrack(track('interrupted'));
+      const previous = engine.audio;
+      engine.audioCtx = { state: 'interrupted', resume: vi.fn(() => new Promise(() => {})), close: vi.fn().mockResolvedValue() };
+      await engine.play();
+      if (pause) engine.pause();
+      await vi.advanceTimersByTimeAsync(2500);
+      expect(engine.audio === previous).toBe(pause);
+      expect(engine.wantsToPlay).toBe(!pause);
+    }
+  });
+
+  it('restores native audio if building the EQ graph fails after attaching the element', async () => {
+    const engine = new AudioEngine();
+    engine.loadTrack(track('eq'));
+    await engine.play();
+    const previous = engine.audio;
+    const filter = () => ({ frequency: {}, gain: {}, Q: {}, connect() {} });
+    vi.stubGlobal('window', { AudioContext: class {
+      createBiquadFilter = filter;
+      createAnalyser = () => ({});
+      createMediaElementSource = () => ({ connect() { throw new Error('Graph failed'); }, disconnect() {} });
+      close = vi.fn().mockResolvedValue();
+    } });
+    engine.initWebAudio(true);
+    expect(engine.audio).not.toBe(previous);
+    expect(engine.audio.src).toBe('https://cdn.example/eq.mp3');
+    expect(engine.audioCtx).toBeNull();
+    expect(engine.wantsToPlay).toBe(true);
+  });
+
+  it('leaves healthy playback alone and detects a later buffering stall', async () => {
+    vi.useFakeTimers();
+    const engine = new AudioEngine();
+    const errors = vi.fn();
+    engine.on('error', errors);
+    engine.loadTrack(track('buffer'));
+    await engine.play();
+    engine.audio.dispatchEvent(new Event('playing'));
+    await vi.advanceTimersByTimeAsync(8000);
+    expect(errors).not.toHaveBeenCalled();
+    engine.audio.dispatchEvent(new Event('waiting'));
+    await vi.advanceTimersByTimeAsync(8000);
+    expect(errors).toHaveBeenCalledOnce();
+  });
+
   it('uses native HLS on iPhone and a media-source player on browsers without native HLS', async () => {
     const native = new AudioEngine();
     native.audio.canPlayType = () => 'probably';
@@ -226,6 +340,12 @@ describe('Playback transitions', () => {
 });
 
 describe('Offline audio integrity', () => {
+  it('prefers a local companion file to a cloud copy on desktop', () => {
+    setBackendBaseUrl('http://127.0.0.1:3030');
+    expect(getTrackAudioSources({ audioUrl: '/audio/song.m4a', cloudAudioUrl: 'https://cloud.example/song.m4a' }))
+      .toEqual(['http://127.0.0.1:3030/audio/song.m4a', 'https://cloud.example/song.m4a']);
+  });
+
   it('parses podcast durations in seconds, minutes, or hours without producing NaN', () => {
     expect(parseDurationToSeconds(' 3723 ')).toBe(3723);
     expect(parseDurationToSeconds('62:03')).toBe(3723);

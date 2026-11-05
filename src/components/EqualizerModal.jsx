@@ -66,31 +66,44 @@ export default function EqualizerModal({ isOpen, onClose }) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const grad = ctx.createLinearGradient(0, canvas.height, 0, 0);
+    grad.addColorStop(0, '#00c2d1');
+    grad.addColorStop(1, '#00d8e8');
+    let lastFrame = 0;
 
-    const draw = () => {
-      animRef.current = requestAnimationFrame(draw);
+    const draw = (timestamp = 0) => {
+      animRef.current = null;
+      if (document.hidden) return;
+      if (audioEngine.isPlaying) animRef.current = requestAnimationFrame(draw);
+      if (timestamp && timestamp - lastFrame < 1000 / 30) return;
+      lastFrame = timestamp;
       const freqData = audioEngine.getFrequencyData();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = grad;
 
       const barWidth = (canvas.width / freqData.length) * 1.5;
       let x = 0;
 
       for (let i = 0; i < freqData.length; i++) {
         const barHeight = (freqData[i] / 255) * canvas.height;
-        const grad = ctx.createLinearGradient(0, canvas.height, 0, 0);
-        grad.addColorStop(0, '#00c2d1');
-        grad.addColorStop(1, '#00d8e8');
-
-        ctx.fillStyle = grad;
         ctx.fillRect(x, canvas.height - barHeight, barWidth - 2, barHeight);
         x += barWidth;
       }
     };
 
-    draw();
+    const restart = () => {
+      if (animRef.current !== null) cancelAnimationFrame(animRef.current);
+      draw();
+    };
+    const unsubscribe = audioEngine.on('playState', restart);
+    document.addEventListener('visibilitychange', restart);
+    restart();
 
     return () => {
-      if (animRef.current) cancelAnimationFrame(animRef.current);
+      unsubscribe();
+      document.removeEventListener('visibilitychange', restart);
+      if (animRef.current !== null) cancelAnimationFrame(animRef.current);
     };
   }, [isOpen]);
 

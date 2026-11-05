@@ -39,6 +39,8 @@ export class AudioEngine {
     this.pendingPreparation = null;
     this.preloadPreparation = null;
     this.hls = null;
+    this.frequencyData = new Uint8Array(32);
+    this.contextRecovery = null;
 
     // Callbacks
     this.listeners = {
@@ -62,9 +64,7 @@ export class AudioEngine {
     const unlock = () => {
       if (this.hasUnlockedAudio) return;
       this.hasUnlockedAudio = true;
-      if (this.audioCtx && this.audioCtx.state === 'suspended') {
-        this.audioCtx.resume().catch(() => {});
-      }
+      this.resumeAudioContext();
       // The real play call runs directly in the gesture. A silent sample's delayed
       // promise used to pause and clear a newly selected track on the first tap.
       window.removeEventListener('touchstart', unlock, true);
@@ -99,11 +99,13 @@ export class AudioEngine {
     });
     listen('play', () => {
       this.isPlaying = true;
-      if (this.audioCtx?.state === 'suspended') this.audioCtx.resume().catch(() => {});
+      this.resumeAudioContext();
       this.notify('playState', true);
       if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
     });
     listen('playing', () => clearTimeout(this.startupTimer));
+    listen('waiting', () => { if (this.wantsToPlay) this.armStartupTimeout(); });
+    listen('stalled', () => { if (this.wantsToPlay) this.armStartupTimeout(); });
     listen('pause', () => {
       this.isPlaying = false;
       this.notify('playState', false);
@@ -135,10 +137,10 @@ export class AudioEngine {
 
   armStartupTimeout() {
     clearTimeout(this.startupTimer);
-    if (this.sourceIndex + 1 >= this.sourceCandidates.length) return;
     const version = this.sourceVersion;
+    const position = this.audio.currentTime || 0;
     this.startupTimer = setTimeout(() => {
-      if (version === this.sourceVersion && this.wantsToPlay && this.audio.readyState < 3) {
+      if (version === this.sourceVersion && this.wantsToPlay && (this.audio.currentTime || 0) <= position) {
         this.advanceSource(new Error('Audio source did not become ready'));
       }
     }, 8000);
@@ -161,38 +163,87 @@ export class AudioEngine {
     if (!source) {
       this.wantsToPlay = false;
       this.isPlaying = false;
+      this.audio.pause();
       this.notify('playState', false);
       this.notify('error', error);
       return false;
     }
-    this.configureSource(this.audio, source);
+    this.startSelectedSource(resumeAt);
+    return true;
+  }
+
+  startSelectedSource(resumeAt = 0) {
+    const version = this.sourceVersion;
     if (resumeAt > 0) {
       const audio = this.audio;
-      const version = this.sourceVersion;
       audio.addEventListener('loadedmetadata', () => {
         if (audio === this.audio && version === this.sourceVersion) this.seek(resumeAt);
       }, { once: true });
     }
-    this.audio.load();
+    const pending = this.attachSource(this.sourceCandidates[this.sourceIndex]);
+    this.pendingPreparation = pending ? pending.then(() => {
+      if (version === this.sourceVersion) this.pendingPreparation = null;
+    }).catch((failure) => {
+      if (version === this.sourceVersion) this.advanceSource(failure);
+    }) : null;
     if (this.wantsToPlay) this.play().catch((playError) => this.notify('error', playError));
-    return true;
   }
 
   useNativePlayback() {
+    clearTimeout(this.contextRecovery?.timer);
+    this.contextRecovery = null;
     const previous = this.audio;
     this.audio = new Audio();
     this.audio.preload = 'auto';
     this.audio.playsInline = true;
     this.audio.volume = this.volume;
+    this.audio.muted = previous.muted;
     this.setupAudioListeners();
     previous.pause();
     previous.removeAttribute('src');
     previous.load();
     this.sourceNode?.disconnect();
-    this.audioCtx?.close().catch(() => {});
+    if (this.audioCtx) {
+      this.audioCtx.onstatechange = null;
+      this.audioCtx.close().catch(() => {});
+    }
     this.audioCtx = this.sourceNode = this.analyserNode = this.bassNode = null;
     this.eqNodes = [];
     this.isWebAudioInitialized = false;
+    this.frequencyData.fill(0);
+  }
+
+  resumeAudioContext() {
+    const context = this.audioCtx;
+    if (!context || context.state === 'running') return;
+    const version = this.sourceVersion;
+    if (this.contextRecovery?.context === context && this.contextRecovery.version === version) return;
+    clearTimeout(this.contextRecovery?.timer);
+    const recovery = { context, version, timer: null };
+    this.contextRecovery = recovery;
+    const clearRecovery = () => {
+      clearTimeout(recovery.timer);
+      if (this.contextRecovery === recovery) this.contextRecovery = null;
+    };
+    const recover = () => {
+      clearRecovery();
+      if (context !== this.audioCtx || version !== this.sourceVersion || !this.wantsToPlay) return;
+      const position = this.audio.currentTime || 0;
+      this.useNativePlayback();
+      this.sourceIndex -= 1;
+      this.advanceSourceForEqualizer(position);
+    };
+    if (context.state === 'closed') recover();
+    else {
+      // A device interruption may leave resume() pending without a media error.
+      recovery.timer = setTimeout(() => {
+        if (context.state === 'running') clearRecovery();
+        else recover();
+      }, 2500);
+      context.resume().then(() => {
+        if (context.state === 'running') clearRecovery();
+      }).catch(recover);
+    }
   }
 
   initWebAudio(force = false) {
@@ -203,12 +254,6 @@ export class AudioEngine {
       if (!AudioContextClass) return;
 
       this.audioCtx = new AudioContextClass();
-      try {
-        this.sourceNode = this.audioCtx.createMediaElementSource(this.audio);
-      } catch (nodeErr) {
-        console.warn('createMediaElementSource notice (audio may still play normally):', nodeErr);
-        return;
-      }
 
       // Create Equalizer bands: 60Hz, 250Hz, 1kHz, 4kHz, 16kHz
       const frequencies = [60, 250, 1000, 4000, 16000];
@@ -239,6 +284,7 @@ export class AudioEngine {
       this.analyserNode.smoothingTimeConstant = 0.8;
 
       // Connect graph: Source -> Bass -> EQ 0..4 -> Analyser -> Destination
+      this.sourceNode = this.audioCtx.createMediaElementSource(this.audio);
       let currentNode = this.sourceNode;
       currentNode.connect(this.bassNode);
       currentNode = this.bassNode;
@@ -252,6 +298,10 @@ export class AudioEngine {
       this.analyserNode.connect(this.audioCtx.destination);
 
       this.isWebAudioInitialized = true;
+      this.audioCtx.onstatechange = () => {
+        if (this.wantsToPlay) this.resumeAudioContext();
+      };
+      this.resumeAudioContext();
       // Existing native streams must be re-requested with CORS before entering
       // Web Audio; otherwise even CORS-capable hosts produce silent output.
       if (/^https?:/.test(this.audio.src) && !this.audio.crossOrigin) {
@@ -261,19 +311,21 @@ export class AudioEngine {
       }
     } catch (err) {
       console.warn('Web Audio initialization note (CORS or permissions):', err);
+      const position = this.audio.currentTime || 0;
+      this.useNativePlayback();
+      if (this.sourceCandidates[this.sourceIndex]) {
+        this.sourceIndex -= 1;
+        this.advanceSourceForEqualizer(position);
+      }
     }
   }
 
   advanceSourceForEqualizer(resumeAt) {
+    this.hls?.destroy();
+    this.hls = null;
     this.sourceVersion += 1;
-    const version = this.sourceVersion;
-    const source = this.sourceCandidates[++this.sourceIndex];
-    this.configureSource(this.audio, source);
-    this.audio.addEventListener('loadedmetadata', () => {
-      if (version === this.sourceVersion) this.seek(resumeAt);
-    }, { once: true });
-    this.audio.load();
-    if (this.wantsToPlay) this.play().catch((error) => this.notify('error', error));
+    this.sourceIndex += 1;
+    this.startSelectedSource(resumeAt);
   }
 
   // Setup Apple & standard lock screen controls via MediaSession
@@ -425,6 +477,10 @@ export class AudioEngine {
     this.audio.playbackRate = 1;
     this.audio.preservesPitch = true;
     const source = this.sourceCandidates[0] || '';
+    return this.attachSource(source);
+  }
+
+  attachSource(source) {
     if (isHlsUrl(source) && !this.audio.canPlayType?.('application/vnd.apple.mpegurl')) {
       const version = this.sourceVersion;
       return import('hls.js').then(({ default: Hls }) => {
@@ -438,7 +494,7 @@ export class AudioEngine {
         this.hls.attachMedia(this.audio);
       });
     }
-    this.configureSource(this.audio, this.sourceCandidates[0] || '');
+    this.configureSource(this.audio, source);
     this.audio.load();
   }
 
@@ -522,7 +578,8 @@ export class AudioEngine {
     }
     this.audio.defaultPlaybackRate = 1;
     this.audio.playbackRate = 1;
-    if (this.audioCtx?.state === 'suspended') this.audioCtx.resume().catch(() => {});
+    this.resumeAudioContext();
+    if (version !== this.sourceVersion) return;
     this.armStartupTimeout();
     try {
       // Invoke synchronously in the tap/click handler for WebKit's gesture policy.
@@ -591,10 +648,13 @@ export class AudioEngine {
   }
 
   getFrequencyData() {
-    if (!this.analyserNode) return new Uint8Array(32);
-    const dataArray = new Uint8Array(this.analyserNode.frequencyBinCount);
-    this.analyserNode.getByteFrequencyData(dataArray);
-    return dataArray;
+    if (this.analyserNode) {
+      if (this.frequencyData.length !== this.analyserNode.frequencyBinCount) {
+        this.frequencyData = new Uint8Array(this.analyserNode.frequencyBinCount);
+      }
+      this.analyserNode.getByteFrequencyData(this.frequencyData);
+    } else this.frequencyData.fill(0);
+    return this.frequencyData;
   }
 
   on(event, callback) {

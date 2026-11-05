@@ -50,7 +50,11 @@ export function resolveAudioUrl(url) {
 export function getTrackAudioSources(track) {
   const explicitCloud = /^https?:\/\//.test(track?.cloudAudioUrl || '') ? track.cloudAudioUrl : '';
   const direct = resolveAudioUrl(track?.localAudioUrl || track?.audioUrl);
-  const candidates = [explicitCloud, direct, resolveAudioUrl(track?.audioUrl), getCloudFallbackUrl(track)];
+  // Desktop/LAN companion files are already on disk. Avoid waiting on an
+  // expired or unreachable cloud copy before trying the local file.
+  const localFirst = direct && isDeviceUrl(direct);
+  const candidates = [...(localFirst ? [direct, explicitCloud] : [explicitCloud, direct]),
+    resolveAudioUrl(track?.audioUrl), getCloudFallbackUrl(track)];
   return [...new Set(candidates.filter((url) => url && !url.startsWith('blob:') && !url.startsWith('data:') &&
     !(typeof window !== 'undefined' && window.location.protocol === 'https:' && url.startsWith('http:'))))];
 }

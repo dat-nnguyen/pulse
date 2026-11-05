@@ -162,6 +162,23 @@ npm run install:mac
 
 Once installed, launch **Pulse** anytime via Spotlight (<kbd>⌘</kbd> + <kbd>Space</kbd> &rarr; *Pulse*) or Launchpad.
 
+### Playback recovery on macOS and Web
+
+The shared player tries a companion's local audio file before its cloud copy, while
+offline blobs remain the first choice. A source that cannot start or stops buffering
+for eight seconds falls back to the next source, including HLS streams. If every
+source fails, playback stops and reports an error so Play can retry it.
+
+The equalizer resumes after audio interruptions. If its audio context fails or
+cannot resume within 2.5 seconds, the player bypasses EQ and restores native
+playback at the current position. Reopen the equalizer to enable it again.
+The spectrum display runs at up to 30 fps and stops while paused or hidden.
+
+After rebuilding an installed Mac app, fully quit Pulse with **⌘Q** and reopen it
+to load the new player. Closing the window only hides it and keeps the old process
+running. `npm run pack:mac` creates `release/mac/Pulse.app` on an Intel Mac;
+Apple Silicon builds use `release/mac-arm64/Pulse.app`.
+
 ### Build Standalone `.dmg` Installer
 
 ```bash

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { CheckCircle, AlertCircle, Info, AlertTriangle, X } from 'lucide-react';
 
 // ─── Individual Toast Item ─────────────────────────────────────────────────
@@ -157,12 +157,12 @@ export function useToast() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const toast = {
+  const toast = useMemo(() => ({
     success: (message, opts) => addToast(message, { ...opts, type: 'success' }),
     error: (message, opts) => addToast(message, { ...opts, type: 'error' }),
     warning: (message, opts) => addToast(message, { ...opts, type: 'warning' }),
     info: (message, opts) => addToast(message, { ...opts, type: 'info' }),
-  };
+  }), [addToast]);
 
   return { toasts, toast, removeToast };
 }

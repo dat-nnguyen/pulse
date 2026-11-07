@@ -281,6 +281,10 @@ export default function App() {
           dbPlaylists = updatedPlaylists;
         }
         setPlaylists(dbPlaylists);
+        if (import.meta.env.VITE_AUDIO_DIAGNOSTICS === '1') {
+          import('./services/playbackDiagnostics.js').then(({ auditPlaylistSources }) => auditPlaylistSources(dbTracks, dbPlaylists))
+            .catch((error) => console.warn('Pulse source audit failed:', error.name, error.message));
+        }
 
         const dbLiked = localLikes;
         mockTrackIds.forEach((id) => dbLiked.delete(id));

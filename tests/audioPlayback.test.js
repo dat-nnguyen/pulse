@@ -70,6 +70,35 @@ afterEach(() => {
 });
 
 describe('Playback transitions', () => {
+  it('does not rewrite an unchanged iOS audio cache during playback or preloading', async () => {
+    vi.stubGlobal('navigator', { userAgent: 'iPhone', platform: 'iPhone' });
+    const fixed = await repairM4aTiming(new Blob([fragmentedM4aFixture().bytes], { type: 'audio/mp4' }));
+    const reopened = new Blob([await fixed.blob.arrayBuffer()], { type: 'audio/mp4' });
+    const engine = new AudioEngine();
+    const persist = vi.fn();
+    engine.on('trackPrepared', persist);
+    const cached = track('stable', { audioBlob: reopened, hasSeparateAudio: true, audioTimingVersion: AUDIO_TIMING_VERSION });
+    engine.loadTrack(cached);
+    await engine.pendingPreparation;
+    expect(engine.currentTrack.audioBlob).not.toBe(reopened);
+    expect(persist).not.toHaveBeenCalled();
+    engine.preloadTrack({ ...cached, id: 'next-stable' });
+    await engine.preloadPreparation;
+    expect(persist).not.toHaveBeenCalled();
+    engine.clearPreload();
+  });
+
+  it('still persists a genuinely repaired iOS container even when its cache flags are current', async () => {
+    vi.stubGlobal('navigator', { userAgent: 'iPhone', platform: 'iPhone' });
+    const engine = new AudioEngine();
+    const persist = vi.fn();
+    engine.on('trackPrepared', persist);
+    await engine.preparePlaybackTrack(track('needs-repair', { audioBlob: new Blob([fragmentedM4aFixture().bytes], { type: 'audio/mp4' }),
+      hasSeparateAudio: true, audioTimingVersion: AUDIO_TIMING_VERSION }));
+    expect(persist).toHaveBeenCalledOnce();
+    expect(persist.mock.calls[0][0].duration).toBeCloseTo(179.02585, 4);
+  });
+
   it('rechecks and detaches an iPhone M4A even when its persisted cache flag is current', async () => {
     vi.stubGlobal('navigator', { userAgent: 'iPhone', platform: 'iPhone' });
     const original = new Blob([fragmentedM4aFixture().bytes], { type: 'audio/mp4' });
@@ -435,6 +464,25 @@ describe('Playback transitions', () => {
 });
 
 describe('Offline audio integrity', () => {
+  it('recovers a missing cloud object through its original companion filename', async () => {
+    setBackendBaseUrl('http://my-mac.local:3030');
+    const audioUrl = 'https://cloud.example/storage/v1/object/public/audio-files/audio/track_123.m4a';
+    expect(getTrackAudioSources({ audioUrl, cloudAudioUrl: audioUrl }))
+      .toEqual(['http://my-mac.local:3030/audio/track_123.m4a', audioUrl]);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(new Blob(['ID3original'], { type: 'audio/mpeg' }))));
+    const recovered = await downloadAudioForTrack({ audioUrl, cloudAudioUrl: audioUrl });
+    expect(await recovered.text()).toBe('ID3original');
+    expect(fetch.mock.calls[0][0]).toBe('http://my-mac.local:3030/audio/track_123.m4a');
+  });
+
+  it('keeps HLS and unrelated CDN paths intact instead of deriving a companion file', () => {
+    setBackendBaseUrl('http://my-mac.local:3030');
+    for (const audioUrl of ['https://cdn.example/song.m4a',
+      'https://cloud.example/storage/v1/object/public/audio-files/audio/id/hls-v1/index.m3u8']) {
+      expect(getTrackAudioSources({ audioUrl })).toEqual([audioUrl]);
+    }
+  });
+
   it('prefers a Bonjour companion and never treats another Mac as a cloud CDN', () => {
     setBackendBaseUrl('http://my-mac.local:3030');
     expect(getTrackAudioSources({ audioUrl: '/audio/song.m4a', cloudAudioUrl: 'https://cloud.example/song.m4a' }))

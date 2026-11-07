@@ -17,9 +17,11 @@ import { repairM4aTiming, AUDIO_TIMING_VERSION } from './mp4TimingService.js';
 
 const DB_NAME = 'PulseAudioDB';
 const DB_VERSION = 3;
+let databasePromise = null;
 
 export async function getDB() {
-  return openDB(DB_NAME, DB_VERSION, {
+  if (databasePromise) return databasePromise;
+  const opening = openDB(DB_NAME, DB_VERSION, {
     upgrade(db, oldVersion) {
       if (!db.objectStoreNames.contains('audio')) {
         db.createObjectStore('audio', { keyPath: 'id' });
@@ -39,7 +41,17 @@ export async function getDB() {
         db.createObjectStore('settings');
       }
     },
+    blocking() {
+      opening.then((db) => db.close()).catch(() => {});
+      if (databasePromise === opening) databasePromise = null;
+    },
+    terminated() {
+      if (databasePromise === opening) databasePromise = null;
+    },
   });
+  databasePromise = opening;
+  opening.catch(() => { if (databasePromise === opening) databasePromise = null; });
+  return opening;
 }
 
 // Keep iOS audio files separate from metadata. Rewriting a File-backed Blob

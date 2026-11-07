@@ -30,7 +30,7 @@ vi.mock('../src/services/audioMediaService.js', async (importOriginal) => ({
 
 import { fragmentedM4aFixture } from './fixtures/fragmentedM4a.js';
 import { AUDIO_TIMING_VERSION, repairM4aTiming } from '../src/services/mp4TimingService.js';
-import { getAllTracks, saveTrack, cacheTrackForOffline, syncLibraryWithCloud, updateTrackDuration } from '../src/services/storageService.js';
+import { getDB, getAllTracks, saveTrack, cacheTrackForOffline, syncLibraryWithCloud, updateTrackDuration } from '../src/services/storageService.js';
 import { setBackendBaseUrl } from '../src/services/backendService.js';
 
 beforeEach(() => {
@@ -44,6 +44,12 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Offline storage', () => {
+  it('shares one database connection across concurrent storage operations', async () => {
+    const [first, second] = await Promise.all([getDB(), getDB()]);
+    expect(second).toBe(first);
+    expect(await getDB()).toBe(first);
+  });
+
   it('keeps iOS audio files stable when duration or cloud metadata is updated', async () => {
     vi.stubGlobal('navigator', { onLine: true, userAgent: 'iPhone', platform: 'iPhone' });
     state.tracks.set('ios', { id: 'ios', audioBlob: new Blob([fragmentedM4aFixture().bytes], { type: 'audio/mp4' }),

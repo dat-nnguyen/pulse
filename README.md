@@ -241,6 +241,9 @@ Cached M4A files are checked again before iOS playback, including files marked a
 repaired by older releases. iOS stores audio separately from track metadata so
 cloud sync and duration updates do not rewrite files being played. Existing caches
 are migrated locally and their durations re-measured once; no library reset is needed.
+Playback and preloading reuse an unchanged cache without rewriting its audio file.
+If an older cloud audio object is missing, Pulse also tries its original filename
+on the configured Mac companion. Storage operations share one database connection.
 
 For an optimized device build, select **Release** in Xcode's Run scheme. USB is
 needed for installation; the installed native app then launches from the home screen.

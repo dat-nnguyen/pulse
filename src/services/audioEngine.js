@@ -150,20 +150,26 @@ export class AudioEngine {
       this.updateMediaSessionPosition(currentTime, this.knownDuration);
     });
     listen('play', () => {
+      traceTiming({ event: 'play', wantsToPlay: this.wantsToPlay, sourceKind: audio.src?.split(':')[0] });
       this.isPlaying = true;
       this.resumeAudioContext();
       this.notify('playState', true);
       if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
     });
-    listen('playing', () => clearTimeout(this.startupTimer));
+    listen('playing', () => {
+      clearTimeout(this.startupTimer);
+      traceTiming({ event: 'playing', wantsToPlay: this.wantsToPlay, muted: audio.muted, volume: audio.volume });
+    });
     listen('waiting', () => { if (this.wantsToPlay) this.armStartupTimeout(); });
     listen('stalled', () => { if (this.wantsToPlay) this.armStartupTimeout(); });
     listen('pause', () => {
+      traceTiming({ event: 'pause', wantsToPlay: this.wantsToPlay });
       this.isPlaying = false;
       this.notify('playState', false);
       if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
     });
     listen('ended', () => {
+      traceTiming({ event: 'ended', time: audio.currentTime, duration: audio.duration, preparing: !!this.pendingPreparation });
       this.isPlaying = false;
       this.wantsToPlay = false;
       this.notify('playState', false);
@@ -492,13 +498,14 @@ export class AudioEngine {
     if (track.audioBlob instanceof Blob && track.audioBlob.size) {
       try {
         cachedBlob = new Blob([new Uint8Array(await track.audioBlob.arrayBuffer())], { type: track.audioBlob.type });
-      } catch {
+      } catch (error) {
+        traceTiming({ event: 'cache-read-failed', error: error?.name, message: error?.message });
         // An older metadata rewrite may already have invalidated this handle.
         const { getTrackById } = await import('./storageService.js');
         const fresh = await getTrackById(track.id);
         if (fresh?.audioBlob instanceof Blob) {
           try { cachedBlob = new Blob([new Uint8Array(await fresh.audioBlob.arrayBuffer())], { type: fresh.audioBlob.type }); }
-          catch { /* Recover from the companion/cloud copy below. */ }
+          catch (error) { traceTiming({ event: 'fresh-cache-read-failed', error: error?.name, message: error?.message }); }
         }
       }
     }
@@ -507,7 +514,11 @@ export class AudioEngine {
     traceTiming({ event: 'prepared', bytes: audioBlob.size, duration: timing.duration, changed: timing.changed });
     const prepared = { ...track, audioBlob, audioTimingVersion: AUDIO_TIMING_VERSION,
       ...(timing.duration ? { duration: timing.duration, durationVerified: true } : {}) };
-    this.notify('trackPrepared', prepared);
+    // An unchanged, separated cache is already durable. Replacing it every time
+    // a song is selected/preloaded invalidates other WebKit Blob handles.
+    if (!cachedBlob || audioBlob !== cachedBlob || track.audioTimingVersion !== AUDIO_TIMING_VERSION || !track.hasSeparateAudio) {
+      this.notify('trackPrepared', prepared);
+    }
     return prepared;
   }
 
@@ -603,6 +614,7 @@ export class AudioEngine {
         if (version === this.sourceVersion) this.pendingPreparation = null;
       }).catch((error) => {
         if (version !== this.sourceVersion) return;
+        traceTiming({ event: 'preparation-failed', error: error?.name, message: error?.message });
         this.pendingPreparation = null;
         this.wantsToPlay = false;
         this.notify('playState', false);
@@ -635,6 +647,7 @@ export class AudioEngine {
     this.wantsToPlay = true;
     if (this.isAudioInterrupted) return;
     const version = this.sourceVersion;
+    traceTiming({ event: 'play-request', preparing: !!this.pendingPreparation, interrupted: this.isAudioInterrupted });
     if (this.pendingPreparation) {
       // Safari requires a play call in the original gesture. Prime the same
       // element while the M4A is repaired; never clear/pause it from a delayed
@@ -644,7 +657,10 @@ export class AudioEngine {
         this.audio.play().catch(() => {});
       }
       await this.pendingPreparation;
-      if (version !== this.sourceVersion || !this.wantsToPlay || this.isAudioInterrupted) return;
+      if (version !== this.sourceVersion || !this.wantsToPlay || this.isAudioInterrupted) {
+        traceTiming({ event: 'play-cancelled', versionChanged: version !== this.sourceVersion, wantsToPlay: this.wantsToPlay });
+        return;
+      }
     }
     if (!this.sourceCandidates[this.sourceIndex]) {
       this.wantsToPlay = false;
@@ -658,7 +674,9 @@ export class AudioEngine {
     try {
       // Invoke synchronously in the tap/click handler for WebKit's gesture policy.
       await this.audio.play();
+      traceTiming({ event: 'play-accepted', paused: this.audio.paused, sourceKind: this.audio.src?.split(':')[0] });
     } catch (error) {
+      traceTiming({ event: 'play-rejected', error: error?.name, message: error?.message });
       if (version !== this.sourceVersion || !this.wantsToPlay) return;
       clearTimeout(this.startupTimer);
       if (error.name === 'NotAllowedError' || error.name === 'AbortError') {

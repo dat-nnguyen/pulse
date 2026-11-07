@@ -49,7 +49,20 @@ export function resolveAudioUrl(url) {
 
 export function getTrackAudioSources(track) {
   const explicitCloud = /^https?:\/\//.test(track?.cloudAudioUrl || '') ? track.cloudAudioUrl : '';
-  const direct = resolveAudioUrl(track?.localAudioUrl || track?.audioUrl);
+  // Older cloud rows can point at objects that were never uploaded. Recover
+  // their original companion filename without depending on a stored LAN URL.
+  let companion = '';
+  const backend = getBackendBaseUrl();
+  if (backend) {
+    for (const candidate of [track?.audioUrl, explicitCloud]) {
+      try {
+        const path = new URL(candidate).pathname;
+        const match = path.match(/\/storage\/v1\/object\/public\/audio-files\/audio\/([a-zA-Z0-9_-]+\.(?:m4a|mp4|mp3|aac|flac|wav|ogg|opus|webm))$/i);
+        if (match) { companion = `${backend}/audio/${match[1]}`; break; }
+      } catch { /* Local and non-storage sources already resolve below. */ }
+    }
+  }
+  const direct = resolveAudioUrl(track?.localAudioUrl) || companion || resolveAudioUrl(track?.audioUrl);
   // Desktop/LAN companion files are already on disk. Avoid waiting on an
   // expired or unreachable cloud copy before trying the local file.
   const localFirst = direct && isDeviceUrl(direct);

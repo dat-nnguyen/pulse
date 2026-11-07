@@ -22,7 +22,7 @@ export function getBackendBaseUrl() {
 
     // Running inside iOS/Android native app via Capacitor
     if (isCapacitor) {
-      return 'http://192.168.1.102:3030';
+      return '';
     }
 
     // Running inside Electron desktop packaged app (file://)

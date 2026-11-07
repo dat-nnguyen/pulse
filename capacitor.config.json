@@ -4,7 +4,9 @@
   "webDir": "dist",
   "bundledWebRuntime": false,
   "ios": {
-    "contentInset": "always",
+    "contentInset": "never",
+    "backgroundColor": "#07090e",
+    "preferredContentMode": "mobile",
     "allowsLinkPreview": false,
     "scrollEnabled": false
   },

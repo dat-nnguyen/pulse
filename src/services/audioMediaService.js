@@ -29,7 +29,7 @@ export function getCloudFallbackUrl(track) {
 function isDeviceUrl(url) {
   try {
     const host = new URL(url).hostname;
-    return /^(localhost|127\.|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host);
+    return /^(localhost|127\.|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host) || host.endsWith('.local');
   } catch { return false; }
 }
 

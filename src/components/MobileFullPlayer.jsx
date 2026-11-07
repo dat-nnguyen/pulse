@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   ChevronDown,
   Heart,
@@ -16,10 +16,9 @@ import {
   Volume2,
   Volume1,
   VolumeX,
-  Maximize2,
-  Minimize2,
 } from 'lucide-react';
 import { isSupabaseConfigured } from '../services/supabaseClient';
+import { isAppleMobileAudio } from '../services/audioMediaService';
 
 export default function MobileFullPlayer({
   isOpen,
@@ -49,6 +48,9 @@ export default function MobileFullPlayer({
   const [isMuted, setIsMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(volume || 0.8);
   const canvasRef = useRef(null);
+  const usesHardwareVolume = isAppleMobileAudio();
+  const [scrubPosition, setScrubPosition] = useState(null);
+  const scrubbing = useRef(false);
 
   // Keyboard shortcut listener (Esc to close, Space to toggle play, Arrow keys to seek)
   useEffect(() => {
@@ -86,6 +88,7 @@ export default function MobileFullPlayer({
 
   // Extract dominant color from cover art for ambient backdrop
   useEffect(() => {
+    if (!isOpen) return;
     if (!currentTrack?.coverUrl) {
       setDominantColor('rgba(0, 194, 209, 0.4)');
       return;
@@ -132,7 +135,11 @@ export default function MobileFullPlayer({
     };
     img.onerror = () => setDominantColor('rgba(0, 194, 209, 0.4)');
     img.src = currentTrack.coverUrl;
-  }, [currentTrack?.coverUrl]);
+    return () => {
+      img.onload = null;
+      img.onerror = null;
+    };
+  }, [isOpen, currentTrack?.coverUrl]);
 
   const handleMuteToggle = () => {
     if (!onVolumeChange) return;
@@ -163,7 +170,8 @@ export default function MobileFullPlayer({
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  const progressPercent = duration > 0 ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0;
+  const displayedTime = scrubPosition ?? currentTime;
+  const progressPercent = duration > 0 ? Math.min(100, Math.max(0, (displayedTime / duration) * 100)) : 0;
   const isCloudConnected = isSupabaseConfigured();
   const coverSrc = currentTrack.coverUrl || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80';
   const effectiveVolume = isMuted ? 0 : volume;
@@ -256,8 +264,26 @@ export default function MobileFullPlayer({
                   min="0"
                   max={duration || 100}
                   step="0.1"
-                  value={currentTime}
-                  onChange={(e) => onSeek?.(parseFloat(e.target.value))}
+                  value={displayedTime}
+                  disabled={!duration}
+                  onPointerDown={(event) => {
+                    scrubbing.current = true;
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                  }}
+                  onChange={(event) => {
+                    const position = parseFloat(event.target.value);
+                    if (scrubbing.current) setScrubPosition(position);
+                    else onSeek?.(position);
+                  }}
+                  onPointerUp={(event) => {
+                    if (scrubbing.current) onSeek?.(parseFloat(event.currentTarget.value));
+                    scrubbing.current = false;
+                    setScrubPosition(null);
+                  }}
+                  onPointerCancel={() => {
+                    scrubbing.current = false;
+                    setScrubPosition(null);
+                  }}
                   className="fp-scrubber"
                   style={{
                     background: `linear-gradient(to right, #00c2d1 0%, #00c2d1 ${progressPercent}%, rgba(255, 255, 255, 0.16) ${progressPercent}%, rgba(255, 255, 255, 0.16) 100%)`,
@@ -266,7 +292,7 @@ export default function MobileFullPlayer({
                 />
               </div>
               <div className="fp-time-row">
-                <span className="fp-time-label">{formatTime(currentTime)}</span>
+                <span className="fp-time-label">{formatTime(displayedTime)}</span>
                 <span className="fp-time-label">{formatTime(duration)}</span>
               </div>
             </div>
@@ -326,7 +352,9 @@ export default function MobileFullPlayer({
             {/* Bottom Accessories: Volume + Tools Chips */}
             <div className="fp-accessories-bar">
               {/* Volume Slider */}
-              {onVolumeChange && (
+              {usesHardwareVolume ? (
+                <span className="fp-hardware-volume"><Volume2 size={16} /> Use iPhone volume buttons</span>
+              ) : onVolumeChange && (
                 <div className="fp-volume-module">
                   <button
                     className="fp-btn-icon-subtle"

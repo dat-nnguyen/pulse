@@ -11,7 +11,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Configure AVAudioSession for background audio playback on iPhone & lock screen
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [])
-            try AVAudioSession.sharedInstance().setActive(true)
         } catch {
             print("Failed to set AVAudioSession category: \(error)")
         }

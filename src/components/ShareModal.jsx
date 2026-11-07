@@ -21,14 +21,14 @@ export default function ShareModal({ isOpen, onClose, tracks = [], playlists = [
   const [backendUrl, setBackendUrlState] = useState(() => {
     const base = getBackendBaseUrl();
     if (base) return base;
-    if (typeof window !== 'undefined' && window.location.hostname && window.location.hostname !== 'localhost') {
+    if (typeof window !== 'undefined' && /^https?:$/.test(window.location.protocol) && window.location.hostname && window.location.hostname !== 'localhost') {
       return `http://${window.location.hostname}:3030`;
     }
-    return 'http://192.168.1.102:3030';
+    return '';
   });
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState(null);
-  const currentUrl = window.location.origin;
+  const currentUrl = /^https?:$/.test(window.location.protocol) ? window.location.origin : '';
 
   const handleSaveBackend = async () => {
     setTestingConnection(true);
@@ -136,7 +136,7 @@ export default function ShareModal({ isOpen, onClose, tracks = [], playlists = [
         </div>
 
         {/* Share Link Box */}
-        <div style={{ background: 'var(--pulse-bg-raised)', padding: 14, borderRadius: 12, border: '1px solid var(--border-subtle)', marginBottom: 16 }}>
+        {currentUrl && <div style={{ background: 'var(--pulse-bg-raised)', padding: 14, borderRadius: 12, border: '1px solid var(--border-subtle)', marginBottom: 16 }}>
           <label style={{ fontSize: 11, fontWeight: 800, color: 'var(--pulse-accent)', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 8 }}>
             Web App URL (No Ads • Free & Open)
           </label>
@@ -157,7 +157,7 @@ export default function ShareModal({ isOpen, onClose, tracks = [], playlists = [
               <span>{copied ? 'Copied!' : 'Copy Link'}</span>
             </button>
           </div>
-        </div>
+        </div>}
 
         {/* Companion Audio Server Connection Box (For iPhone & Mobile) */}
         <div style={{ background: 'rgba(0, 242, 254, 0.04)', padding: 14, borderRadius: 12, border: '1px solid rgba(0, 242, 254, 0.25)', marginBottom: 20 }}>
@@ -180,10 +180,13 @@ export default function ShareModal({ isOpen, onClose, tracks = [], playlists = [
           </p>
           <div style={{ display: 'flex', gap: 10 }}>
             <input
-              type="text"
+              type="url"
               value={backendUrl}
               onChange={(e) => setBackendUrlState(e.target.value)}
-              placeholder="http://192.168.1.102:3030"
+              placeholder="http://your-mac.local:3030"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               className="pulse-input"
               style={{ flex: 1, padding: '10px 14px', fontSize: 13 }}
             />

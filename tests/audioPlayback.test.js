@@ -70,6 +70,87 @@ afterEach(() => {
 });
 
 describe('Playback transitions', () => {
+  it('requests a playback audio session on iPhone', () => {
+    const audioSession = { type: 'auto' };
+    vi.stubGlobal('navigator', { userAgent: 'iPhone', platform: 'iPhone', audioSession });
+    new AudioEngine();
+    expect(audioSession.type).toBe('playback');
+  });
+
+  it('waits through an iOS interruption without switching sources or rebuilding EQ', async () => {
+    vi.useFakeTimers();
+    const engine = new AudioEngine();
+    engine.loadTrack(track('call'));
+    await engine.play();
+    const audio = engine.audio;
+    const context = { state: 'interrupted', resume: vi.fn().mockRejectedValue(new Error('Phone call')),
+      close: vi.fn().mockResolvedValue() };
+    engine.audioCtx = context;
+    engine.handleAudioSessionEvent({ type: 'interruptionBegan' });
+    engine.resumeAudioContext();
+    engine.audio.dispatchEvent(new Event('waiting'));
+    await vi.advanceTimersByTimeAsync(16000);
+    expect(engine.audio).toBe(audio);
+    expect(context.resume).not.toHaveBeenCalled();
+    expect(engine.wantsToPlay).toBe(true);
+    context.state = 'running';
+    engine.handleAudioSessionEvent({ type: 'interruptionEnded', shouldResume: true });
+    expect(audio.play).toHaveBeenCalledTimes(2);
+    expect(engine.isPlaying).toBe(true);
+    engine.pause();
+  });
+
+  it('respects a user pause or denied resume when an iOS interruption ends', async () => {
+    for (const shouldResume of [false, true]) {
+      const engine = new AudioEngine();
+      engine.loadTrack(track('paused-call'));
+      await engine.play();
+      engine.handleAudioSessionEvent({ type: 'interruptionBegan' });
+      if (shouldResume) engine.pause();
+      engine.handleAudioSessionEvent({ type: 'interruptionEnded', shouldResume });
+      expect(engine.audio.play).toHaveBeenCalledTimes(1);
+      expect(engine.wantsToPlay).toBe(false);
+    }
+  });
+
+  it('pauses when headphones disconnect and resumes on the first Play tap', async () => {
+    const engine = new AudioEngine();
+    engine.loadTrack(track('headphones'));
+    await engine.play();
+    engine.handleAudioSessionEvent({ type: 'headphonesDisconnected' });
+    expect(engine.isPlaying).toBe(false);
+    expect(engine.wantsToPlay).toBe(false);
+    engine.togglePlay();
+    expect(engine.audio.play).toHaveBeenCalledTimes(2);
+    engine.pause();
+  });
+
+  it('resumes on the first tap after the system pauses the audio element', async () => {
+    const engine = new AudioEngine();
+    engine.loadTrack(track('system-pause'));
+    await engine.play();
+    engine.audio.pause();
+    engine.togglePlay();
+    expect(engine.audio.play).toHaveBeenCalledTimes(2);
+    engine.pause();
+  });
+
+  it('refreshes progress on returning to the app without starting paused music', () => {
+    const engine = new AudioEngine();
+    engine.loadTrack(track('foreground'));
+    engine.audio.metadata(180);
+    engine.audio.currentTime = 42;
+    engine.audio.paused = true;
+    const onTime = vi.fn();
+    const onPlayState = vi.fn();
+    engine.on('timeUpdate', onTime);
+    engine.on('playState', onPlayState);
+    engine.refreshPlaybackState();
+    expect(onTime).toHaveBeenLastCalledWith({ currentTime: 42, duration: 180 });
+    expect(onPlayState).toHaveBeenLastCalledWith(false);
+    expect(engine.audio.play).not.toHaveBeenCalled();
+  });
+
   it('uses the HLS player when a failed direct source falls back to HLS', async () => {
     const engine = new AudioEngine();
     engine.loadTrack(track('fallback', { cloudAudioUrl: 'https://cloud.example/expired.mp3', audioUrl: 'https://cdn.example/live.m3u8' }));
@@ -340,6 +421,13 @@ describe('Playback transitions', () => {
 });
 
 describe('Offline audio integrity', () => {
+  it('prefers a Bonjour companion and never treats another Mac as a cloud CDN', () => {
+    setBackendBaseUrl('http://my-mac.local:3030');
+    expect(getTrackAudioSources({ audioUrl: '/audio/song.m4a', cloudAudioUrl: 'https://cloud.example/song.m4a' }))
+      .toEqual(['http://my-mac.local:3030/audio/song.m4a', 'https://cloud.example/song.m4a']);
+    expect(getTrackAudioSources({ audioUrl: 'http://old-mac.local:3030/audio/song.m4a' })[0])
+      .toBe('http://my-mac.local:3030/audio/song.m4a');
+  });
   it('prefers a local companion file to a cloud copy on desktop', () => {
     setBackendBaseUrl('http://127.0.0.1:3030');
     expect(getTrackAudioSources({ audioUrl: '/audio/song.m4a', cloudAudioUrl: 'https://cloud.example/song.m4a' }))

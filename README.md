@@ -208,8 +208,8 @@ No cables, no developer mode, and no App Store required:
 For an authentic native iOS app compiled via Apple Xcode:
 
 ```bash
-# 1. Sync the compiled web bundle to the iOS native project
-npm run ios:sync
+# 1. Build the current client and sync it to the iOS native project
+npm run ios:build
 
 # 2. Open the Xcode workspace
 npm run ios:open
@@ -221,6 +221,24 @@ In **Xcode**:
 3. Under **Signing & Capabilities**, select your **Personal Team** (free Apple ID supported).
 4. Verify **Background Modes** has `Audio, AirPlay, and Picture in Picture` checked.
 5. Press **⌘ + R** to build and run on your device.
+
+`ios:build` automatically uses your Mac's Bonjour hostname (`http://<mac-name>.local:3030`)
+for the companion, so changing Wi-Fi IP addresses does not break streaming. Keep
+Pulse open on the Mac and both devices on the same Wi-Fi, and allow **Local Network**
+access on the iPhone. To use another companion, set `VITE_BACKEND_URL` when running
+`ios:build`, or enter its address in **Sync & Wi-Fi → Test & Save**. Cloud audio and
+downloaded tracks remain available without the Mac.
+
+The native shell and CSS use one set of safe-area insets for the notch and home
+indicator, including landscape. EQ and Queue open above the fullscreen player;
+dragging the scrubber seeks once when released. On iPhone, adjust volume with the
+hardware buttons or Control Center. Native audio interruptions suspend recovery
+timers during calls/Siri, resume only when iOS permits and the user has not paused,
+and pause when headphones disconnect. Returning to Pulse refreshes the displayed
+playback position without automatically starting paused music.
+
+For an optimized device build, select **Release** in Xcode's Run scheme. USB is
+needed for installation; the installed native app then launches from the home screen.
 
 ---
 
@@ -315,6 +333,7 @@ real-free-music-player/
 | `npm run dist:mac` | Package the release `.dmg` installer for macOS |
 | `npm run pack:mac` | Package the macOS directory bundle without generating a DMG |
 | `npm run ios:sync` | Sync frontend assets from `dist/` to the Capacitor iOS project |
+| `npm run ios:build` | Build and sync iOS with the Mac's Bonjour companion address |
 | `npm run ios:open` | Open the native iOS project in Xcode |
 | `npm test` | Run the complete Vitest regression suite (48/48 unit & contract tests) |
 | `npm run lint` | Run the code linter (`oxlint`) |

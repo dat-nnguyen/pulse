@@ -41,6 +41,7 @@ export class AudioEngine {
     this.hls = null;
     this.frequencyData = new Uint8Array(32);
     this.contextRecovery = null;
+    this.isAudioInterrupted = false;
 
     // Callbacks
     this.listeners = {
@@ -56,7 +57,51 @@ export class AudioEngine {
     this.hasUnlockedAudio = false;
     this.setupAudioListeners();
     this.setupMediaSession();
+    this.setupPlatformAudio();
     this.unlockAudioForIOS();
+  }
+
+  setupPlatformAudio() {
+    // Safari's audio session API lets audio keep playing with the silent switch
+    // enabled and makes this element behave as music rather than ambient sound.
+    try {
+      if (isAppleMobileAudio() && navigator.audioSession) navigator.audioSession.type = 'playback';
+    } catch { /* Older WebKit uses the native AVAudioSession configuration. */ }
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('pulseAudioSession', (event) => this.handleAudioSessionEvent(event.detail));
+      window.addEventListener('pageshow', () => this.refreshPlaybackState());
+    }
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) this.refreshPlaybackState();
+      });
+    }
+  }
+
+  handleAudioSessionEvent(detail) {
+    if (detail?.type === 'interruptionBegan') {
+      this.isAudioInterrupted = true;
+      clearTimeout(this.startupTimer);
+      clearTimeout(this.contextRecovery?.timer);
+      this.contextRecovery = null;
+      this.audio.pause();
+    } else if (detail?.type === 'interruptionEnded') {
+      this.isAudioInterrupted = false;
+      if (detail.shouldResume && this.wantsToPlay) {
+        this.play().catch((error) => this.notify('error', error));
+      } else this.pause();
+    } else if (detail?.type === 'headphonesDisconnected') {
+      this.pause();
+    }
+  }
+
+  refreshPlaybackState() {
+    if (!this.currentTrack || this.pendingPreparation || this.isAudioInterrupted) return;
+    this.isPlaying = !this.audio.paused && !this.audio.ended;
+    this.notify('playState', this.isPlaying);
+    this.notify('timeUpdate', { currentTime: this.audio.currentTime || 0, duration: this.knownDuration });
+    this.updateMediaSessionPosition(this.audio.currentTime || 0, this.knownDuration);
+    if (this.isPlaying) this.resumeAudioContext();
   }
 
   unlockAudioForIOS() {
@@ -137,10 +182,11 @@ export class AudioEngine {
 
   armStartupTimeout() {
     clearTimeout(this.startupTimer);
+    if (this.isAudioInterrupted) return;
     const version = this.sourceVersion;
     const position = this.audio.currentTime || 0;
     this.startupTimer = setTimeout(() => {
-      if (version === this.sourceVersion && this.wantsToPlay && (this.audio.currentTime || 0) <= position) {
+      if (version === this.sourceVersion && this.wantsToPlay && !this.isAudioInterrupted && (this.audio.currentTime || 0) <= position) {
         this.advanceSource(new Error('Audio source did not become ready'));
       }
     }, 8000);
@@ -215,7 +261,7 @@ export class AudioEngine {
 
   resumeAudioContext() {
     const context = this.audioCtx;
-    if (!context || context.state === 'running') return;
+    if (!context || context.state === 'running' || this.isAudioInterrupted) return;
     const version = this.sourceVersion;
     if (this.contextRecovery?.context === context && this.contextRecovery.version === version) return;
     clearTimeout(this.contextRecovery?.timer);
@@ -227,7 +273,7 @@ export class AudioEngine {
     };
     const recover = () => {
       clearRecovery();
-      if (context !== this.audioCtx || version !== this.sourceVersion || !this.wantsToPlay) return;
+      if (context !== this.audioCtx || version !== this.sourceVersion || !this.wantsToPlay || this.isAudioInterrupted) return;
       const position = this.audio.currentTime || 0;
       this.useNativePlayback();
       this.sourceIndex -= 1;
@@ -560,6 +606,7 @@ export class AudioEngine {
   async play() {
     if (!this.currentTrack) return;
     this.wantsToPlay = true;
+    if (this.isAudioInterrupted) return;
     const version = this.sourceVersion;
     if (this.pendingPreparation) {
       // Safari requires a play call in the original gesture. Prime the same
@@ -570,7 +617,7 @@ export class AudioEngine {
         this.audio.play().catch(() => {});
       }
       await this.pendingPreparation;
-      if (version !== this.sourceVersion || !this.wantsToPlay) return;
+      if (version !== this.sourceVersion || !this.wantsToPlay || this.isAudioInterrupted) return;
     }
     if (!this.sourceCandidates[this.sourceIndex]) {
       this.wantsToPlay = false;
@@ -604,7 +651,7 @@ export class AudioEngine {
   }
 
   togglePlay() {
-    if (this.wantsToPlay || this.isPlaying) this.pause();
+    if (this.isPlaying || (this.wantsToPlay && (this.pendingPreparation || this.isAudioInterrupted))) this.pause();
     else if (this.currentTrack) {
       if (!this.pendingPreparation && (!this.audio.src || !this.sourceCandidates[this.sourceIndex])) this.loadTrack(this.currentTrack);
       this.play().catch((error) => this.notify('error', error));

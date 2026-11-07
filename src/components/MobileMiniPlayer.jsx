@@ -44,6 +44,15 @@ export default function MobileMiniPlayer({
       <div
         style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0, cursor: 'pointer' }}
         onClick={onOpenFullscreen}
+        role="button"
+        tabIndex={0}
+        aria-label="Open fullscreen player"
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onOpenFullscreen();
+          }
+        }}
       >
         <img
           src={currentTrack.coverUrl || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80'}
@@ -63,6 +72,7 @@ export default function MobileMiniPlayer({
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <button
           className={`aura-control-btn ${isLiked ? 'active' : ''}`}
+          aria-label={isLiked ? 'Unlike track' : 'Like track'}
           onClick={(e) => {
             e.stopPropagation();
             onToggleLike();
@@ -103,6 +113,7 @@ export default function MobileMiniPlayer({
 
         <button
           className="aura-control-btn"
+          aria-label="Next track"
           onClick={(e) => {
             e.stopPropagation();
             onNext();

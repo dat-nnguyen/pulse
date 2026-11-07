@@ -15,6 +15,7 @@
     "install:mac": "npm run build && electron-builder --mac --dir && rm -rf /Applications/Pulse.app && cp -R release/mac/Pulse.app /Applications/Pulse.app && xattr -cr /Applications/Pulse.app && echo '✅ Pulse.app installed to /Applications!'",
     "start": "npm run build && node server.js",
     "ios:init": "cap add ios",
+    "ios:build": "node scripts/build-ios.mjs",
     "ios:sync": "cap sync ios",
     "ios:open": "cap open ios",
     "lint": "oxlint",

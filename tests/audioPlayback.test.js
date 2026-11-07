@@ -2,7 +2,7 @@ import { beforeAll, beforeEach, afterEach, describe, expect, it, vi } from 'vite
 import { downloadAudioForTrack, fetchAudioBlob, getTrackAudioSources, prepareAudioBlob, readAudioDuration } from '../src/services/audioMediaService.js';
 import { setBackendBaseUrl } from '../src/services/backendService.js';
 import { fragmentedM4aFixture } from './fixtures/fragmentedM4a.js';
-import { repairM4aTiming } from '../src/services/mp4TimingService.js';
+import { repairM4aTiming, AUDIO_TIMING_VERSION } from '../src/services/mp4TimingService.js';
 import { parseDurationToSeconds } from '../src/services/podcastService.js';
 const hlsInstances = vi.hoisted(() => []);
 vi.mock('hls.js', () => ({ default: class {
@@ -70,6 +70,20 @@ afterEach(() => {
 });
 
 describe('Playback transitions', () => {
+  it('rechecks and detaches an iPhone M4A even when its persisted cache flag is current', async () => {
+    vi.stubGlobal('navigator', { userAgent: 'iPhone', platform: 'iPhone' });
+    const original = new Blob([fragmentedM4aFixture().bytes], { type: 'audio/mp4' });
+    const engine = new AudioEngine();
+    engine.loadTrack(track('stale-cache', { audioBlob: original, audioTimingVersion: AUDIO_TIMING_VERSION,
+      duration: 358, durationVerified: true }));
+    expect(engine.pendingPreparation).not.toBeNull();
+    await engine.pendingPreparation;
+    expect(engine.currentTrack.audioBlob).not.toBe(original);
+    expect(engine.currentTrack.duration).toBeCloseTo(179.02585, 4);
+    expect((await repairM4aTiming(engine.currentTrack.audioBlob)).changed).toBe(false);
+    expect(engine.audio.src).toMatch(/^blob:/);
+  });
+
   it('requests a playback audio session on iPhone', () => {
     const audioSession = { type: 'auto' };
     vi.stubGlobal('navigator', { userAgent: 'iPhone', platform: 'iPhone', audioSession });

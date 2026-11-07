@@ -12,15 +12,18 @@ import {
   deleteTrackFromSupabase,
   deletePlaylistFromSupabase,
 } from './supabaseService';
-import { downloadAudioForTrack, prepareAudioBlob, readAudioDuration, finiteDuration } from './audioMediaService.js';
+import { downloadAudioForTrack, prepareAudioBlob, readAudioDuration, finiteDuration, isAppleMobileAudio } from './audioMediaService.js';
 import { repairM4aTiming, AUDIO_TIMING_VERSION } from './mp4TimingService.js';
 
 const DB_NAME = 'PulseAudioDB';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 export async function getDB() {
   return openDB(DB_NAME, DB_VERSION, {
     upgrade(db, oldVersion) {
+      if (!db.objectStoreNames.contains('audio')) {
+        db.createObjectStore('audio', { keyPath: 'id' });
+      }
       if (!db.objectStoreNames.contains('tracks')) {
         const trackStore = db.createObjectStore('tracks', { keyPath: 'id' });
         trackStore.createIndex('addedAt', 'addedAt');
@@ -39,6 +42,37 @@ export async function getDB() {
   });
 }
 
+// Keep iOS audio files separate from metadata. Rewriting a File-backed Blob
+// during cloud reconciliation can invalidate WebKit's existing Blob handles.
+async function hydrateTrack(db, track) {
+  if (!track?.hasSeparateAudio || track.audioBlob instanceof Blob) return track;
+  const cached = await db.get('audio', track.id);
+  return { ...track, audioBlob: cached?.audioBlob };
+}
+
+async function readStoredTrack(db, id) {
+  return hydrateTrack(db, await db.get('tracks', id));
+}
+
+async function readStoredTracks(db, indexed = false) {
+  const tracks = indexed ? await db.getAllFromIndex('tracks', 'addedAt') : await db.getAll('tracks');
+  return Promise.all(tracks.map((track) => hydrateTrack(db, track)));
+}
+
+async function putStoredTrack(db, track, replaceAudio = false) {
+  if (isAppleMobileAudio() && track.audioBlob instanceof Blob && track.audioBlob.size) {
+    if (replaceAudio || !track.hasSeparateAudio) {
+      const bytes = new Uint8Array(await track.audioBlob.arrayBuffer());
+      const audioBlob = new Blob([bytes], { type: track.audioBlob.type });
+      await db.put('audio', { id: track.id, audioBlob });
+      track.audioBlob = audioBlob;
+    }
+    track.hasSeparateAudio = true;
+    const { audioBlob: _audioBlob, ...metadata } = track;
+    await db.put('tracks', metadata);
+  } else await db.put('tracks', track);
+}
+
 function audioFormat(mime, fallback = '') {
   return ({ 'audio/mp4': 'M4A', 'audio/mpeg': 'MP3', 'audio/aac': 'AAC', 'audio/flac': 'FLAC',
     'audio/wav': 'WAV', 'audio/ogg': 'OGG', 'audio/webm': 'WEBM' })[mime.split(';')[0]] || fallback || 'MP3';
@@ -47,23 +81,36 @@ function audioFormat(mime, fallback = '') {
 export async function updateTrackDuration(id, duration) {
   if (!id || !finiteDuration(duration)) return;
   const db = await getDB();
-  const track = await db.get('tracks', id);
+  const track = await readStoredTrack(db, id);
   if (track && (!track.durationVerified || track.duration !== duration)) {
-    await db.put('tracks', { ...track, duration, durationVerified: true });
+    await putStoredTrack(db, { ...track, duration, durationVerified: true });
   }
 }
 
-async function migrateAudioTiming(tracks, db) {
+let timingMigration = Promise.resolve();
+function migrateAudioTiming(tracks, db) {
+  const pending = timingMigration.then(() => migrateTrackAudioTiming(tracks, db));
+  timingMigration = pending.catch(() => {});
+  return pending;
+}
+
+async function migrateTrackAudioTiming(tracks, db) {
   const migrated = [];
-  for (const track of tracks) {
-    if (!(track.audioBlob instanceof Blob) || !track.audioBlob.size || track.audioTimingVersion === AUDIO_TIMING_VERSION) {
+  for (const savedTrack of tracks) {
+    // A parallel startup/auth sync may have migrated this record while waiting.
+    const track = isAppleMobileAudio() ? await readStoredTrack(db, savedTrack.id) || savedTrack : savedTrack;
+    const needsSeparateAudio = isAppleMobileAudio() && !track.hasSeparateAudio;
+    if (!(track.audioBlob instanceof Blob) || !track.audioBlob.size || (track.audioTimingVersion === AUDIO_TIMING_VERSION && !needsSeparateAudio)) {
       migrated.push(track);
       continue;
     }
     const timing = await repairM4aTiming(track.audioBlob);
+    // Earlier caches could have a repaired container but retain the doubled
+    // duration marked as verified. Re-measure those files once during migration.
+    const duration = timing.duration || await readAudioDuration(timing.blob);
     const fixed = { ...track, audioBlob: timing.blob, audioTimingVersion: AUDIO_TIMING_VERSION,
-      ...(timing.changed && timing.duration ? { duration: timing.duration, durationVerified: true } : {}) };
-    await db.put('tracks', fixed);
+      ...(duration ? { duration, durationVerified: true } : { durationVerified: false }) };
+    await putStoredTrack(db, fixed, true);
     migrated.push(fixed);
   }
   return migrated;
@@ -72,10 +119,10 @@ async function migrateAudioTiming(tracks, db) {
 // Persist a repaired playback cache locally; do not re-upload a user's library.
 export async function cachePreparedPlaybackTrack(track) {
   const db = await getDB();
-  const existing = await db.get('tracks', track.id);
+  const existing = await readStoredTrack(db, track.id);
   const saved = { ...existing, ...track, addedAt: existing?.addedAt || track.addedAt || Date.now(),
     isDownloaded: true, fileSizeBytes: track.audioBlob.size, audioTimingVersion: AUDIO_TIMING_VERSION };
-  await db.put('tracks', saved);
+  await putStoredTrack(db, saved, true);
   return saved;
 }
 
@@ -108,7 +155,7 @@ export async function saveTrack(track) {
     item.downloadedAt = item.downloadedAt || Date.now();
     item.audioTimingVersion = AUDIO_TIMING_VERSION;
   }
-  await db.put('tracks', item);
+  await putStoredTrack(db, item, true);
 
   if (!item.offlineCacheOnly && isSupabaseConfigured() && (typeof navigator === 'undefined' || navigator.onLine)) {
     try {
@@ -130,7 +177,7 @@ export async function saveTrack(track) {
     }
   }
 
-  await db.put('tracks', item);
+  await putStoredTrack(db, item);
   return item;
 }
 
@@ -147,7 +194,7 @@ export async function cacheTrackForOffline(track, onProgress = () => {}) {
       const saved = { ...track, ...cached, audioBlob, isDownloaded: true, audioTimingVersion: AUDIO_TIMING_VERSION,
         ...(timing.changed && timing.duration ? { duration: timing.duration, durationVerified: true } : {}) };
       const db = await getDB();
-      await db.put('tracks', saved);
+      await putStoredTrack(db, saved, true);
       return saved;
     }
   }
@@ -169,7 +216,7 @@ export async function cacheTrackForOffline(track, onProgress = () => {}) {
     downloadedAt: Date.now(),
   };
   const db = await getDB();
-  await db.put('tracks', saved);
+  await putStoredTrack(db, saved, true);
   onProgress({ status: 'complete', trackId: track.id, bytes: blob.size });
   return saved;
 }
@@ -193,7 +240,7 @@ export async function downloadPlaylistForOffline(playlist, tracks) {
 
 export async function syncLibraryWithCloud(force = false) {
   const db = await getDB();
-  const localTracks = await migrateAudioTiming(await db.getAll('tracks'), db);
+  const localTracks = await migrateAudioTiming(await readStoredTracks(db), db);
   const localPlaylists = await db.getAll('playlists');
   const localLikes = await db.getAll('likes');
 
@@ -201,7 +248,7 @@ export async function syncLibraryWithCloud(force = false) {
     return {
       synced: false,
       reason: 'offline',
-      tracks: await db.getAllFromIndex('tracks', 'addedAt'),
+      tracks: await readStoredTracks(db, true),
       playlists: localPlaylists,
       likedIds: new Set(localLikes.map((l) => l.id)),
     };
@@ -227,6 +274,7 @@ export async function syncLibraryWithCloud(force = false) {
         ...ct,
         // Retain local audioBlob for instant zero-latency playback if cached
         audioBlob: local?.audioBlob || ct.audioBlob,
+        hasSeparateAudio: Boolean(local?.hasSeparateAudio),
         localAudioUrl: local?.localAudioUrl || ((ct.audioUrl && (ct.audioUrl.startsWith('/audio/') || ct.audioUrl.includes('localhost') || ct.audioUrl.includes('127.0.0.1'))) ? ct.audioUrl : null),
         duration: local?.durationVerified ? local.duration : ct.duration,
         durationVerified: Boolean(local?.durationVerified),
@@ -237,7 +285,7 @@ export async function syncLibraryWithCloud(force = false) {
         isDownloaded: Boolean((local?.audioBlob || ct.audioBlob)?.size),
         isCloudSynced: true,
       };
-      await db.put('tracks', merged);
+      await putStoredTrack(db, merged);
     }
 
     // Handle local tracks that are not on cloud:
@@ -246,13 +294,14 @@ export async function syncLibraryWithCloud(force = false) {
         if (lt.isCloudSynced && !force) {
           // Track was deleted on another device -> delete locally
           await db.delete('tracks', lt.id);
+          await db.delete('audio', lt.id);
           await db.delete('likes', lt.id);
         } else {
           // Track was added offline or local -> push to Supabase
           try {
             await saveTrackToSupabase(lt);
             lt.isCloudSynced = true;
-            await db.put('tracks', lt);
+            await putStoredTrack(db, lt);
           } catch (err) {
             console.warn('Failed to upload offline track to cloud:', lt.id, err);
           }
@@ -295,7 +344,7 @@ export async function syncLibraryWithCloud(force = false) {
     }
 
     // Return fresh consolidated lists
-    const freshTracks = await db.getAllFromIndex('tracks', 'addedAt');
+    const freshTracks = await readStoredTracks(db, true);
     const freshPlaylists = await db.getAll('playlists');
     const freshLikes = await db.getAll('likes');
 
@@ -306,11 +355,11 @@ export async function syncLibraryWithCloud(force = false) {
       likedIds: new Set(freshLikes.map((l) => l.id)),
     };
   } catch (err) {
-    console.warn('syncLibraryWithCloud error:', err);
+    console.warn('syncLibraryWithCloud error:', err.name, err.message);
     return {
       synced: false,
       error: err.message,
-      tracks: await db.getAllFromIndex('tracks', 'addedAt'),
+      tracks: await readStoredTracks(db, true),
       playlists: await db.getAll('playlists'),
       likedIds: new Set((await db.getAll('likes')).map((l) => l.id)),
     };
@@ -319,7 +368,7 @@ export async function syncLibraryWithCloud(force = false) {
 
 export async function getAllTracks({ syncCloud = true } = {}) {
   const db = await getDB();
-  const localTracks = await migrateAudioTiming(await db.getAllFromIndex('tracks', 'addedAt'), db);
+  const localTracks = await migrateAudioTiming(await readStoredTracks(db, true), db);
 
   if (syncCloud && isSupabaseConfigured() && navigator.onLine) {
     try {
@@ -337,12 +386,13 @@ export async function getAllTracks({ syncCloud = true } = {}) {
 
 export async function getTrackById(id) {
   const db = await getDB();
-  return db.get('tracks', id);
+  return readStoredTrack(db, id);
 }
 
 export async function deleteTrack(id) {
   const db = await getDB();
   await db.delete('tracks', id);
+  await db.delete('audio', id);
   await db.delete('likes', id);
 
   // Remove from playlists locally

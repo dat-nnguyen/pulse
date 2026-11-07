@@ -3,7 +3,7 @@
 // Clear only those initialization durations; keep every media byte and offset.
 const MAX_MOVIE_BOX = 16 * 1024 * 1024;
 const cachedTiming = new WeakMap();
-export const AUDIO_TIMING_VERSION = 3;
+export const AUDIO_TIMING_VERSION = 4;
 
 function boxAt(view, offset, end) {
   if (offset + 8 > end) return null;

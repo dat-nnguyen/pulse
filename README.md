@@ -237,6 +237,11 @@ timers during calls/Siri, resume only when iOS permits and the user has not paus
 and pause when headphones disconnect. Returning to Pulse refreshes the displayed
 playback position without automatically starting paused music.
 
+Cached M4A files are checked again before iOS playback, including files marked as
+repaired by older releases. iOS stores audio separately from track metadata so
+cloud sync and duration updates do not rewrite files being played. Existing caches
+are migrated locally and their durations re-measured once; no library reset is needed.
+
 For an optimized device build, select **Release** in Xcode's Run scheme. USB is
 needed for installation; the installed native app then launches from the home screen.
 

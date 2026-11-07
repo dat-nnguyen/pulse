@@ -564,7 +564,7 @@ export default function App() {
     });
     const unsubPrepared = audioEngine.on('trackPrepared', (prepared) => {
       setTracks((items) => items.map((item) => item.id === prepared.id ? { ...item, ...prepared } : item));
-      cachePreparedPlaybackTrack(prepared).catch((error) => console.warn('Playback cache repair failed:', error));
+      cachePreparedPlaybackTrack(prepared).catch((error) => console.warn('Playback cache repair failed:', error.name, error.message));
     });
     const unsubResolved = audioEngine.on('durationResolved', ({ trackId, duration: measured }) => {
       setTracks((items) => items.map((item) => item.id === trackId
@@ -572,7 +572,7 @@ export default function App() {
       if (currentTrackRef.current?.id === trackId) {
         setCurrentTrack((item) => item?.id === trackId ? { ...item, duration: measured, durationVerified: true } : item);
       }
-      updateTrackDuration(trackId, measured).catch((error) => console.warn('Duration cache update failed:', error));
+      updateTrackDuration(trackId, measured).catch((error) => console.warn('Duration cache update failed:', error.name, error.message));
     });
     const unsubPlayState = audioEngine.on('playState', (playing) => {
       setIsPlaying(playing);
@@ -587,7 +587,7 @@ export default function App() {
     const unsubNextReq = audioEngine.on('nextTrackRequest', handleNextTrack);
     const unsubPrevReq = audioEngine.on('prevTrackRequest', handlePrevTrack);
     const unsubError = audioEngine.on('error', (error) => {
-      console.warn('Audio playback error handled in App:', error);
+      console.warn('Audio playback error handled in App:', error.name, error.message);
       toast?.error?.('Playback error. Please check audio file or network connection.');
     });
     const unsubscribePlaybackSync = playbackSync.onMessage((message) => {

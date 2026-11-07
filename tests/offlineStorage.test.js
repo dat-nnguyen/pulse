@@ -1,13 +1,13 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
-const state = vi.hoisted(() => ({ tracks: new Map(), cloudTracks: [], configured: false }));
+const state = vi.hoisted(() => ({ tracks: new Map(), audio: new Map(), cloudTracks: [], configured: false }));
 vi.mock('idb', () => ({
   openDB: async () => ({
-    get: async (store, id) => store === 'tracks' ? state.tracks.get(id) : undefined,
-    put: async (store, value) => { if (store === 'tracks') state.tracks.set(value.id, value); },
+    get: async (store, id) => store === 'tracks' ? state.tracks.get(id) : store === 'audio' ? state.audio.get(id) : undefined,
+    put: async (store, value) => { if (store === 'tracks') state.tracks.set(value.id, value); else if (store === 'audio') state.audio.set(value.id, value); },
     getAll: async (store) => store === 'tracks' ? [...state.tracks.values()] : [],
     getAllFromIndex: async () => [...state.tracks.values()],
-    delete: async (store, id) => { if (store === 'tracks') state.tracks.delete(id); },
+    delete: async (store, id) => { if (store === 'tracks') state.tracks.delete(id); else if (store === 'audio') state.audio.delete(id); },
   }),
 }));
 vi.mock('../src/services/supabaseService', () => ({
@@ -29,11 +29,13 @@ vi.mock('../src/services/audioMediaService.js', async (importOriginal) => ({
 }));
 
 import { fragmentedM4aFixture } from './fixtures/fragmentedM4a.js';
+import { AUDIO_TIMING_VERSION, repairM4aTiming } from '../src/services/mp4TimingService.js';
 import { getAllTracks, saveTrack, cacheTrackForOffline, syncLibraryWithCloud, updateTrackDuration } from '../src/services/storageService.js';
 import { setBackendBaseUrl } from '../src/services/backendService.js';
 
 beforeEach(() => {
   state.tracks.clear();
+  state.audio.clear();
   state.configured = false;
   state.cloudTracks = [];
   vi.stubGlobal('navigator', { onLine: true });
@@ -42,6 +44,26 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Offline storage', () => {
+  it('keeps iOS audio files stable when duration or cloud metadata is updated', async () => {
+    vi.stubGlobal('navigator', { onLine: true, userAgent: 'iPhone', platform: 'iPhone' });
+    state.tracks.set('ios', { id: 'ios', audioBlob: new Blob([fragmentedM4aFixture().bytes], { type: 'audio/mp4' }),
+      duration: 358, durationVerified: true, audioTimingVersion: 3, addedAt: 1 });
+    const [migrated] = await getAllTracks({ syncCloud: false });
+    const cachedAudio = state.audio.get('ios').audioBlob;
+    expect(migrated.audioBlob).toBe(cachedAudio);
+    expect(state.tracks.get('ios').audioBlob).toBeUndefined();
+    expect(state.tracks.get('ios').hasSeparateAudio).toBe(true);
+    await updateTrackDuration('ios', 179);
+    expect(state.audio.get('ios').audioBlob).toBe(cachedAudio);
+    state.configured = true;
+    state.cloudTracks = [{ id: 'ios', duration: 358, audioUrl: 'https://cdn.example/ios.m4a' }];
+    const synced = await syncLibraryWithCloud();
+    expect(synced.tracks[0].duration).toBe(179);
+    expect(synced.tracks[0].audioBlob).toBe(cachedAudio);
+    expect(state.audio.get('ios').audioBlob).toBe(cachedAudio);
+    expect(state.tracks.get('ios').audioBlob).toBeUndefined();
+  });
+
   it('returns the local library immediately without cloud reconciliation when requested', async () => {
     state.configured = true;
     state.tracks.set('local', { id: 'local', title: 'Cached song', isCloudSynced: true });
@@ -52,13 +74,29 @@ describe('Offline storage', () => {
   });
   it('migrates already verified doubled iOS durations and fixes cached fragments without a new download', async () => {
     const original = new Blob([fragmentedM4aFixture().bytes], { type: 'audio/mp4' });
-    state.tracks.set('legends', { id: 'legends', title: 'Legends Never Die', duration: 358, durationVerified: true, audioBlob: original });
+    state.tracks.set('legends', { id: 'legends', title: 'Legends Never Die', duration: 358, durationVerified: true,
+      audioTimingVersion: 3, audioBlob: original });
     vi.stubGlobal('fetch', vi.fn());
     const [corrected] = await getAllTracks();
     expect(corrected.duration).toBeCloseTo(179.02585, 4);
     expect(corrected.audioBlob).not.toBe(original);
-    expect(corrected.audioTimingVersion).toBe(3);
+    expect(corrected.audioTimingVersion).toBe(AUDIO_TIMING_VERSION);
     expect(state.tracks.get('legends').duration).toBeCloseTo(179.02585, 4);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('re-measures a repaired version-3 cache whose old doubled duration was marked verified', async () => {
+    const timing = await repairM4aTiming(new Blob([fragmentedM4aFixture().bytes], { type: 'audio/mp4' }));
+    // Reopening IndexedDB produces a new Blob identity without the in-memory repair result.
+    const reopened = new Blob([await timing.blob.arrayBuffer()], { type: 'audio/mp4' });
+    state.tracks.set('cached', { id: 'cached', audioBlob: reopened, duration: 62.5,
+      durationVerified: true, audioTimingVersion: 3 });
+    vi.stubGlobal('fetch', vi.fn());
+    const [corrected] = await getAllTracks({ syncCloud: false });
+    expect(corrected.duration).toBe(31.25);
+    expect(corrected.durationVerified).toBe(true);
+    expect(corrected.audioBlob).toBe(reopened);
+    expect(corrected.audioTimingVersion).toBe(AUDIO_TIMING_VERSION);
     expect(fetch).not.toHaveBeenCalled();
   });
 

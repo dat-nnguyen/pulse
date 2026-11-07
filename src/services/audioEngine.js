@@ -5,6 +5,10 @@ import { repairM4aTiming, AUDIO_TIMING_VERSION } from './mp4TimingService.js';
 import { isHlsUrl } from './hlsAudioService.js';
 export { getCloudFallbackUrl } from './audioMediaService.js';
 
+const traceTiming = (detail) => {
+  if (import.meta.env.VITE_AUDIO_DIAGNOSTICS === '1') console.info('Pulse audio timing', JSON.stringify(detail));
+};
+
 export class AudioEngine {
   constructor() {
     this.audio = new Audio();
@@ -129,6 +133,9 @@ export class AudioEngine {
     const durationChanged = () => {
       const duration = audio.readyState >= 1 ? finiteDuration(audio.duration) : 0;
       if (!duration || duration === this.knownDuration) return;
+      traceTiming({ event: 'metadata', duration, storedDuration: this.currentTrack?.duration,
+        timingVersion: this.currentTrack?.audioTimingVersion, bytes: this.currentTrack?.audioBlob?.size,
+        sourceIndex: this.sourceIndex, sourceKind: this.audio.src?.split(':')[0] });
       this.knownDuration = duration;
       this.notify('durationChange', duration);
       this.notify('durationResolved', { trackId: this.currentTrack?.id, duration });
@@ -193,6 +200,7 @@ export class AudioEngine {
   }
 
   advanceSource(error) {
+    traceTiming({ event: 'fallback', sourceIndex: this.sourceIndex, error: error?.message || error?.code });
     clearTimeout(this.startupTimer);
     this.hls?.destroy();
     this.hls = null;
@@ -472,14 +480,31 @@ export class AudioEngine {
 
   needsTimingPreparation(track) {
     return isAppleMobileAudio() && (track.audioBlob instanceof Blob
-      ? track.audioTimingVersion !== AUDIO_TIMING_VERSION
+      ? /^(audio|video)\/mp4/i.test(track.audioBlob.type) || track.audioTimingVersion !== AUDIO_TIMING_VERSION
       : /^(M4A|MP4)$/i.test(track.format || '') || /\.(m4a|mp4)(?:[?#]|$)/i.test(track.audioUrl || track.cloudAudioUrl || ''));
   }
 
   async preparePlaybackTrack(track) {
-    const audioBlob = track.audioBlob instanceof Blob && track.audioBlob.size
-      ? await prepareAudioBlob(track.audioBlob, track) : await downloadAudioForTrack(track);
+    // File-backed IndexedDB blobs can regain their original MP4 header after a
+    // cache rewrite in WebKit. Decode a detached memory copy, even when an old
+    // cache flag claims the file has already been repaired.
+    let cachedBlob = null;
+    if (track.audioBlob instanceof Blob && track.audioBlob.size) {
+      try {
+        cachedBlob = new Blob([new Uint8Array(await track.audioBlob.arrayBuffer())], { type: track.audioBlob.type });
+      } catch {
+        // An older metadata rewrite may already have invalidated this handle.
+        const { getTrackById } = await import('./storageService.js');
+        const fresh = await getTrackById(track.id);
+        if (fresh?.audioBlob instanceof Blob) {
+          try { cachedBlob = new Blob([new Uint8Array(await fresh.audioBlob.arrayBuffer())], { type: fresh.audioBlob.type }); }
+          catch { /* Recover from the companion/cloud copy below. */ }
+        }
+      }
+    }
+    const audioBlob = cachedBlob ? await prepareAudioBlob(cachedBlob, track) : await downloadAudioForTrack(track);
     const timing = await repairM4aTiming(audioBlob);
+    traceTiming({ event: 'prepared', bytes: audioBlob.size, duration: timing.duration, changed: timing.changed });
     const prepared = { ...track, audioBlob, audioTimingVersion: AUDIO_TIMING_VERSION,
       ...(timing.duration ? { duration: timing.duration, durationVerified: true } : {}) };
     this.notify('trackPrepared', prepared);
@@ -546,6 +571,8 @@ export class AudioEngine {
 
   loadTrack(track) {
     if (!track) return;
+    traceTiming({ event: 'load', duration: track.duration, format: track.format, mime: track.audioBlob?.type,
+      timingVersion: track.audioTimingVersion, bytes: track.audioBlob?.size, preparation: this.needsTimingPreparation(track) });
     clearTimeout(this.startupTimer);
     this.sourceVersion += 1;
     const version = this.sourceVersion;

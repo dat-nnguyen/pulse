@@ -53,3 +53,45 @@ describe('Fragmented M4A timing repair', () => {
     }
   });
 });
+
+const mp4Box = (type, ...parts) => {
+  const data = Buffer.concat(parts.map((part) => Buffer.from(part)));
+  const header = Buffer.alloc(8);
+  header.writeUInt32BE(data.length + 8);
+  header.write(type, 4);
+  return Buffer.concat([header, data]);
+};
+const mediaTrack = (handler) => mp4Box('trak', mp4Box('mdia',
+  mp4Box('hdlr', Buffer.alloc(8), Buffer.from(handler), Buffer.alloc(12))));
+
+describe('Legacy video downloads used as audio', () => {
+  it('hides video while preserving audio, file length and sample offsets', async () => {
+    const video = mediaTrack('vide');
+    const audio = mediaTrack('soun');
+    const prefix = mp4Box('ftyp', Buffer.from('isom0000'));
+    const movie = mp4Box('moov', video, audio);
+    const media = mp4Box('mdat', Buffer.from('unchanged video and audio samples'));
+    const original = new Blob([prefix, movie, media], { type: 'audio/mp4' });
+    const repaired = await repairM4aTiming(original);
+    const bytes = Buffer.from(await repaired.blob.arrayBuffer());
+    expect(repaired.changed).toBe(true);
+    expect(bytes.length).toBe(original.size);
+    expect(bytes.toString('ascii', prefix.length + 12, prefix.length + 16)).toBe('free');
+    expect(bytes.subarray(prefix.length + 8 + video.length, prefix.length + movie.length)).toEqual(audio);
+    expect(bytes.subarray(-media.length)).toEqual(media);
+    const reopened = new Blob([bytes], { type: 'audio/mp4' });
+    expect((await repairM4aTiming(reopened)).blob).toBe(reopened);
+  });
+
+  it('preserves audio-only, video-only, malformed and fragmented movies', async () => {
+    for (const movie of [
+      mp4Box('moov', mediaTrack('soun')),
+      mp4Box('moov', mediaTrack('vide')),
+      mp4Box('moov', mediaTrack('vide'), mediaTrack('soun'), Buffer.from([0, 1])),
+      mp4Box('moov', mediaTrack('vide'), mediaTrack('soun'), mp4Box('mvex')),
+    ]) {
+      const original = new Blob([mp4Box('ftyp', Buffer.from('isom0000')), movie]);
+      expect((await repairM4aTiming(original)).blob).toBe(original);
+    }
+  });
+});

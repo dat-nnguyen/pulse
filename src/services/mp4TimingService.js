@@ -3,7 +3,7 @@
 // Clear only those initialization durations; keep every media byte and offset.
 const MAX_MOVIE_BOX = 16 * 1024 * 1024;
 const cachedTiming = new WeakMap();
-export const AUDIO_TIMING_VERSION = 4;
+export const AUDIO_TIMING_VERSION = 5;
 
 function boxAt(view, offset, end) {
   if (offset + 8 > end) return null;
@@ -64,6 +64,42 @@ export function repairFragmentedMovieHeader(bytes) {
   return { bytes: fixed, changed: true, duration, fragmented: true };
 }
 
+// Older downloads contain both H.264 video and AAC audio. Expose just the
+// audio track to iOS's audio element without transcoding or moving samples.
+// Equal-sized free boxes preserve every absolute chunk offset in the file.
+export function removeVideoTracks(bytes) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const root = boxAt(view, 0, bytes.length);
+  if (root?.type !== 'moov') return bytes;
+  const children = (parent) => {
+    const boxes = [];
+    for (let offset = parent.data; offset < parent.end;) {
+      const box = boxAt(view, offset, parent.end);
+      if (!box) throw new Error('Invalid MP4 box');
+      boxes.push(box);
+      offset = box.end;
+    }
+    return boxes;
+  };
+  try {
+    const boxes = children(root);
+    // Fragmented video needs coordinated traf/trex changes; leave it intact.
+    if (boxes.some((box) => box.type === 'mvex')) return bytes;
+    const tracks = boxes.filter((box) => box.type === 'trak').map((box) => {
+      const media = children(box).find((child) => child.type === 'mdia');
+      const handler = media && children(media).find((child) => child.type === 'hdlr');
+      const type = handler && handler.data + 12 <= handler.end
+        ? String.fromCharCode(...bytes.slice(handler.data + 8, handler.data + 12)) : '';
+      return { box, type };
+    });
+    const video = tracks.filter(({ type }) => type === 'vide');
+    if (!video.length || !tracks.some(({ type }) => type === 'soun')) return bytes;
+    const fixed = bytes.slice();
+    for (const { box } of video) fixed.set([102, 114, 101, 101], box.start + 4); // free
+    return fixed;
+  } catch { return bytes; }
+}
+
 // Recover cache entries written by the earlier composite-Blob implementation:
 // complete original file + replacement moov + complete original file. Only
 // accept this exact invalid layout; never truncate a normal media file.
@@ -108,14 +144,17 @@ async function inspectAndRepair(blob) {
     if (!Number.isSafeInteger(size) || size < headerSize || offset + size > blob.size) return unchanged;
     if (type === 'moov') {
       if (size > MAX_MOVIE_BOX) return unchanged;
-      const result = repairFragmentedMovieHeader(new Uint8Array(await blob.slice(offset, offset + size).arrayBuffer()));
-      if (!result.fragmented) return unchanged;
+      const movie = new Uint8Array(await blob.slice(offset, offset + size).arrayBuffer());
+      const audioOnly = removeVideoTracks(movie);
+      const result = repairFragmentedMovieHeader(audioOnly);
+      const removedVideo = audioOnly !== movie;
+      if (!result.fragmented && !removedVideo) return unchanged;
       // Materialize one contiguous buffer. Persisting a composite of File-backed
       // Blob slices in WebKit can write the complete backing file for each slice,
       // bringing back the original timeline when IndexedDB is reopened.
       const data = new Uint8Array(await blob.arrayBuffer());
       const recoveredLength = compositeCacheLength(data, size);
-      if (!result.changed && recoveredLength === data.length) return unchanged;
+      if (!result.changed && !removedVideo && recoveredLength === data.length) return unchanged;
       const fixedBytes = data.slice(0, recoveredLength);
       fixedBytes.set(result.bytes, offset);
       const fixed = new Blob([fixedBytes], { type: 'audio/mp4' });

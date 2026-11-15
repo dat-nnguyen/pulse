@@ -554,3 +554,30 @@ describe('Offline audio integrity', () => {
     setBackendBaseUrl('');
   });
 });
+
+describe('Companion download recovery', () => {
+  it('abandons an unreachable companion and downloads the cloud source', async () => {
+    vi.useFakeTimers();
+    setBackendBaseUrl('http://mac.local:3030');
+    const fetchMock = vi.fn((url, { signal }) => {
+      if (url.startsWith('http://mac.local')) {
+        return new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Error('Unreachable companion')), { once: true }));
+      }
+      return Promise.resolve({ ok: true, status: 200, headers: new Headers({ 'content-type': 'audio/mpeg' }),
+        blob: async () => new Blob(['ID3audio'], { type: 'audio/mpeg' }) });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const download = downloadAudioForTrack(track('fallback', {
+      localAudioUrl: '/audio/song.mp3', cloudAudioUrl: 'https://cdn.example/song.mp3',
+    }));
+    await vi.advanceTimersByTimeAsync(8000);
+    expect((await download).size).toBe(8);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('recovers legacy Ambient filenames from cloud metadata alone', () => {
+    setBackendBaseUrl('http://mac.local:3030');
+    const url = 'https://example.supabase.co/storage/v1/object/public/audio-files/audio/ambient.m4a.part';
+    expect(getTrackAudioSources({ audioUrl: url })[0]).toBe('http://mac.local:3030/audio/ambient.m4a.part');
+  });
+});

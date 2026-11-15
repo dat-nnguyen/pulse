@@ -57,7 +57,7 @@ export function getTrackAudioSources(track) {
     for (const candidate of [track?.audioUrl, explicitCloud]) {
       try {
         const path = new URL(candidate).pathname;
-        const match = path.match(/\/storage\/v1\/object\/public\/audio-files\/audio\/([a-zA-Z0-9_-]+\.(?:m4a|mp4|mp3|aac|flac|wav|ogg|opus|webm))$/i);
+        const match = path.match(/\/storage\/v1\/object\/public\/audio-files\/audio\/([a-zA-Z0-9_-]+\.(?:m4a|mp4|mp3|aac|flac|wav|ogg|opus|webm)(?:\.part)?)$/i);
         if (match) { companion = `${backend}/audio/${match[1]}`; break; }
       } catch { /* Local and non-storage sources already resolve below. */ }
     }
@@ -126,7 +126,16 @@ export function readAudioDuration(blob, timeoutMs = 5000) {
 }
 
 export async function fetchAudioBlob(url, track = {}, onProgress = () => {}) {
-  const response = await fetch(url, { signal: AbortSignal.timeout(600000) });
+  // A sleeping/unreachable Mac must not block cloud fallback for ten minutes.
+  // Keep the longer transfer budget once the source has actually responded.
+  const connection = new AbortController();
+  const timer = setTimeout(() => connection.abort(), 8000);
+  let response;
+  try {
+    response = await fetch(url, { signal: AbortSignal.any([connection.signal, AbortSignal.timeout(600000)]) });
+  } finally {
+    clearTimeout(timer);
+  }
   if (!response.ok) throw new Error(`Download failed (${response.status})`);
   // A fragment is not a complete offline download.
   if (response.status === 206) throw new Error('The server returned incomplete audio');

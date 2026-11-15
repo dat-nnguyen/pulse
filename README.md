@@ -245,6 +245,33 @@ Playback and preloading reuse an unchanged cache without rewriting its audio fil
 If an older cloud audio object is missing, Pulse also tries its original filename
 on the configured Mac companion. Storage operations share one database connection.
 
+Legacy MP4 downloads with both video and audio are prepared as audio-only media
+before iPhone playback. The player hides the static video track without transcoding
+AAC or changing sample offsets, and saves the repaired cache once. If the Mac
+companion does not respond within eight seconds, downloads try the cloud source
+instead of waiting for the full transfer timeout.
+
+To renew an expired development installation, rebuild and install over the existing
+app with the same bundle ID and signing team; do not delete Pulse or its library.
+With Xcode installed, the command-line build can use its tools without changing the
+system-wide `xcode-select` setting:
+
+```bash
+npm run ios:build
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
+  -project ios/App/App.xcodeproj -scheme App -configuration Release \
+  -destination 'generic/platform=iOS' -derivedDataPath /tmp/pulse-ios \
+  -allowProvisioningUpdates build
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcrun devicectl list devices
+# Replace DEVICE_ID with the paired iPhone identifier from the previous command.
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcrun devicectl device install app \
+  --device DEVICE_ID /tmp/pulse-ios/Build/Products/Release-iphoneos/App.app
+```
+
+Keep the iPhone unlocked and trusted over USB during installation. A disconnected
+CoreDevice tunnel must be reconnected before installing, even if the paired device
+is still listed. The embedded provisioning profile records the new expiration date.
+
 For an optimized device build, select **Release** in Xcode's Run scheme. USB is
 needed for installation; the installed native app then launches from the home screen.
 

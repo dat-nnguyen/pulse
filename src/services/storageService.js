@@ -311,9 +311,9 @@ export async function syncLibraryWithCloud(force = false) {
         } else {
           // Track was added offline or local -> push to Supabase
           try {
-            await saveTrackToSupabase(lt);
-            lt.isCloudSynced = true;
-            await putStoredTrack(db, lt);
+            if (await saveTrackToSupabase(lt)) {
+              await putStoredTrack(db, { ...lt, isCloudSynced: true });
+            }
           } catch (err) {
             console.warn('Failed to upload offline track to cloud:', lt.id, err);
           }
@@ -335,9 +335,9 @@ export async function syncLibraryWithCloud(force = false) {
         } else {
           // Push local playlist to cloud
           try {
-            await savePlaylistToSupabase(lp);
-            lp.isCloudSynced = true;
-            await db.put('playlists', lp);
+            if (await savePlaylistToSupabase(lp)) {
+              await db.put('playlists', { ...lp, isCloudSynced: true });
+            }
           } catch (err) {
             console.warn('Failed to upload local playlist to cloud:', lp.id, err);
           }
@@ -370,6 +370,8 @@ export async function syncLibraryWithCloud(force = false) {
     console.warn('syncLibraryWithCloud error:', err.name, err.message);
     return {
       synced: false,
+      reason: 'cloud-unavailable',
+      status: err.status,
       error: err.message,
       tracks: await readStoredTracks(db, true),
       playlists: await db.getAll('playlists'),

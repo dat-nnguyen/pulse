@@ -2,6 +2,13 @@ import { getSupabaseClient, isSupabaseConfigured, getSupabaseCredentials } from 
 import { createHlsAudioPackage, isHlsUrl } from './hlsAudioService.js';
 export { isSupabaseConfigured, getSupabaseCredentials };
 
+function readCloudRows({ data, error, status }) {
+  // A failed or incomplete read must never reach reconciliation as an empty table.
+  if (error) throw Object.assign(new Error(error.message), { status });
+  if (!Array.isArray(data)) throw new Error('Cloud library response is incomplete');
+  return data;
+}
+
 // Upload audio blob/file to Supabase Storage Bucket ('audio-files')
 export async function uploadAudioToSupabaseStorage(trackId, fileBlob, filename = 'track.mp3') {
   const client = getSupabaseClient();
@@ -103,22 +110,17 @@ export async function saveTrackToSupabase(track) {
 // Fetch all tracks from Supabase
 export async function fetchTracksFromSupabase() {
   const client = getSupabaseClient();
-  if (!client) return [];
+  if (!client) throw new Error('Supabase is not configured');
 
-  const { data, error } = await client
+  const rows = readCloudRows(await client
     .from('tracks')
     .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.warn('Failed to fetch tracks from Supabase:', error.message);
-    return [];
-  }
+    .order('created_at', { ascending: false }));
 
   const clientCreds = getSupabaseCredentials();
   const storageBase = clientCreds.url ? `${clientCreds.url}/storage/v1/object/public/audio-files/audio` : '';
 
-  return (data || []).map((row) => {
+  return rows.map((row) => {
     let cloudAudioUrl = null;
     let audioUrl = row.audio_url || '';
 
@@ -152,20 +154,20 @@ export async function fetchTracksFromSupabase() {
 // Fetch all playlists from Supabase
 export async function fetchPlaylistsFromSupabase() {
   const client = getSupabaseClient();
-  if (!client) return [];
+  if (!client) throw new Error('Supabase is not configured');
 
-  const { data: playlistsData, error: plErr } = await client.from('playlists').select('*');
-  if (plErr) return [];
-
-  const { data: tracksJunction } = await client.from('playlist_tracks').select('*').order('position');
+  const [playlists, tracksJunction] = (await Promise.all([
+    client.from('playlists').select('*'),
+    client.from('playlist_tracks').select('*').order('position'),
+  ])).map(readCloudRows);
 
   const junctionMap = {};
-  (tracksJunction || []).forEach((j) => {
+  tracksJunction.forEach((j) => {
     if (!junctionMap[j.playlist_id]) junctionMap[j.playlist_id] = [];
     junctionMap[j.playlist_id].push(j.track_id);
   });
 
-  return (playlistsData || []).map((pl) => ({
+  return playlists.map((pl) => ({
     id: pl.id,
     name: pl.name,
     title: pl.name,
@@ -196,14 +198,16 @@ export async function savePlaylistToSupabase(playlist) {
 
   // Sync track junction
   if (Array.isArray(playlist.trackIds)) {
-    await client.from('playlist_tracks').delete().eq('playlist_id', playlist.id);
+    const { error: deleteError } = await client.from('playlist_tracks').delete().eq('playlist_id', playlist.id);
+    if (deleteError) throw deleteError;
     const rows = playlist.trackIds.map((trackId, idx) => ({
       playlist_id: playlist.id,
       track_id: trackId,
       position: idx,
     }));
     if (rows.length > 0) {
-      await client.from('playlist_tracks').insert(rows);
+      const { error: insertError } = await client.from('playlist_tracks').insert(rows);
+      if (insertError) throw insertError;
     }
   }
 
@@ -213,12 +217,10 @@ export async function savePlaylistToSupabase(playlist) {
 // Sync likes
 export async function fetchLikesFromSupabase() {
   const client = getSupabaseClient();
-  if (!client) return new Set();
+  if (!client) throw new Error('Supabase is not configured');
 
-  const { data, error } = await client.from('likes').select('track_id');
-  if (error) return new Set();
-
-  return new Set((data || []).map((d) => d.track_id));
+  const rows = readCloudRows(await client.from('likes').select('track_id'));
+  return new Set(rows.map((d) => d.track_id));
 }
 
 export async function toggleLikeInSupabase(trackId, isLiked) {

@@ -1,13 +1,16 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
-const state = vi.hoisted(() => ({ tracks: new Map(), audio: new Map(), cloudTracks: [], configured: false }));
+const state = vi.hoisted(() => ({
+  tracks: new Map(), audio: new Map(), playlists: new Map(), likes: new Map(),
+  cloudTracks: [], cloudError: null, configured: false,
+}));
 vi.mock('idb', () => ({
   openDB: async () => ({
-    get: async (store, id) => store === 'tracks' ? state.tracks.get(id) : store === 'audio' ? state.audio.get(id) : undefined,
-    put: async (store, value) => { if (store === 'tracks') state.tracks.set(value.id, value); else if (store === 'audio') state.audio.set(value.id, value); },
-    getAll: async (store) => store === 'tracks' ? [...state.tracks.values()] : [],
+    get: async (store, id) => state[store].get(id),
+    put: async (store, value) => state[store].set(value.id, value),
+    getAll: async (store) => [...state[store].values()],
     getAllFromIndex: async () => [...state.tracks.values()],
-    delete: async (store, id) => { if (store === 'tracks') state.tracks.delete(id); else if (store === 'audio') state.audio.delete(id); },
+    delete: async (store, id) => state[store].delete(id),
   }),
 }));
 vi.mock('../src/services/supabaseService', () => ({
@@ -16,7 +19,10 @@ vi.mock('../src/services/supabaseService', () => ({
   uploadAudioToSupabaseStorage: async () => null,
   uploadCoverToSupabaseStorage: async () => null,
   fetchTracksFromSupabase: async () => state.cloudTracks,
-  fetchPlaylistsFromSupabase: async () => [],
+  fetchPlaylistsFromSupabase: async () => {
+    if (state.cloudError) throw state.cloudError;
+    return [];
+  },
   fetchLikesFromSupabase: async () => new Set(),
   savePlaylistToSupabase: async () => null,
   toggleLikeInSupabase: async () => null,
@@ -36,8 +42,11 @@ import { setBackendBaseUrl } from '../src/services/backendService.js';
 beforeEach(() => {
   state.tracks.clear();
   state.audio.clear();
+  state.playlists.clear();
+  state.likes.clear();
   state.configured = false;
   state.cloudTracks = [];
+  state.cloudError = null;
   vi.stubGlobal('navigator', { onLine: true });
   setBackendBaseUrl('');
 });
@@ -77,6 +86,35 @@ describe('Offline storage', () => {
     const tracks = await getAllTracks({ syncCloud: false });
     expect(tracks.map((track) => track.id)).toEqual(['local']);
     expect(state.tracks.has('local')).toBe(true);
+  });
+
+  it('preserves tracks, cached audio, playlists and likes when a cloud read returns 402', async () => {
+    state.configured = true;
+    state.cloudError = Object.assign(new Error('exceed_storage_size_quota'), { status: 402 });
+    const blob = new Blob(['ID3cached'], { type: 'audio/mpeg' });
+    state.tracks.set('local', { id: 'local', isCloudSynced: true, hasSeparateAudio: true, durationVerified: true,
+      audioTimingVersion: AUDIO_TIMING_VERSION });
+    state.audio.set('local', { id: 'local', audioBlob: blob });
+    state.playlists.set('playlist', { id: 'playlist', trackIds: ['local'], isCloudSynced: true });
+    state.likes.set('local', { id: 'local' });
+
+    const result = await syncLibraryWithCloud();
+
+    expect(result).toMatchObject({ synced: false, reason: 'cloud-unavailable', status: 402,
+      tracks: [{ id: 'local', audioBlob: blob }], playlists: [{ id: 'playlist', trackIds: ['local'] }],
+      likedIds: new Set(['local']) });
+    expect(state.audio.get('local').audioBlob).toBe(blob);
+  });
+
+  it('leaves local items pending when their cloud writes are rejected', async () => {
+    state.configured = true;
+    state.tracks.set('local', { id: 'local', title: 'Pending song' });
+    state.playlists.set('playlist', { id: 'playlist', trackIds: ['local'] });
+
+    await syncLibraryWithCloud();
+
+    expect(state.tracks.get('local').isCloudSynced).toBeUndefined();
+    expect(state.playlists.get('playlist').isCloudSynced).toBeUndefined();
   });
   it('migrates already verified doubled iOS durations and fixes cached fragments without a new download', async () => {
     const original = new Blob([fragmentedM4aFixture().bytes], { type: 'audio/mp4' });

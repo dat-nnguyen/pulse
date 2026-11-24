@@ -13,17 +13,11 @@ app.use(cors({ origin: config.corsOrigins }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Serve cached audio files from primary cache directory
-app.use('/audio', express.static(config.cacheDir));
-
-// Also check rootDir cache directory if different
-if (config.rootDirCache && config.rootDirCache !== config.cacheDir && fs.existsSync(config.rootDirCache)) {
-  app.use('/audio', express.static(config.rootDirCache));
-}
-
-// Also check packaged userData cache directory if different and exists
-if (config.userDataCache && config.userDataCache !== config.cacheDir && fs.existsSync(config.userDataCache)) {
-  app.use('/audio', express.static(config.userDataCache));
+// An extensionless lookup recovers an original file for cloud tracks packaged as HLS.
+const audioExtensions = ['m4a', 'mp4', 'mp3', 'aac', 'flac', 'wav', 'ogg', 'opus', 'webm'];
+const cacheDirs = new Set([config.cacheDir, config.rootDirCache, config.userDataCache]);
+for (const dir of cacheDirs) {
+  if (dir) app.use('/audio', express.static(dir, { extensions: audioExtensions, index: false, redirect: false }));
 }
 
 // Audio not found handler: never fall through to HTML SPA fallback for audio requests!

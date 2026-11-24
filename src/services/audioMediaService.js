@@ -33,6 +33,29 @@ function isDeviceUrl(url) {
   } catch { return false; }
 }
 
+function getCompanionAudioUrl(track, explicitCloud) {
+  const location = typeof window === 'undefined' ? null : window.location;
+  const sameOrigin = location?.port === '3030' && isDeviceUrl(location.origin) ? location.origin : '';
+  const backend = getBackendBaseUrl() || sameOrigin;
+  if (!backend) return '';
+
+  for (const candidate of [track?.audioUrl, explicitCloud]) {
+    try {
+      const pathname = new URL(candidate).pathname;
+      const prefix = '/storage/v1/object/public/audio-files/audio/';
+      if (!pathname.startsWith(prefix)) continue;
+      const filename = pathname.slice(prefix.length);
+      if (/^[\w-]+\.(?:m4a|mp4|mp3|aac|flac|wav|ogg|opus|webm)(?:\.part)?$/i.test(filename)) {
+        return `${backend}/audio/${filename}`;
+      }
+      // Supabase stores long MP4 uploads as HLS. The companion still has the original file.
+      const hls = filename.match(/^([\w-]+)\/hls-v1\/index\.m3u8$/i);
+      if (hls) return `${backend}/audio/${hls[1]}`;
+    } catch { /* Relative and non-storage URLs are handled by the standard sources. */ }
+  }
+  return '';
+}
+
 export function resolveAudioUrl(url) {
   if (!url) return '';
   const backend = getBackendBaseUrl();
@@ -49,24 +72,12 @@ export function resolveAudioUrl(url) {
 
 export function getTrackAudioSources(track) {
   const explicitCloud = /^https?:\/\//.test(track?.cloudAudioUrl || '') ? track.cloudAudioUrl : '';
-  // Older cloud rows can point at objects that were never uploaded. Recover
-  // their original companion filename without depending on a stored LAN URL.
-  let companion = '';
-  const backend = getBackendBaseUrl();
-  if (backend) {
-    for (const candidate of [track?.audioUrl, explicitCloud]) {
-      try {
-        const path = new URL(candidate).pathname;
-        const match = path.match(/\/storage\/v1\/object\/public\/audio-files\/audio\/([a-zA-Z0-9_-]+\.(?:m4a|mp4|mp3|aac|flac|wav|ogg|opus|webm)(?:\.part)?)$/i);
-        if (match) { companion = `${backend}/audio/${match[1]}`; break; }
-      } catch { /* Local and non-storage sources already resolve below. */ }
-    }
-  }
-  const direct = resolveAudioUrl(track?.localAudioUrl) || companion || resolveAudioUrl(track?.audioUrl);
+  const companion = getCompanionAudioUrl(track, explicitCloud);
+  const direct = resolveAudioUrl(track?.localAudioUrl) || resolveAudioUrl(track?.audioUrl);
   // Desktop/LAN companion files are already on disk. Avoid waiting on an
   // expired or unreachable cloud copy before trying the local file.
-  const localFirst = direct && isDeviceUrl(direct);
-  const candidates = [...(localFirst ? [direct, explicitCloud] : [explicitCloud, direct]),
+  const localFirst = isDeviceUrl(direct);
+  const candidates = [localFirst ? direct : null, companion, explicitCloud, direct,
     resolveAudioUrl(track?.audioUrl), getCloudFallbackUrl(track)];
   return [...new Set(candidates.filter((url) => url && !url.startsWith('blob:') && !url.startsWith('data:') &&
     !(typeof window !== 'undefined' && window.location.protocol === 'https:' && url.startsWith('http:'))))];

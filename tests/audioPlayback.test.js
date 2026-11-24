@@ -475,10 +475,9 @@ describe('Offline audio integrity', () => {
     expect(fetch.mock.calls[0][0]).toBe('http://my-mac.local:3030/audio/track_123.m4a');
   });
 
-  it('keeps HLS and unrelated CDN paths intact instead of deriving a companion file', () => {
+  it('keeps unrelated CDN and HLS paths intact instead of deriving a companion file', () => {
     setBackendBaseUrl('http://my-mac.local:3030');
-    for (const audioUrl of ['https://cdn.example/song.m4a',
-      'https://cloud.example/storage/v1/object/public/audio-files/audio/id/hls-v1/index.m3u8']) {
+    for (const audioUrl of ['https://cdn.example/song.m4a', 'https://cdn.example/live/index.m3u8']) {
       expect(getTrackAudioSources({ audioUrl })).toEqual([audioUrl]);
     }
   });
@@ -556,6 +555,17 @@ describe('Offline audio integrity', () => {
 });
 
 describe('Companion download recovery', () => {
+  it('tries the original Mac file for HLS tracks from the local desktop origin or iPhone companion', () => {
+    const origin = 'http://127.0.0.1:3030';
+    vi.stubGlobal('window', { location: { origin, protocol: 'http:', hostname: '127.0.0.1', port: '3030' } });
+    const cloudAudioUrl = 'https://cloud.example/storage/v1/object/public/audio-files/audio/long-track/hls-v1/index.m3u8';
+    expect(getTrackAudioSources({ cloudAudioUrl })).toEqual([`${origin}/audio/long-track`, cloudAudioUrl]);
+
+    vi.stubGlobal('window', { location: { protocol: 'capacitor:' } });
+    setBackendBaseUrl('http://mac.local:3030');
+    expect(getTrackAudioSources({ cloudAudioUrl })).toEqual(['http://mac.local:3030/audio/long-track', cloudAudioUrl]);
+  });
+
   it('abandons an unreachable companion and downloads the cloud source', async () => {
     vi.useFakeTimers();
     setBackendBaseUrl('http://mac.local:3030');

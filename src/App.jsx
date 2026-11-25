@@ -12,6 +12,7 @@ import {
   savePlaylist,
   deletePlaylist as removePlaylistFromDB,
   syncLibraryWithCloud,
+  restoreLibraryBackup,
   isTrackInPlaylist,
   detectPlaylistDuplicates,
   deduplicatePlaylist,
@@ -49,6 +50,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authModalMode, setAuthModalMode] = useState('login');
+  const [cloudIssue, setCloudIssue] = useState(null);
 
   // Toast notification system
   const { toasts, toast, removeToast } = useToast();
@@ -230,8 +232,44 @@ export default function App() {
 
   // Initialize Library & Clean up any legacy mock tracks
   useEffect(() => {
+    let disposed = false;
+    let pendingSync = null;
+    let lastSync = 0;
+    function refreshCloud(force = false) {
+      if (disposed) return;
+      if (pendingSync) return pendingSync;
+      lastSync = Date.now();
+      pendingSync = syncLibraryWithCloud(force).then((result) => {
+        if (disposed) return;
+        setCloudIssue(result.reason === 'cloud-unavailable' ? { status: result.status } : null);
+        if (result.synced) {
+          setTracks(result.tracks);
+          setPlaylists(result.playlists);
+          setLikedIds(result.likedIds);
+          if (!currentTrackRef.current && result.tracks.length) {
+            setCurrentTrack(result.tracks[0]);
+            audioEngine.loadTrack(result.tracks[0]);
+          }
+        }
+      }).catch((error) => console.warn('Library refresh failed:', error.message))
+        .finally(() => { pendingSync = null; });
+      return pendingSync;
+    }
+
     async function initDB() {
       try {
+        try {
+          let backup;
+          if (import.meta.env.VITE_PULSE_BUNDLED_RESTORE === '1' && window.location.protocol === 'capacitor:') {
+            const response = await fetch('/library-restore.json');
+            if (response.ok) backup = await response.json();
+          } else if (window.pulseLibraryRestore) {
+            backup = await window.pulseLibraryRestore.load();
+          }
+          if (backup) await restoreLibraryBackup(backup);
+        } catch (error) {
+          console.warn('Pulse library restore failed:', error.name);
+        }
         const [localTracks, localPlaylists, localLikes] = await Promise.all([
           getAllTracks({ syncCloud: false }), getAllPlaylists({ syncCloud: false }), getLikedIds({ syncCloud: false }),
         ]);
@@ -302,44 +340,24 @@ export default function App() {
           audioEngine.pause();
           setCurrentTrack(null);
         }
-        // Render the local library first; refresh cloud data once in the background.
-        const refreshed = await syncLibraryWithCloud();
-        if (refreshed.synced) {
-          setTracks(refreshed.tracks);
-          setPlaylists(refreshed.playlists);
-          setLikedIds(refreshed.likedIds);
-          if (!currentTrackRef.current && refreshed.tracks.length) {
-            setCurrentTrack(refreshed.tracks[0]);
-            audioEngine.loadTrack(refreshed.tracks[0]);
-          }
-        }
       } catch (err) {
         console.error('Database initialization error:', err);
       }
     }
-    initDB();
+    const localReady = initDB();
+    void localReady.then(() => refreshCloud());
 
     // Check user authentication & listen for recovery / auth changes
     getCurrentUser().then((u) => {
+      if (disposed) return;
       setUser(u);
       playbackSync.connect(u?.id);
     });
     const unsubscribeAuth = subscribeAuthChange(
-      async (u) => {
+      (u) => {
         setUser(u);
         playbackSync.connect(u?.id);
-        if (u) {
-          try {
-            const res = await syncLibraryWithCloud(true);
-            if (res.synced) {
-              if (res.tracks) setTracks(res.tracks);
-              if (res.playlists) setPlaylists(res.playlists);
-              if (res.likedIds) setLikedIds(res.likedIds);
-            }
-          } catch (e) {
-            console.warn('Auth change sync error:', e);
-          }
-        }
+        if (u) void localReady.then(() => refreshCloud(true));
       },
       () => {
         // PASSWORD_RECOVERY event
@@ -352,19 +370,14 @@ export default function App() {
     let syncTimeout = null;
     const unsubscribeCloud = subscribeToCloudChanges(() => {
       if (syncTimeout) clearTimeout(syncTimeout);
-      syncTimeout = setTimeout(async () => {
-        try {
-          const res = await syncLibraryWithCloud();
-          if (res.synced) {
-            if (res.tracks) setTracks(res.tracks);
-            if (res.playlists) setPlaylists(res.playlists);
-            if (res.likedIds) setLikedIds(res.likedIds);
-          }
-        } catch (e) {
-          console.warn('Realtime cloud sync error:', e);
-        }
-      }, 600);
+      syncTimeout = setTimeout(() => void localReady.then(() => refreshCloud()), 600);
     });
+    const onReconnect = () => void localReady.then(() => refreshCloud());
+    const onForeground = () => {
+      if (!document.hidden && Date.now() - lastSync > 60_000) onReconnect();
+    };
+    window.addEventListener('online', onReconnect);
+    document.addEventListener('visibilitychange', onForeground);
 
     if (window.location.hash.includes('type=recovery')) {
       setAuthModalMode('recovery');
@@ -372,6 +385,9 @@ export default function App() {
     }
 
     return () => {
+      disposed = true;
+      window.removeEventListener('online', onReconnect);
+      document.removeEventListener('visibilitychange', onForeground);
       unsubscribeAuth();
       unsubscribeCloud();
       playbackSync.disconnect();
@@ -1017,6 +1033,7 @@ export default function App() {
             onGoForward={handleGoForward}
             onGoHome={handleGoHome}
             activeDownloads={activeDownloads}
+            cloudIssue={cloudIssue}
           />
 
           {/* Pure Playlists & Collection Main View */}
@@ -1209,6 +1226,8 @@ export default function App() {
 
       <SupabaseModal
         isOpen={showSupabaseModal}
+        cloudIssue={cloudIssue}
+        onCloudIssue={setCloudIssue}
         onClose={() => setShowSupabaseModal(false)}
         onSyncSuccess={(res) => {
           if (res.tracks) setTracks(res.tracks);

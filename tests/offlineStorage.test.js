@@ -1,7 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({
-  tracks: new Map(), audio: new Map(), playlists: new Map(), likes: new Map(),
+  tracks: new Map(), audio: new Map(), playlists: new Map(), likes: new Map(), settings: new Map(),
   cloudTracks: [], cloudError: null, configured: false,
 }));
 vi.mock('idb', () => ({
@@ -11,6 +11,15 @@ vi.mock('idb', () => ({
     getAll: async (store) => [...state[store].values()],
     getAllFromIndex: async () => [...state.tracks.values()],
     delete: async (store, id) => state[store].delete(id),
+    transaction: () => ({
+      done: Promise.resolve(),
+      objectStore: (store) => ({
+        get: async (id) => state[store].get(id),
+        getKey: async (id) => state[store].has(id) ? id : undefined,
+        put: async (value, id) => state[store].set(id, value),
+        add: async (value) => state[store].set(value.id, value),
+      }),
+    }),
   }),
 }));
 vi.mock('../src/services/supabaseService', () => ({
@@ -36,7 +45,7 @@ vi.mock('../src/services/audioMediaService.js', async (importOriginal) => ({
 
 import { fragmentedM4aFixture } from './fixtures/fragmentedM4a.js';
 import { AUDIO_TIMING_VERSION, repairM4aTiming } from '../src/services/mp4TimingService.js';
-import { getDB, getAllTracks, saveTrack, cacheTrackForOffline, syncLibraryWithCloud, updateTrackDuration } from '../src/services/storageService.js';
+import { getDB, getAllTracks, saveTrack, cacheTrackForOffline, syncLibraryWithCloud, updateTrackDuration, restoreLibraryBackup } from '../src/services/storageService.js';
 import { setBackendBaseUrl } from '../src/services/backendService.js';
 
 beforeEach(() => {
@@ -44,6 +53,7 @@ beforeEach(() => {
   state.audio.clear();
   state.playlists.clear();
   state.likes.clear();
+  state.settings.clear();
   state.configured = false;
   state.cloudTracks = [];
   state.cloudError = null;
@@ -115,6 +125,23 @@ describe('Offline storage', () => {
 
     expect(state.tracks.get('local').isCloudSynced).toBeUndefined();
     expect(state.playlists.get('playlist').isCloudSynced).toBeUndefined();
+  });
+
+  it('restores missing library records once and preserves newer local changes', async () => {
+    state.tracks.set('existing', { id: 'existing', title: 'Edited locally' });
+    const backup = { id: 'before-outage', tracks: [
+      { id: 'existing', title: 'Old title' }, { id: 'recovered', title: 'Recovered', hasSeparateAudio: true },
+    ], playlists: [{ id: 'list', trackIds: ['existing', 'recovered'] }], likes: [{ id: 'recovered' }] };
+
+    await restoreLibraryBackup(backup);
+    expect(state.tracks.get('existing').title).toBe('Edited locally');
+    expect(state.tracks.get('recovered')).toMatchObject({ title: 'Recovered', isDownloaded: false });
+    expect(state.tracks.get('recovered').hasSeparateAudio).toBeUndefined();
+    expect(state.playlists.get('list').trackIds).toEqual(['existing', 'recovered']);
+    expect(state.likes.has('recovered')).toBe(true);
+    state.tracks.delete('recovered');
+    await restoreLibraryBackup(backup);
+    expect(state.tracks.has('recovered')).toBe(false);
   });
   it('migrates already verified doubled iOS durations and fixes cached fragments without a new download', async () => {
     const original = new Blob([fragmentedM4aFixture().bytes], { type: 'audio/mp4' });

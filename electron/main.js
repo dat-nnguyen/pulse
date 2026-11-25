@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut } from 'electron';
+import { app, BrowserWindow, globalShortcut, ipcMain } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
@@ -12,6 +12,15 @@ const rootDir = path.resolve(__dirname, '../');
 let mainWindow = null;
 let serverProcess = null;
 let embeddedServer = null;
+
+const backupPath = process.env.PULSE_LIBRARY_RESTORE;
+if (backupPath) {
+  ipcMain.handle('pulse:load-library-backup', async ({ sender, senderFrame }) => {
+    if (!embeddedServer?.listening || sender !== mainWindow?.webContents || senderFrame !== sender.mainFrame ||
+        !senderFrame.url.startsWith('http://127.0.0.1:3030/')) return null;
+    return JSON.parse(await fs.promises.readFile(backupPath, 'utf8'));
+  });
+}
 
 // Determine writable paths on macOS
 const userDataDir = app.getPath('userData');
@@ -133,6 +142,7 @@ async function createWindow() {
     titleBarStyle: 'hiddenInset', // Sleek macOS native traffic lights in dark header
     trafficLightPosition: { x: 18, y: 18 },
     webPreferences: {
+      preload: backupPath ? path.join(__dirname, 'libraryRestore.cjs') : undefined,
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: true,

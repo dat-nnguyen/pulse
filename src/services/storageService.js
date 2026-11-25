@@ -54,6 +54,35 @@ export async function getDB() {
   return opening;
 }
 
+export async function restoreLibraryBackup(backup) {
+  if (!backup || typeof backup.id !== 'string' || !backup.id ||
+      !Array.isArray(backup.tracks) || !Array.isArray(backup.playlists) || !Array.isArray(backup.likes)) {
+    throw new Error('Invalid Pulse library backup');
+  }
+  const db = await getDB();
+  const tx = db.transaction(['tracks', 'playlists', 'likes', 'settings'], 'readwrite');
+  const settings = tx.objectStore('settings');
+  const key = `library-restore:${backup.id}`;
+  if (await settings.get(key)) return tx.done;
+
+  for (const name of ['tracks', 'playlists', 'likes']) {
+    const store = tx.objectStore(name);
+    for (const entry of backup[name]) {
+      if (typeof entry?.id !== 'string' || !entry.id || await store.getKey(entry.id)) continue;
+      if (name === 'tracks') {
+        const track = { ...entry, addedAt: entry.addedAt || Date.now(), isDownloaded: false };
+        delete track.audioBlob;
+        delete track.hasSeparateAudio;
+        await store.add(track);
+      } else {
+        await store.add(entry);
+      }
+    }
+  }
+  await settings.put(true, key);
+  await tx.done;
+}
+
 // Keep iOS audio files separate from metadata. Rewriting a File-backed Blob
 // during cloud reconciliation can invalidate WebKit's existing Blob handles.
 async function hydrateTrack(db, track) {

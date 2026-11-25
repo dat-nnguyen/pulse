@@ -115,7 +115,8 @@ export async function fetchTracksFromSupabase() {
   const rows = readCloudRows(await client
     .from('tracks')
     .select('*')
-    .order('created_at', { ascending: false }));
+    .order('created_at', { ascending: false })
+    .abortSignal(AbortSignal.timeout(8000)));
 
   const clientCreds = getSupabaseCredentials();
   const storageBase = clientCreds.url ? `${clientCreds.url}/storage/v1/object/public/audio-files/audio` : '';
@@ -157,8 +158,8 @@ export async function fetchPlaylistsFromSupabase() {
   if (!client) throw new Error('Supabase is not configured');
 
   const [playlists, tracksJunction] = (await Promise.all([
-    client.from('playlists').select('*'),
-    client.from('playlist_tracks').select('*').order('position'),
+    client.from('playlists').select('*').abortSignal(AbortSignal.timeout(8000)),
+    client.from('playlist_tracks').select('*').order('position').abortSignal(AbortSignal.timeout(8000)),
   ])).map(readCloudRows);
 
   const junctionMap = {};
@@ -219,7 +220,7 @@ export async function fetchLikesFromSupabase() {
   const client = getSupabaseClient();
   if (!client) throw new Error('Supabase is not configured');
 
-  const rows = readCloudRows(await client.from('likes').select('track_id'));
+  const rows = readCloudRows(await client.from('likes').select('track_id').abortSignal(AbortSignal.timeout(8000)));
   return new Set(rows.map((d) => d.track_id));
 }
 

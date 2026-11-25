@@ -281,6 +281,25 @@ needed for installation; the installed native app then launches from the home sc
 
 Pulse includes cloud synchronization powered by Supabase for cross-device library and playlist parity.
 
+When a cloud request fails, Pulse keeps the local library and waits for a complete
+cloud response before reconciling tracks, playlists, and likes. Downloaded tracks
+can still play from the device. With the Mac companion reachable, Pulse can also
+play original audio files for tracks packaged as HLS in cloud storage.
+
+If Cloud Sync shows a project restriction (HTTP 402), check usage and billing in
+the Supabase dashboard. After the restriction is lifted, return to Pulse or use
+**Cloud Sync → Sync Now** to refresh. Keep the existing Pulse installation to
+retain its local library and downloads.
+
+For a local recovery, a backup JSON contains a unique `id` and arrays named
+`tracks`, `playlists`, and `likes`. Pulse imports missing records once and keeps
+existing records. On Mac, quit Pulse and launch the installed app with
+`open -a Pulse --env PULSE_LIBRARY_RESTORE=/path/to/backup.json`. For iPhone, set
+`PULSE_LIBRARY_RESTORE` to that path while running `npm run ios:build`, then build
+and install from Xcode. Rebuild without the variable after the import to remove
+the backup from the app bundle. The JSON carries library records only, so audio
+still needs a source such as the Mac cache.
+
 ### 1. Environment Configuration
 
 Create a `.env` file in the project root:

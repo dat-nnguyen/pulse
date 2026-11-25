@@ -81,8 +81,8 @@ export async function testSupabaseConnection(url, key) {
     const client = createClient(url.trim(), key.trim(), {
       auth: { persistSession: false },
     });
-    // Try a lightweight auth check rather than querying a table
-    const { error } = await client.auth.getSession();
+    const { error } = await client.from('tracks').select('id', { head: true }).limit(1)
+      .abortSignal(AbortSignal.timeout(8000));
     if (error) {
       return { success: false, error: error.message };
     }

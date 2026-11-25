@@ -20,7 +20,7 @@ import {
 } from '../services/supabaseClient';
 import { syncLibraryWithCloud } from '../services/storageService';
 
-export default function SupabaseModal({ isOpen, onClose, onSyncSuccess }) {
+export default function SupabaseModal({ isOpen, onClose, onSyncSuccess, cloudIssue, onCloudIssue }) {
   const credentials = getSupabaseCredentials();
   const [supabaseUrl, setSupabaseUrl] = useState(credentials.url || '');
   const [supabaseKey, setSupabaseKey] = useState(credentials.key || '');
@@ -54,6 +54,7 @@ export default function SupabaseModal({ isOpen, onClose, onSyncSuccess }) {
     setSyncStatus(null);
     try {
       const res = await syncLibraryWithCloud(true);
+      onCloudIssue(res.reason === 'cloud-unavailable' ? { status: res.status } : null);
       if (res.synced) {
         setSyncStatus({
           type: 'success',
@@ -123,10 +124,12 @@ export default function SupabaseModal({ isOpen, onClose, onSyncSuccess }) {
             <Cloud size={20} color={isConnected ? 'var(--pulse-accent)' : 'var(--text-secondary)'} />
             <div>
               <div style={{ fontSize: 13.5, fontWeight: 700, color: '#f8fafc' }}>
-                {isConnected ? 'Connected to Supabase Cloud' : 'Local Offline Mode (IndexedDB)'}
+                {cloudIssue ? 'Cloud Sync unavailable' : isConnected ? 'Connected to Supabase Cloud' : 'Local Offline Mode'}
               </div>
               <div style={{ fontSize: 11.5, color: '#94a3b8' }}>
-                {isConnected
+                {cloudIssue?.status === 402
+                  ? 'Supabase has restricted this project. Check usage and billing in your dashboard.'
+                  : cloudIssue ? 'Pulse can play downloaded tracks and audio available on your Mac.' : isConnected
                   ? 'Tracks, playlists & audio files sync across iPhone & Mac'
                   : 'Operating locally on device with zero cloud latency'}
               </div>

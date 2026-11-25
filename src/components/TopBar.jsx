@@ -30,8 +30,10 @@ export default function TopBar({
   onGoForward,
   onGoHome,
   activeDownloads = { isDownloading: false, count: 0 },
+  cloudIssue,
 }) {
   const isCloudConnected = isSupabaseConfigured();
+  const cloudLabel = cloudIssue ? 'Cloud Sync unavailable' : 'Cloud Sync';
 
   return (
     <header className="aura-top-bar">
@@ -166,9 +168,9 @@ export default function TopBar({
                 width: 6,
                 height: 6,
                 borderRadius: '50%',
-                background: '#10b981',
+                background: cloudIssue ? 'var(--pulse-warning)' : '#10b981',
               }}
-              title="Cloud Sync Active"
+              title={cloudLabel}
             />
           </button>
         ) : (
@@ -223,11 +225,11 @@ export default function TopBar({
         <button
           className="aura-circle-btn"
           onClick={onOpenSupabase}
-          title={isCloudConnected ? "Cloud Sync: Connected (Supabase)" : "Cloud Sync: Connect Supabase"}
+          title={cloudLabel}
           style={{ width: 34, height: 34, position: 'relative' }}
-          aria-label="Cloud Sync"
+          aria-label={cloudLabel}
         >
-          <Cloud size={16} color={isCloudConnected ? "var(--pulse-accent)" : "currentColor"} />
+          <Cloud size={16} color={cloudIssue ? 'var(--pulse-warning)' : isCloudConnected ? 'var(--pulse-accent)' : 'currentColor'} />
           {isCloudConnected && (
             <span
               style={{
@@ -237,8 +239,7 @@ export default function TopBar({
                 width: 6,
                 height: 6,
                 borderRadius: '50%',
-                background: '#10b981',
-                boxShadow: '0 0 6px rgba(16, 185, 129, 0.8)',
+                background: cloudIssue ? 'var(--pulse-warning)' : '#10b981',
               }}
             />
           )}

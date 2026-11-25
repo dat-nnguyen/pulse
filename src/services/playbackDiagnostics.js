@@ -13,7 +13,10 @@ export async function auditPlaylistSources(tracks, playlists) {
     } catch (error) { return { error: error.name }; }
   };
   const backend = getBackendBaseUrl();
-  console.info('Pulse source audit', JSON.stringify({ companion: backend ? await probe(`${backend}/api/status`) : null }));
+  console.info('Pulse source audit', JSON.stringify({
+    tracks: tracks.length, playlists: playlists.length, cached: tracks.filter((track) => track.audioBlob?.size).length,
+    companion: backend || window.location.port === '3030' ? await probe(`${backend}/api/status`) : null,
+  }));
   for (let index = 0; index < playlists.length; index += 1) {
     const ids = new Set(playlists[index].trackIds || []);
     const items = tracks.filter((track) => ids.has(track.id));
